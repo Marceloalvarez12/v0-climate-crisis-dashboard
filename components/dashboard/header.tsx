@@ -1,0 +1,74 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { Bell, Settings, Zap, Radio } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+
+export function DashboardHeader() {
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const [alertCount, setAlertCount] = useState(3)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (Math.random() > 0.7) {
+        setAlertCount(prev => Math.min(prev + 1, 9))
+      }
+    }, 10000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+          <Zap className="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-base font-bold text-foreground">Centro de Crisis Climaticas</h1>
+          <p className="text-[10px] text-muted-foreground">Sistema de Monitoreo de Agente IA</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 sm:flex">
+          <Radio className="h-3 w-3 text-success animate-pulse" />
+          <span className="text-xs text-muted-foreground">Sistema Activo</span>
+        </div>
+
+        <div className="hidden rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 font-mono text-xs text-foreground md:block">
+          {currentTime.toLocaleString("es-AR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })}
+        </div>
+
+        <Button variant="ghost" size="icon" className="relative h-8 w-8">
+          <Bell className="h-4 w-4" />
+          {alertCount > 0 && (
+            <Badge className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center bg-primary p-0 text-[10px]">
+              {alertCount}
+            </Badge>
+          )}
+        </Button>
+
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Settings className="h-4 w-4" />
+        </Button>
+      </div>
+    </header>
+  )
+}
