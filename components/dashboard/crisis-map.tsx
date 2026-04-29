@@ -631,7 +631,7 @@ export function CrisisMap() {
 
       {/* Incident Detail Modal */}
       <Dialog open={!!selectedIncident && !showDeployModal} onOpenChange={handleCloseDetails}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto z-[9999]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <div className={cn("rounded-full p-2", getSeverityColor(selectedIncident?.severity || "low"))}>
@@ -788,7 +788,7 @@ export function CrisisMap() {
 
       {/* Deploy Resources Modal */}
       <Dialog open={showDeployModal} onOpenChange={handleCloseDeploy}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md z-[9999]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Send className="h-5 w-5 text-primary" />
