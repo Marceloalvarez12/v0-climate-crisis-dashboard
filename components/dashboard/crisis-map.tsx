@@ -65,41 +65,41 @@ const incidents: Incident[] = [
     id: "1", 
     type: "flood", 
     severity: "critical", 
-    location: "Centro Historico", 
+    location: "Centro Historico - Plaza Independencia", 
     coordinates: { lat: -26.8241, lng: -65.2226 }, 
     affectedPeople: 1250, 
-    timestamp: new Date(),
+    timestamp: new Date(Date.now() - 15 * 60000),
     source: "social",
     sourceDetails: {
       platform: "X (Twitter)",
       username: "@tucuman_alerta",
-      content: "URGENTE: Inundacion severa en Plaza Independencia. El agua supera los 50cm. Vecinos atrapados en edificios. Se necesita ayuda inmediata. #InundacionTucuman",
-      imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=400"
+      content: "URGENTE: Inundacion severa en Plaza Independencia. El agua supera los 50cm en calles San Martin y 24 de Septiembre. Vecinos atrapados en edificios del microcentro. Se necesita ayuda inmediata. Bomberos desbordados. #InundacionTucuman #EmergenciaSMT",
+      imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600&h=400&fit=crop"
     }
   },
   { 
     id: "2", 
     type: "fire", 
     severity: "high", 
-    location: "Barrio Norte", 
+    location: "Barrio Norte - Deposito Industrial", 
     coordinates: { lat: -26.8050, lng: -65.2100 }, 
     affectedPeople: 340, 
-    timestamp: new Date(),
+    timestamp: new Date(Date.now() - 8 * 60000),
     source: "camera",
     sourceDetails: {
       cameraId: "CAM-BN-047",
-      cameraLocation: "Av. Mate de Luna y Laprida",
-      imageUrl: "https://images.unsplash.com/photo-1493246507139-91e8fad9978e?w=400"
+      cameraLocation: "Av. Mate de Luna esquina Laprida - Camara Municipal #47",
+      imageUrl: "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=600&h=400&fit=crop"
     }
   },
   { 
     id: "3", 
     type: "storm", 
     severity: "medium", 
-    location: "Yerba Buena", 
+    location: "Yerba Buena - Country Jockey Club", 
     coordinates: { lat: -26.8167, lng: -65.2833 }, 
     affectedPeople: 890, 
-    timestamp: new Date(),
+    timestamp: new Date(Date.now() - 25 * 60000),
     source: "sensor",
     sourceDetails: {
       sensorId: "WS-YB-012",
@@ -111,26 +111,26 @@ const incidents: Incident[] = [
     id: "4", 
     type: "flood", 
     severity: "high", 
-    location: "San Pablo", 
+    location: "Barrio San Pablo - Canal Norte", 
     coordinates: { lat: -26.8400, lng: -65.2500 }, 
     affectedPeople: 720, 
-    timestamp: new Date(),
+    timestamp: new Date(Date.now() - 12 * 60000),
     source: "social",
     sourceDetails: {
       platform: "X (Twitter)",
       username: "@rescate_tucuman",
-      content: "Canal San Pablo desbordado. Evacuacion en curso. Multiples familias afectadas. Bomberos en el lugar.",
-      imageUrl: "https://images.unsplash.com/photo-1446824505046-e43605ffb17f?w=400"
+      content: "ACTUALIZACION: Canal San Pablo completamente desbordado en altura de calle Honduras. Evacuacion de 180 familias en curso. Bomberos Voluntarios y Defensa Civil trabajando. Corte total de Av. Ejercito del Norte. Eviten la zona. #AlertaTucuman",
+      imageUrl: "https://images.unsplash.com/photo-1446824505046-e43605ffb17f?w=600&h=400&fit=crop"
     }
   },
   { 
     id: "5", 
     type: "general", 
     severity: "low", 
-    location: "El Manantial", 
+    location: "El Manantial - Ruta 301", 
     coordinates: { lat: -26.8600, lng: -65.2700 }, 
     affectedPeople: 150, 
-    timestamp: new Date(),
+    timestamp: new Date(Date.now() - 45 * 60000),
     source: "sensor",
     sourceDetails: {
       sensorId: "WS-EM-003",
@@ -142,45 +142,77 @@ const incidents: Incident[] = [
     id: "6", 
     type: "fire", 
     severity: "critical", 
-    location: "Villa 9 de Julio", 
+    location: "Villa 9 de Julio - Fabrica Textil", 
     coordinates: { lat: -26.7950, lng: -65.2350 }, 
     affectedPeople: 560, 
-    timestamp: new Date(),
+    timestamp: new Date(Date.now() - 5 * 60000),
     source: "camera",
     sourceDetails: {
       cameraId: "CAM-V9J-023",
-      cameraLocation: "Av. Roca y Catamarca",
-      imageUrl: "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=400"
+      cameraLocation: "Av. Roca y Catamarca - Sistema de Videovigilancia Municipal",
+      imageUrl: "https://images.unsplash.com/photo-1486551937199-baf066858de7?w=600&h=400&fit=crop"
     }
   },
   { 
     id: "7", 
     type: "storm", 
     severity: "high", 
-    location: "Banda del Rio Sali", 
+    location: "Banda del Rio Sali - Zona Industrial", 
     coordinates: { lat: -26.8480, lng: -65.1650 }, 
     affectedPeople: 430, 
-    timestamp: new Date(),
+    timestamp: new Date(Date.now() - 18 * 60000),
     source: "social",
     sourceDetails: {
       platform: "X (Twitter)",
       username: "@meteo_noa",
-      content: "Alerta roja por tormenta electrica en Banda del Rio Sali. Vientos de hasta 80km/h. Arboles caidos. Precaucion extrema.",
+      content: "ALERTA METEOROLOGICA ROJA para Banda del Rio Sali y alrededores. Registramos rafagas de viento de 85km/h. Multiples arboles caidos en Av. Mitre. Corte de energia en 12 manzanas. SMN confirma continuara las proximas 2hs. #TormentaTucuman #AlertaRoja",
+      imageUrl: "https://images.unsplash.com/photo-1527482937786-6f4c6c3fd49c?w=600&h=400&fit=crop"
     }
   },
   { 
     id: "8", 
     type: "flood", 
     severity: "medium", 
-    location: "Las Talitas", 
+    location: "Las Talitas - Barrio Mutual", 
     coordinates: { lat: -26.7700, lng: -65.2050 }, 
     affectedPeople: 280, 
-    timestamp: new Date(),
+    timestamp: new Date(Date.now() - 35 * 60000),
     source: "sensor",
     sourceDetails: {
       sensorId: "FL-LT-008",
       temperature: 20,
       humidity: 88
+    }
+  },
+  { 
+    id: "9", 
+    type: "flood", 
+    severity: "critical", 
+    location: "Barrio Sur - Av. Roca", 
+    coordinates: { lat: -26.8350, lng: -65.2180 }, 
+    affectedPeople: 980, 
+    timestamp: new Date(Date.now() - 3 * 60000),
+    source: "social",
+    sourceDetails: {
+      platform: "X (Twitter)",
+      username: "@emergencias_tuc",
+      content: "EMERGENCIA MAXIMA en Barrio Sur. Av. Roca intransitable desde Corrientes hasta Chacabuco. Agua ingresando a viviendas. Hospital Centro de Salud Sur solicita evacuacion de pacientes. Ambulancias no pueden acceder. Necesitamos lanchas URGENTE. #SOSTucuman",
+      imageUrl: "https://images.unsplash.com/photo-1583245177184-4ab53e5e391a?w=600&h=400&fit=crop"
+    }
+  },
+  { 
+    id: "10", 
+    type: "fire", 
+    severity: "medium", 
+    location: "Tafi Viejo - Talleres Ferroviarios", 
+    coordinates: { lat: -26.7320, lng: -65.2570 }, 
+    affectedPeople: 85, 
+    timestamp: new Date(Date.now() - 22 * 60000),
+    source: "camera",
+    sourceDetails: {
+      cameraId: "CAM-TV-011",
+      cameraLocation: "Entrada Talleres Ferroviarios - Camara de Seguridad Industrial",
+      imageUrl: "https://images.unsplash.com/photo-1493246507139-91e8fad9978e?w=600&h=400&fit=crop"
     }
   },
 ]
