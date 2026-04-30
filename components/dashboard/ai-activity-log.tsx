@@ -312,8 +312,8 @@ export function AIActivityLog() {
   }
 
   return (
-    <div className="flex h-full flex-col rounded-lg border border-border bg-card">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+    <div className="flex h-full flex-col rounded-lg border border-border bg-card overflow-hidden">
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3 shrink-0">
         <div className="relative">
           <div className="h-2 w-2 rounded-full bg-success" />
           <div className="absolute inset-0 h-2 w-2 rounded-full bg-success animate-pulse-ring" />
@@ -323,7 +323,8 @@ export function AIActivityLog() {
           Activo
         </Badge>
       </div>
-      <ScrollArea className="flex-1 px-2 py-2" ref={scrollRef}>
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <ScrollArea className="h-full px-2 py-2 custom-scrollbar" ref={scrollRef}>
         <div className="space-y-2">
           {activities.map((activity) => {
             const isProcessed = processedAlerts.has(activity.id)
@@ -483,7 +484,8 @@ export function AIActivityLog() {
             )
           })}
         </div>
-      </ScrollArea>
+        </ScrollArea>
+      </div>
 
       {/* Confirmation Dialog */}
       <AlertDialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}>

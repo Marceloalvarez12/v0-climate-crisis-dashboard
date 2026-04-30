@@ -491,18 +491,19 @@ export function CrisisMap() {
         </div>
       </div>
 
-      {/* Incident List Sidebar - for clicking */}
-      <div className="absolute left-3 top-14 bottom-14 z-[1000] w-64 overflow-y-auto rounded-lg border border-border bg-card/95 backdrop-blur-sm">
-        <div className="sticky top-0 border-b border-border bg-card px-3 py-2">
+      {/* Incident List Panel - Top Right */}
+      <div className="absolute right-3 top-14 z-[1000] w-64 max-h-[240px] rounded-lg border border-border bg-card/95 backdrop-blur-sm shadow-xl">
+        <div className="flex items-center justify-between border-b border-border bg-card px-3 py-2 rounded-t-lg">
           <p className="text-xs font-semibold text-foreground">Incidentes Activos ({filteredIncidents.length})</p>
+          <Badge variant="outline" className="text-[9px] border-primary/50 text-primary animate-pulse">En vivo</Badge>
         </div>
-        <div className="p-2 space-y-2">
+        <div className="overflow-y-auto max-h-[190px] p-2 space-y-1.5 custom-scrollbar">
           {filteredIncidents.map((incident) => (
             <button
               key={incident.id}
               onClick={() => handleOpenDetails(incident)}
               className={cn(
-                "w-full text-left rounded-lg border p-2 transition-all hover:bg-secondary/50",
+                "w-full text-left rounded-lg border p-2 transition-all hover:bg-secondary/50 hover:scale-[1.01]",
                 incident.severity === "critical" ? "border-primary/50 bg-primary/5" :
                 incident.severity === "high" ? "border-accent/50 bg-accent/5" :
                 "border-border"
