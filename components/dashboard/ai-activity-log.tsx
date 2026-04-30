@@ -1,11 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Bot, Search, MapPin, AlertTriangle, Database, Radio, CheckCircle2, Rocket, Bell, X } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { 
+  Bot, Search, MapPin, AlertTriangle, Database, Radio, CheckCircle2, 
+  Rocket, Bell, X, Brain, Sparkles, Target, Satellite, Loader2,
+  ChevronDown, ChevronUp, Zap
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,37 +23,116 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 
+interface ReasoningStep {
+  step: number
+  thought: string
+  action?: string
+  result?: string
+}
+
 interface ActivityItem {
   id: string
-  type: "extraction" | "analysis" | "alert" | "database" | "monitoring" | "complete"
+  type: "extraction" | "analysis" | "alert" | "database" | "monitoring" | "complete" | "reasoning"
   message: string
   timestamp: Date
   isNew?: boolean
   actionable?: boolean
   location?: string
   severity?: "critical" | "high" | "medium" | "low"
+  confidence?: number
+  reasoning?: ReasoningStep[]
 }
 
 const initialActivities: ActivityItem[] = [
   { id: "1", type: "monitoring", message: "Sistema de monitoreo iniciado", timestamp: new Date(Date.now() - 300000) },
   { id: "2", type: "extraction", message: "Extrayendo datos de X (Twitter)...", timestamp: new Date(Date.now() - 240000) },
-  { id: "3", type: "analysis", message: "Analizando menciones de inundaciones en Salta", timestamp: new Date(Date.now() - 180000) },
+  { 
+    id: "3", 
+    type: "reasoning", 
+    message: "Analizando menciones de inundaciones en Tucuman", 
+    timestamp: new Date(Date.now() - 180000),
+    confidence: 92,
+    reasoning: [
+      { step: 1, thought: "Detectados 47 tweets con palabras clave: 'inundacion', 'agua', 'evacuacion' en San Miguel de Tucuman" },
+      { step: 2, thought: "Geolocalizando tweets... 38 tienen coordenadas verificables" },
+      { step: 3, thought: "Cruzando con datos historicos de zonas inundables...", action: "Consultando base de datos municipal" },
+      { step: 4, thought: "Patron detectado: 89% de reportes concentrados en radio de 2km del Centro Historico", result: "ALERTA VALIDADA" },
+    ]
+  },
   { id: "4", type: "database", message: "Guardando 47 reportes en base de datos", timestamp: new Date(Date.now() - 120000) },
-  { id: "5", type: "alert", message: "Identificando zona de riesgo en Centro Historico", timestamp: new Date(Date.now() - 60000), actionable: true, location: "Centro Historico, Tucuman", severity: "critical" },
-  { id: "6", type: "complete", message: "Coordenadas enviadas a equipos de rescate", timestamp: new Date(Date.now() - 30000) },
 ]
 
-const newMessages = [
-  { type: "extraction" as const, message: "Extrayendo datos de redes sociales..." },
-  { type: "analysis" as const, message: "Procesando imagenes satelitales de zona sur..." },
-  { type: "alert" as const, message: "Nuevo incidente detectado en Yerba Buena", actionable: true, location: "Yerba Buena, Tucuman", severity: "high" as const },
-  { type: "database" as const, message: "Actualizando base de datos de recursos" },
-  { type: "monitoring" as const, message: "Escaneando noticias locales de La Gaceta..." },
-  { type: "complete" as const, message: "Alerta enviada a Defensa Civil" },
-  { type: "alert" as const, message: "Alerta critica: Inundacion en San Pablo", actionable: true, location: "San Pablo, Tucuman", severity: "critical" as const },
-  { type: "analysis" as const, message: "IA analizando patrones de evacuacion..." },
-  { type: "extraction" as const, message: "Recopilando datos de sensores meteorologicos..." },
-  { type: "alert" as const, message: "Incendio reportado en Villa 9 de Julio", actionable: true, location: "Villa 9 de Julio, Tucuman", severity: "critical" as const },
+const newMessages: Omit<ActivityItem, "id" | "timestamp">[] = [
+  { 
+    type: "alert", 
+    message: "Identificando zona de riesgo en Centro Historico", 
+    actionable: true, 
+    location: "Centro Historico, Tucuman", 
+    severity: "critical",
+    confidence: 94,
+    reasoning: [
+      { step: 1, thought: "Tweet de @tucuman_alerta reporta inundacion severa" },
+      { step: 2, thought: "Verificando fuente... Usuario verificado con historial confiable (Score: 8.7/10)" },
+      { step: 3, thought: "Imagen adjunta analizada con Vision AI: agua visible en calles, nivel estimado 40-60cm", action: "Procesando imagen con modelo de deteccion" },
+      { step: 4, thought: "Correlacionando con sensores de lluvia cercanos: 85mm en ultima hora", result: "CONFIRMADO - Nivel de confianza 94%" },
+    ]
+  },
+  { type: "complete", message: "Coordenadas enviadas a equipos de rescate" },
+  { type: "extraction", message: "Extrayendo datos de redes sociales..." },
+  { 
+    type: "reasoning", 
+    message: "IA analizando patrones de evacuacion...", 
+    confidence: 78,
+    reasoning: [
+      { step: 1, thought: "Analizando flujo de trafico en tiempo real via Google Maps API" },
+      { step: 2, thought: "Identificando rutas de evacuacion optimas...", action: "Calculando 3 rutas alternativas" },
+      { step: 3, thought: "Ruta por Av. Mate de Luna BLOQUEADA - arboles caidos reportados" },
+      { step: 4, thought: "Ruta recomendada: Av. Sarmiento -> Ruta 9 Norte", result: "Tiempo estimado evacuacion: 45 min" },
+    ]
+  },
+  { type: "database", message: "Actualizando base de datos de recursos" },
+  { type: "monitoring", message: "Escaneando noticias locales de La Gaceta..." },
+  { 
+    type: "alert", 
+    message: "ALERTA CRITICA: Desborde detectado en Canal Norte", 
+    actionable: true, 
+    location: "Barrio San Pablo, Tucuman", 
+    severity: "critical",
+    confidence: 97,
+    reasoning: [
+      { step: 1, thought: "Sensor FL-CN-001 reporta nivel de agua critico: 4.2m (umbral: 3.5m)" },
+      { step: 2, thought: "Confirmando con camara de seguridad CAM-SP-012...", action: "Analizando feed en vivo" },
+      { step: 3, thought: "Vision AI detecta desbordamiento activo - agua ingresando a zona residencial" },
+      { step: 4, thought: "Poblacion en riesgo estimada: 720 personas en radio de 500m", result: "EVACUACION INMEDIATA REQUERIDA" },
+    ]
+  },
+  { type: "complete", message: "Alerta enviada a Defensa Civil" },
+  { 
+    type: "reasoning", 
+    message: "Prediciendo expansion de zona afectada...", 
+    confidence: 85,
+    reasoning: [
+      { step: 1, thought: "Modelo hidrologico cargado: TucumanFlood_v3.2" },
+      { step: 2, thought: "Inputs: precipitacion actual, topografia, nivel de canales", action: "Ejecutando simulacion" },
+      { step: 3, thought: "Proyeccion a 2 horas: expansion hacia Barrio Sur probable (73%)" },
+      { step: 4, thought: "Recomendacion: alertar preventivamente a 340 familias adicionales", result: "Alerta preventiva generada" },
+    ]
+  },
+  { type: "extraction", message: "Recopilando datos de sensores meteorologicos..." },
+  { 
+    type: "alert", 
+    message: "Incendio reportado en Villa 9 de Julio", 
+    actionable: true, 
+    location: "Villa 9 de Julio, Tucuman", 
+    severity: "critical",
+    confidence: 91,
+    reasoning: [
+      { step: 1, thought: "Camara CAM-V9J-023 detecta humo y llamas en sector industrial" },
+      { step: 2, thought: "Cruzando con reportes de redes sociales: 12 menciones en ultimos 5 minutos" },
+      { step: 3, thought: "Servicio meteorologico indica vientos de 25km/h direccion NE", action: "Calculando propagacion" },
+      { step: 4, thought: "Riesgo de propagacion a zona residencial en 45 minutos si no se interviene", result: "ACCION INMEDIATA REQUERIDA" },
+    ]
+  },
 ]
 
 const getIcon = (type: ActivityItem["type"]) => {
@@ -65,6 +149,8 @@ const getIcon = (type: ActivityItem["type"]) => {
       return <Radio className="h-3.5 w-3.5" />
     case "complete":
       return <CheckCircle2 className="h-3.5 w-3.5" />
+    case "reasoning":
+      return <Brain className="h-3.5 w-3.5" />
   }
 }
 
@@ -82,6 +168,8 @@ const getIconColor = (type: ActivityItem["type"]) => {
       return "text-accent"
     case "complete":
       return "text-success"
+    case "reasoning":
+      return "text-purple-400"
   }
 }
 
@@ -108,25 +196,36 @@ export function AIActivityLog() {
     activity: ActivityItem | null
   }>({ open: false, type: "deploy", activity: null })
   const [processedAlerts, setProcessedAlerts] = useState<Set<string>>(new Set())
+  const [expandedReasoning, setExpandedReasoning] = useState<Set<string>>(new Set())
+  const [validatingSatellite, setValidatingSatellite] = useState<string | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const messageIndexRef = useRef(0)
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const randomMessage = newMessages[Math.floor(Math.random() * newMessages.length)]
+      const template = newMessages[messageIndexRef.current % newMessages.length]
       const newActivity: ActivityItem = {
+        ...template,
         id: Date.now().toString(),
-        type: randomMessage.type,
-        message: randomMessage.message,
         timestamp: new Date(),
         isNew: true,
-        actionable: randomMessage.actionable,
-        location: randomMessage.location,
-        severity: randomMessage.severity,
       }
-      setActivities(prev => [...prev.slice(-15), newActivity])
+      setActivities(prev => [...prev.slice(-20), newActivity])
+      messageIndexRef.current += 1
     }, 4000)
 
     return () => clearInterval(interval)
   }, [])
+
+  // Auto scroll to bottom
+  useEffect(() => {
+    if (scrollRef.current) {
+      const scrollElement = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]')
+      if (scrollElement) {
+        scrollElement.scrollTop = scrollElement.scrollHeight
+      }
+    }
+  }, [activities])
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -140,6 +239,37 @@ export function AIActivityLog() {
     setConfirmDialog({ open: true, type: "notify", activity })
   }
 
+  const toggleReasoning = (activityId: string) => {
+    setExpandedReasoning(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(activityId)) {
+        newSet.delete(activityId)
+      } else {
+        newSet.add(activityId)
+      }
+      return newSet
+    })
+  }
+
+  const handleValidateSatellite = async (activityId: string) => {
+    setValidatingSatellite(activityId)
+    
+    // Simular llamada a API satelital
+    await new Promise(resolve => setTimeout(resolve, 2500))
+    
+    toast.success("Validacion Satelital Completada", {
+      description: "Imagen Sentinel-2 confirma anomalia en la zona. Confianza aumentada a 98%.",
+    })
+    
+    setActivities(prev => prev.map(act => 
+      act.id === activityId 
+        ? { ...act, confidence: 98 }
+        : act
+    ))
+    
+    setValidatingSatellite(null)
+  }
+
   const confirmAction = () => {
     if (!confirmDialog.activity) return
 
@@ -151,7 +281,6 @@ export function AIActivityLog() {
         description: `Unidades de emergencia enviadas a ${confirmDialog.activity.location}`,
       })
       
-      // Add completion activity
       const completeActivity: ActivityItem = {
         id: Date.now().toString(),
         type: "complete",
@@ -165,7 +294,6 @@ export function AIActivityLog() {
         description: `Defensa Civil y Bomberos alertados sobre ${confirmDialog.activity.location}`,
       })
       
-      // Add completion activity
       const completeActivity: ActivityItem = {
         id: Date.now().toString(),
         type: "complete",
@@ -195,17 +323,19 @@ export function AIActivityLog() {
           Activo
         </Badge>
       </div>
-      <ScrollArea className="flex-1 px-2 py-2">
+      <ScrollArea className="flex-1 px-2 py-2" ref={scrollRef}>
         <div className="space-y-2">
           {activities.map((activity) => {
             const isProcessed = processedAlerts.has(activity.id)
             const showActions = activity.actionable && activity.type === "alert" && !isProcessed
+            const hasReasoning = activity.reasoning && activity.reasoning.length > 0
+            const isReasoningExpanded = expandedReasoning.has(activity.id)
 
             return (
               <div
                 key={activity.id}
                 className={cn(
-                  "rounded-md p-2.5 transition-colors",
+                  "rounded-md p-2.5 transition-all duration-300",
                   activity.isNew ? "bg-secondary/50 animate-in fade-in slide-in-from-top-2 duration-300" : "bg-transparent",
                   showActions && "border border-primary/30 bg-primary/5"
                 )}
@@ -219,9 +349,95 @@ export function AIActivityLog() {
                       <p className="text-xs text-foreground leading-relaxed">{activity.message}</p>
                       {activity.severity && getSeverityBadge(activity.severity)}
                     </div>
-                    <p className="mt-0.5 text-[10px] font-mono text-muted-foreground">
-                      {formatTime(activity.timestamp)}
-                    </p>
+                    
+                    {/* Confidence Badge */}
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-[10px] font-mono text-muted-foreground">
+                        {formatTime(activity.timestamp)}
+                      </p>
+                      {activity.confidence && (
+                        <Badge 
+                          variant="outline" 
+                          className="text-[9px] h-4 px-1.5 bg-purple-500/10 text-purple-400 border-purple-500/30"
+                        >
+                          <Target className="h-2.5 w-2.5 mr-0.5" />
+                          {activity.confidence}%
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Reasoning Toggle */}
+                    {hasReasoning && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 mt-1.5 text-[10px] text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 px-2 gap-1"
+                        onClick={() => toggleReasoning(activity.id)}
+                      >
+                        <Brain className="h-3 w-3" />
+                        {isReasoningExpanded ? "Ocultar" : "Ver"} Razonamiento
+                        {isReasoningExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      </Button>
+                    )}
+
+                    {/* Expanded Reasoning Panel */}
+                    {hasReasoning && isReasoningExpanded && (
+                      <div className="mt-2 p-2.5 rounded-md bg-purple-500/5 border border-purple-500/20 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <Sparkles className="h-3 w-3 text-purple-400" />
+                          <span className="text-[10px] font-medium text-purple-400">Cadena de Razonamiento</span>
+                        </div>
+                        <div className="space-y-2">
+                          {activity.reasoning?.map((step, idx) => (
+                            <div key={idx} className="flex gap-2 text-[10px]">
+                              <div className="flex-shrink-0 w-4 h-4 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 text-[9px] font-bold">
+                                {step.step}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-muted-foreground leading-relaxed">{step.thought}</p>
+                                {step.action && (
+                                  <p className="text-blue-400 mt-0.5 flex items-center gap-1">
+                                    <Zap className="h-2.5 w-2.5" />
+                                    {step.action}
+                                  </p>
+                                )}
+                                {step.result && (
+                                  <p className="text-green-400 mt-0.5 font-medium flex items-center gap-1">
+                                    <CheckCircle2 className="h-2.5 w-2.5" />
+                                    {step.result}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Validate with Satellite Button */}
+                        {activity.confidence && activity.confidence < 98 && (
+                          <div className="mt-2.5 pt-2 border-t border-purple-500/20">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full h-7 text-[10px] bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20"
+                              onClick={() => handleValidateSatellite(activity.id)}
+                              disabled={validatingSatellite === activity.id}
+                            >
+                              {validatingSatellite === activity.id ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  Consultando Sentinel-2...
+                                </>
+                              ) : (
+                                <>
+                                  <Satellite className="h-3 w-3 mr-1" />
+                                  Validar con Imagen Satelital
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     
                     {/* Action Buttons for Alerts */}
                     {showActions && (
@@ -271,7 +487,7 @@ export function AIActivityLog() {
 
       {/* Confirmation Dialog */}
       <AlertDialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}>
-        <AlertDialogContent>
+        <AlertDialogContent className="z-[9999]">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               {confirmDialog.type === "deploy" ? (
@@ -286,25 +502,39 @@ export function AIActivityLog() {
                 </>
               )}
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              {confirmDialog.type === "deploy" ? (
-                <>
-                  <p>Esta a punto de desplegar unidades de emergencia a:</p>
-                  <p className="font-semibold text-foreground">{confirmDialog.activity?.location}</p>
-                  <p className="text-xs">Se notificara a las unidades mas cercanas disponibles (ambulancias, bomberos, rescate).</p>
-                </>
-              ) : (
-                <>
-                  <p>Esta a punto de notificar a las siguientes autoridades:</p>
-                  <ul className="text-sm space-y-1 mt-2">
-                    <li>- Defensa Civil de Tucuman</li>
-                    <li>- Cuerpo de Bomberos</li>
-                    <li>- Policia de Tucuman</li>
-                    <li>- Sistema de Emergencias 911</li>
-                  </ul>
-                  <p className="font-semibold text-foreground mt-2">Ubicacion: {confirmDialog.activity?.location}</p>
-                </>
-              )}
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                {confirmDialog.type === "deploy" ? (
+                  <>
+                    <p>Esta a punto de desplegar unidades de emergencia a:</p>
+                    <p className="font-semibold text-foreground">{confirmDialog.activity?.location}</p>
+                  </>
+                ) : (
+                  <>
+                    <p>Notificar a las siguientes autoridades:</p>
+                    <ul className="text-sm space-y-1">
+                      <li>- Defensa Civil de Tucuman</li>
+                      <li>- Cuerpo de Bomberos</li>
+                      <li>- Policia de Tucuman</li>
+                    </ul>
+                    <p className="font-semibold text-foreground">Ubicacion: {confirmDialog.activity?.location}</p>
+                  </>
+                )}
+
+                {/* Confidence indicator */}
+                {confirmDialog.activity?.confidence && (
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Brain className="h-3 w-3" />
+                        Nivel de Confianza IA
+                      </span>
+                      <span className="text-sm font-bold text-purple-400">{confirmDialog.activity.confidence}%</span>
+                    </div>
+                    <Progress value={confirmDialog.activity.confidence} className="h-2" />
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
