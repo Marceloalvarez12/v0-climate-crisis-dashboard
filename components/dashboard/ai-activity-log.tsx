@@ -21,7 +21,28 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { toast } from "sonner"
+
+interface SatelliteValidation {
+  activity: ActivityItem
+  imageUrl: string
+  analysisData: {
+    waterDetected: boolean
+    affectedAreaKm2: number
+    vegetationDamage: string
+    thermalAnomaly: boolean
+    cloudCoverage: number
+    captureTime: string
+    satellite: string
+    resolution: string
+  }
+}
 
 interface ReasoningStep {
   step: number
@@ -198,6 +219,7 @@ export function AIActivityLog() {
   const [processedAlerts, setProcessedAlerts] = useState<Set<string>>(new Set())
   const [expandedReasoning, setExpandedReasoning] = useState<Set<string>>(new Set())
   const [validatingSatellite, setValidatingSatellite] = useState<string | null>(null)
+  const [satelliteModal, setSatelliteModal] = useState<SatelliteValidation | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const messageIndexRef = useRef(0)
 
@@ -257,9 +279,40 @@ export function AIActivityLog() {
     // Simular llamada a API satelital
     await new Promise(resolve => setTimeout(resolve, 2500))
     
-    toast.success("Validacion Satelital Completada", {
-      description: "Imagen Sentinel-2 confirma anomalia en la zona. Confianza aumentada a 98%.",
-    })
+    const activity = activities.find(a => a.id === activityId)
+    if (!activity) {
+      setValidatingSatellite(null)
+      return
+    }
+
+    // Determinar tipo de imagen basado en el tipo de incidente
+    const isFlood = activity.message.toLowerCase().includes("inundacion") || 
+                    activity.message.toLowerCase().includes("desborde") ||
+                    activity.message.toLowerCase().includes("agua")
+    const isFire = activity.message.toLowerCase().includes("incendio") || 
+                   activity.message.toLowerCase().includes("fuego")
+
+    // Generar datos de validacion
+    const validationData: SatelliteValidation = {
+      activity,
+      imageUrl: isFlood 
+        ? "https://images.unsplash.com/photo-1446824505046-e43605ffb17f?w=800&h=500&fit=crop"
+        : isFire 
+          ? "https://images.unsplash.com/photo-1486551937199-baf066858de7?w=800&h=500&fit=crop"
+          : "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&h=500&fit=crop",
+      analysisData: {
+        waterDetected: isFlood,
+        affectedAreaKm2: isFlood ? 2.4 : isFire ? 0.8 : 1.2,
+        vegetationDamage: isFire ? "Severo (78%)" : isFlood ? "Moderado (34%)" : "Bajo (12%)",
+        thermalAnomaly: isFire,
+        cloudCoverage: 15,
+        captureTime: new Date().toISOString(),
+        satellite: "Sentinel-2A",
+        resolution: "10m/pixel"
+      }
+    }
+
+    setSatelliteModal(validationData)
     
     setActivities(prev => prev.map(act => 
       act.id === activityId 
@@ -547,6 +600,113 @@ export function AIActivityLog() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Satellite Validation Modal */}
+      <Dialog open={!!satelliteModal} onOpenChange={() => setSatelliteModal(null)}>
+        <DialogContent className="max-w-2xl z-[9999]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Satellite className="h-5 w-5 text-blue-400" />
+              Validacion Satelital - Sentinel-2
+            </DialogTitle>
+          </DialogHeader>
+          
+          {satelliteModal && (
+            <div className="space-y-4">
+              {/* Satellite Image */}
+              <div className="relative rounded-lg overflow-hidden border border-border">
+                <img 
+                  src={satelliteModal.imageUrl} 
+                  alt="Imagen satelital de la zona afectada"
+                  className="w-full h-48 object-cover"
+                />
+                <div className="absolute top-2 left-2 flex gap-1.5">
+                  <Badge className="bg-green-500/90 text-white text-[10px]">EN VIVO</Badge>
+                  <Badge variant="outline" className="bg-background/80 text-[10px]">
+                    {satelliteModal.analysisData.satellite}
+                  </Badge>
+                </div>
+                <div className="absolute bottom-2 right-2">
+                  <Badge variant="outline" className="bg-background/80 text-[10px]">
+                    Res: {satelliteModal.analysisData.resolution}
+                  </Badge>
+                </div>
+                {/* Overlay grid effect */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                <div 
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    backgroundImage: `
+                      linear-gradient(to right, rgba(59, 130, 246, 0.1) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(59, 130, 246, 0.1) 1px, transparent 1px)
+                    `,
+                    backgroundSize: '20px 20px'
+                  }}
+                />
+              </div>
+
+              {/* Analysis Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                  <p className="text-[10px] text-muted-foreground mb-1">Deteccion de Agua</p>
+                  <p className={cn(
+                    "text-sm font-semibold",
+                    satelliteModal.analysisData.waterDetected ? "text-blue-400" : "text-muted-foreground"
+                  )}>
+                    {satelliteModal.analysisData.waterDetected ? "CONFIRMADO" : "No detectado"}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                  <p className="text-[10px] text-muted-foreground mb-1">Anomalia Termica</p>
+                  <p className={cn(
+                    "text-sm font-semibold",
+                    satelliteModal.analysisData.thermalAnomaly ? "text-primary" : "text-muted-foreground"
+                  )}>
+                    {satelliteModal.analysisData.thermalAnomaly ? "DETECTADA" : "Normal"}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                  <p className="text-[10px] text-muted-foreground mb-1">Area Afectada</p>
+                  <p className="text-sm font-semibold text-accent">
+                    {satelliteModal.analysisData.affectedAreaKm2} km²
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                  <p className="text-[10px] text-muted-foreground mb-1">Dano Vegetacion</p>
+                  <p className="text-sm font-semibold text-yellow-400">
+                    {satelliteModal.analysisData.vegetationDamage}
+                  </p>
+                </div>
+              </div>
+
+              {/* Confidence Update */}
+              <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-400" />
+                    <div>
+                      <p className="text-sm font-semibold text-green-400">Validacion Exitosa</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Imagen satelital confirma la anomalia reportada
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-muted-foreground">Confianza actualizada</p>
+                    <p className="text-xl font-bold text-green-400">98%</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Metadata */}
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 border-t border-border">
+                <span>Cobertura de nubes: {satelliteModal.analysisData.cloudCoverage}%</span>
+                <span>Captura: {new Date(satelliteModal.analysisData.captureTime).toLocaleString("es-AR")}</span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
