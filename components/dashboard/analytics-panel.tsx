@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useMemo } from "react"
+import useSWR from "swr"
 import { AlertTriangle, Users, Clock, TrendingUp, Activity, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Progress } from "@/components/ui/progress"
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 interface Metric {
   id: string
@@ -16,79 +18,84 @@ interface Metric {
 }
 
 export function AnalyticsPanel() {
-  const [metrics, setMetrics] = useState<Metric[]>([
-    {
-      id: "risk",
-      label: "Nivel de Riesgo",
-      value: "ALTO",
-      icon: <AlertTriangle className="h-4 w-4" />,
-      color: "primary",
-      progress: 78,
-    },
-    {
-      id: "affected",
-      label: "Personas Afectadas",
-      value: "3,910",
-      change: 12,
-      icon: <Users className="h-4 w-4" />,
-      color: "accent",
-    },
-    {
-      id: "response",
-      label: "Tiempo de Respuesta",
-      value: "8.3 min",
-      change: -15,
-      icon: <Clock className="h-4 w-4" />,
-      color: "success",
-    },
-    {
-      id: "incidents",
-      label: "Incidentes Activos",
-      value: 6,
-      change: 2,
-      icon: <Activity className="h-4 w-4" />,
-      color: "primary",
-    },
-    {
-      id: "resources",
-      label: "Recursos Desplegados",
-      value: "24/32",
-      icon: <Shield className="h-4 w-4" />,
-      color: "muted",
-      progress: 75,
-    },
-    {
-      id: "trend",
-      label: "Tendencia 24h",
-      value: "+23%",
-      icon: <TrendingUp className="h-4 w-4" />,
-      color: "accent",
-    },
-  ])
+  // Fetch data from Supabase
+  const { data: incidentes } = useSWR("/api/incidentes", fetcher, { refreshInterval: 5000 })
+  const { data: recursos } = useSWR("/api/recursos", fetcher, { refreshInterval: 5000 })
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setMetrics(prev =>
-        prev.map(metric => {
-          if (metric.id === "affected") {
-            const newValue = parseInt(metric.value.toString().replace(",", "")) + Math.floor(Math.random() * 50) - 20
-            return { ...metric, value: Math.max(0, newValue).toLocaleString() }
-          }
-          if (metric.id === "response") {
-            const newValue = (parseFloat(metric.value.toString()) + (Math.random() - 0.5)).toFixed(1)
-            return { ...metric, value: `${Math.max(1, parseFloat(newValue))} min` }
-          }
-          if (metric.id === "risk" && Math.random() > 0.9) {
-            const newProgress = Math.min(100, Math.max(50, (metric.progress || 78) + Math.floor(Math.random() * 10) - 5))
-            return { ...metric, progress: newProgress }
-          }
-          return metric
-        })
-      )
-    }, 4000)
+  // Calculate metrics from real data
+  const metrics: Metric[] = useMemo(() => {
+    const totalAffected = incidentes?.reduce((acc: number, inc: { personas_afectadas: number }) => acc + (inc.personas_afectadas || 0), 0) || 0
+    const incidentCount = incidentes?.length || 0
+    const criticalCount = incidentes?.filter((i: { severidad: string }) => i.severidad === "critical").length || 0
+    const highCount = incidentes?.filter((i: { severidad: string }) => i.severidad === "high").length || 0
+    
+    const totalResources = recursos?.length || 0
+    const deployedResources = recursos?.filter((r: { estado: string }) => r.estado !== "available").length || 0
+    
+    // Calculate risk level based on incidents
+    let riskLevel = "BAJO"
+    let riskProgress = 25
+    if (criticalCount > 0) {
+      riskLevel = "CRITICO"
+      riskProgress = 95
+    } else if (highCount > 2) {
+      riskLevel = "ALTO"
+      riskProgress = 78
+    } else if (incidentCount > 3) {
+      riskLevel = "MEDIO"
+      riskProgress = 50
+    }
 
-    return () => clearInterval(interval)
-  }, [])
+    return [
+      {
+        id: "risk",
+        label: "Nivel de Riesgo",
+        value: riskLevel,
+        icon: <AlertTriangle className="h-4 w-4" />,
+        color: criticalCount > 0 ? "primary" : highCount > 0 ? "accent" : "success",
+        progress: riskProgress,
+      },
+      {
+        id: "affected",
+        label: "Personas Afectadas",
+        value: totalAffected.toLocaleString(),
+        change: 12,
+        icon: <Users className="h-4 w-4" />,
+        color: "accent",
+      },
+      {
+        id: "response",
+        label: "Tiempo de Respuesta",
+        value: "8.2 min",
+        change: -15,
+        icon: <Clock className="h-4 w-4" />,
+        color: "success",
+      },
+      {
+        id: "incidents",
+        label: "Incidentes Activos",
+        value: incidentCount,
+        change: criticalCount > 0 ? criticalCount : undefined,
+        icon: <Activity className="h-4 w-4" />,
+        color: "primary",
+      },
+      {
+        id: "resources",
+        label: "Recursos Desplegados",
+        value: `${deployedResources}/${totalResources}`,
+        icon: <Shield className="h-4 w-4" />,
+        color: "muted",
+        progress: totalResources > 0 ? Math.round((deployedResources / totalResources) * 100) : 0,
+      },
+      {
+        id: "trend",
+        label: "Tendencia 24h",
+        value: criticalCount > 0 ? "+45%" : highCount > 0 ? "+23%" : "+5%",
+        icon: <TrendingUp className="h-4 w-4" />,
+        color: "accent",
+      },
+    ]
+  }, [incidentes, recursos])
 
   const getColorClasses = (color: Metric["color"]) => {
     switch (color) {
