@@ -325,7 +325,7 @@ export function AIActivityLog() {
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         <ScrollArea className="h-full px-2 py-2 custom-scrollbar" ref={scrollRef}>
-        <div className="space-y-2">
+          <div className="space-y-2">
           {activities.map((activity) => {
             const isProcessed = processedAlerts.has(activity.id)
             const showActions = activity.actionable && activity.type === "alert" && !isProcessed
@@ -483,7 +483,7 @@ export function AIActivityLog() {
               </div>
             )
           })}
-        </div>
+          </div>
         </ScrollArea>
       </div>
 
