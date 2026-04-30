@@ -8,8 +8,10 @@ import { CrisisMap } from "@/components/dashboard/crisis-map"
 import { AnalyticsPanel } from "@/components/dashboard/analytics-panel"
 import { BroadcastPanel } from "@/components/dashboard/broadcast-panel"
 import { LiveAlert } from "@/components/dashboard/live-alert"
+import { DevPanel } from "@/components/dashboard/dev-panel"
 import { Button } from "@/components/ui/button"
 import { Siren } from "lucide-react"
+import { Suspense } from "react"
 
 export default function CrisisDashboard() {
   const [showLiveAlert, setShowLiveAlert] = useState(false)
@@ -36,6 +38,11 @@ export default function CrisisDashboard() {
 
   return (
     <div className="flex h-screen flex-col bg-background">
+      {/* Dev Panel - Only visible with ?dev=true */}
+      <Suspense fallback={null}>
+        <DevPanel />
+      </Suspense>
+
       {/* Live Alert Overlay */}
       {showLiveAlert && (
         <LiveAlert onDismiss={() => setShowLiveAlert(false)} />
