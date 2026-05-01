@@ -1,101 +1,105 @@
 "use client"
 
-import { useMemo } from "react"
 import useSWR from "swr"
-import { AlertTriangle, Users, Clock, TrendingUp, Activity, Shield } from "lucide-react"
+import { AlertTriangle, Users, Clock, TrendingUp, TrendingDown, Activity, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
-interface Metric {
-  id: string
-  label: string
-  value: string | number
-  change?: number
-  icon: React.ReactNode
-  color: "primary" | "accent" | "success" | "muted"
-  progress?: number
+interface AnalyticsData {
+  riskLevel: string
+  riskProgress: number
+  criticalCount: number
+  highCount: number
+  affectedNow: number
+  affectedChange: number
+  avgResponseMin: number | null
+  resolvedCount: number
+  activeIncidentCount: number
+  incidentsTrend: number
+  totalResources: number
+  deployedResources: number
+  enCamino: number
+  ocupados: number
+  resourceProgress: number
 }
 
 export function AnalyticsPanel() {
-  // Fetch data from Supabase
-  const { data: incidentes } = useSWR("/api/incidentes", fetcher, { refreshInterval: 5000 })
-  const { data: recursos } = useSWR("/api/recursos", fetcher, { refreshInterval: 5000 })
+  const { data } = useSWR<AnalyticsData>("/api/analytics", fetcher, { refreshInterval: 2000 })
 
-  // Calculate metrics from real data
-  const metrics: Metric[] = useMemo(() => {
-    const totalAffected = incidentes?.reduce((acc: number, inc: { personas_afectadas: number }) => acc + (inc.personas_afectadas || 0), 0) || 0
-    const incidentCount = incidentes?.length || 0
-    const criticalCount = incidentes?.filter((i: { severidad: string }) => i.severidad === "critical").length || 0
-    const highCount = incidentes?.filter((i: { severidad: string }) => i.severidad === "high").length || 0
-    
-    const totalResources = recursos?.length || 0
-    const deployedResources = recursos?.filter((r: { estado: string }) => r.estado !== "available").length || 0
-    
-    // Calculate risk level based on incidents
-    let riskLevel = "BAJO"
-    let riskProgress = 25
-    if (criticalCount > 0) {
-      riskLevel = "CRITICO"
-      riskProgress = 95
-    } else if (highCount > 2) {
-      riskLevel = "ALTO"
-      riskProgress = 78
-    } else if (incidentCount > 3) {
-      riskLevel = "MEDIO"
-      riskProgress = 50
-    }
+  const d = data
 
-    return [
-      {
-        id: "risk",
-        label: "Nivel de Riesgo",
-        value: riskLevel,
-        icon: <AlertTriangle className="h-4 w-4" />,
-        color: criticalCount > 0 ? "primary" : highCount > 0 ? "accent" : "success",
-        progress: riskProgress,
-      },
-      {
-        id: "affected",
-        label: "Personas Afectadas",
-        value: totalAffected.toLocaleString(),
-        change: 12,
-        icon: <Users className="h-4 w-4" />,
-        color: "accent",
-      },
-      {
-        id: "response",
-        label: "Tiempo de Respuesta",
-        value: "8.2 min",
-        change: -15,
-        icon: <Clock className="h-4 w-4" />,
-        color: "success",
-      },
-      {
-        id: "incidents",
-        label: "Incidentes Activos",
-        value: incidentCount,
-        change: criticalCount > 0 ? criticalCount : undefined,
-        icon: <Activity className="h-4 w-4" />,
-        color: "primary",
-      },
-      {
-        id: "resources",
-        label: "Recursos Desplegados",
-        value: `${deployedResources}/${totalResources}`,
-        icon: <Shield className="h-4 w-4" />,
-        color: "muted",
-        progress: totalResources > 0 ? Math.round((deployedResources / totalResources) * 100) : 0,
-      },
-      {
-        id: "trend",
-        label: "Tendencia 24h",
-        value: criticalCount > 0 ? "+45%" : highCount > 0 ? "+23%" : "+5%",
-        icon: <TrendingUp className="h-4 w-4" />,
-        color: "accent",
-      },
-    ]
-  }, [incidentes, recursos])
+  const riskColor = !d
+    ? "muted"
+    : d.criticalCount > 0 ? "primary"
+    : d.highCount > 0 ? "accent"
+    : "success"
+
+  const responseValue = d?.avgResponseMin != null
+    ? `${d.avgResponseMin} min`
+    : "—"
+
+  // Trend for response time: negative change is good (faster)
+  const responseTrend = d?.resolvedCount
+    ? Math.round(((d.avgResponseMin ?? 8) - 8) / 8 * 100)
+    : null
+
+  const trendValue = d
+    ? (d.incidentsTrend >= 0 ? `+${d.incidentsTrend}%` : `${d.incidentsTrend}%`)
+    : "—"
+
+  const metrics = [
+    {
+      id: "risk",
+      label: "Nivel de Riesgo",
+      value: d?.riskLevel ?? "—",
+      icon: <AlertTriangle className="h-4 w-4" />,
+      color: riskColor as "primary" | "accent" | "success" | "muted",
+      progress: d?.riskProgress,
+    },
+    {
+      id: "affected",
+      label: "Personas Afectadas",
+      value: d ? d.affectedNow.toLocaleString("es-AR") : "—",
+      change: d?.affectedChange,
+      icon: <Users className="h-4 w-4" />,
+      color: "accent" as const,
+    },
+    {
+      id: "response",
+      label: "Tiempo de Respuesta",
+      value: responseValue,
+      change: responseTrend ?? undefined,
+      icon: <Clock className="h-4 w-4" />,
+      color: "success" as const,
+    },
+    {
+      id: "incidents",
+      label: "Incidentes Activos",
+      value: d?.activeIncidentCount ?? "—",
+      change: d?.incidentsTrend,
+      icon: <Activity className="h-4 w-4" />,
+      color: "primary" as const,
+    },
+    {
+      id: "resources",
+      label: "Recursos Desplegados",
+      value: d ? `${d.deployedResources}/${d.totalResources}` : "—",
+      icon: <Shield className="h-4 w-4" />,
+      color: "muted" as const,
+      progress: d?.resourceProgress,
+      sublabel: d && d.enCamino > 0 ? `${d.enCamino} en camino` : undefined,
+    },
+    {
+      id: "trend",
+      label: "Tendencia 24h",
+      value: trendValue,
+      icon: d?.incidentsTrend != null && d.incidentsTrend < 0
+        ? <TrendingDown className="h-4 w-4" />
+        : <TrendingUp className="h-4 w-4" />,
+      color: (d?.incidentsTrend != null && d.incidentsTrend < 0 ? "success" : "accent") as "success" | "accent",
+    },
+  ]
 
   const getColorClasses = (color: Metric["color"]) => {
     switch (color) {
@@ -128,8 +132,8 @@ export function AnalyticsPanel() {
       <div className="flex items-center justify-between border-b border-border px-4 py-2">
         <h2 className="text-sm font-semibold text-foreground">Analiticas en Tiempo Real</h2>
         <div className="flex items-center gap-1.5">
-          <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-          <span className="text-[10px] text-muted-foreground">En vivo</span>
+          <div className={cn("h-1.5 w-1.5 rounded-full", d ? "bg-success animate-pulse" : "bg-muted-foreground")} />
+          <span className="text-[10px] text-muted-foreground">{d ? "En vivo" : "Cargando..."}</span>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -156,14 +160,17 @@ export function AnalyticsPanel() {
               )}
             </div>
             <div className="mt-2">
-              <p className="text-lg font-bold leading-none">{metric.value}</p>
+              <p className="text-lg font-bold leading-none tabular-nums">{metric.value}</p>
               <p className="mt-1 text-[10px] opacity-70">{metric.label}</p>
+              {"sublabel" in metric && metric.sublabel && (
+                <p className="mt-0.5 text-[9px] opacity-50">{metric.sublabel}</p>
+              )}
             </div>
             {metric.progress !== undefined && (
               <div className="mt-2">
                 <div className="h-1 w-full overflow-hidden rounded-full bg-background/50">
                   <div
-                    className={cn("h-full rounded-full transition-all duration-500", getProgressColor(metric.color))}
+                    className={cn("h-full rounded-full transition-all duration-700", getProgressColor(metric.color))}
                     style={{ width: `${metric.progress}%` }}
                   />
                 </div>
