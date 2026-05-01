@@ -294,13 +294,43 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
   }
 
   const handleConfirmDeploy = async () => {
+    // Capture location before clearing state
+    const location = selectedIncident?.location ?? "ubicacion desconocida"
+    const incidentId = selectedIncident?.id
+
+    // Close all modals immediately
     setShowConfirmModal(false)
     setSelectedIncident(null)
-    // Trigger actual deploy logic via existing handleDeployResources path
-    setShowDeployModal(true)
-    setResources(prev => prev.map((r, i) => ({ ...r, selected: i === 0 }))) // auto-select first resource
-    await new Promise(r => setTimeout(r, 50))
-    handleDeployResources()
+
+    // Update the incident status in Supabase if we have an id
+    if (incidentId) {
+      try {
+        await fetch("/api/incidentes", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: incidentId, estado: "atendido" }),
+        })
+        mutate() // refresh SWR so map updates
+      } catch {
+        // non-blocking
+      }
+    }
+
+    // Also update first available resource to "dispatched" in Supabase
+    try {
+      await fetch("/api/recursos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: "dispatched", incidente_id: incidentId }),
+      })
+    } catch {
+      // non-blocking
+    }
+
+    toast.success(`Recursos desplegados a ${location}`, {
+      description: "Unidades en camino. Estado actualizado en tiempo real.",
+      duration: 4000,
+    })
   }
 
   const handleDeployResources = async () => {
@@ -311,18 +341,15 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
     }
 
     setDeployingResources(true)
-    
-    // Simulate deployment
     await new Promise(resolve => setTimeout(resolve, 2000))
-    
     setDeployingResources(false)
     setDeploySuccess(true)
-    
+
     toast.success(
-      `Recursos desplegados a ${selectedIncident?.location}`,
+      `Recursos desplegados`,
       { description: `${selected.map(s => s.name).join(", ")}` }
     )
-    
+
     setTimeout(() => {
       handleCloseDeploy()
     }, 1500)
@@ -520,7 +547,7 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
       </div>
 
       {/* Incident Detail Modal */}
-      <Dialog open={!!selectedIncident && !showDeployModal} onOpenChange={handleCloseDetails}>
+      <Dialog open={!!selectedIncident && !showDeployModal && !showConfirmModal} onOpenChange={handleCloseDetails}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto z-[9999]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
@@ -677,7 +704,7 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
       </Dialog>
 
       {/* Confirmation Modal */}
-      <Dialog open={showConfirmModal} onOpenChange={() => setShowConfirmModal(false)}>
+      <Dialog open={showConfirmModal} onOpenChange={(open) => { if (!open) setShowConfirmModal(false) }}>
         <DialogContent className="max-w-md z-[9999]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
