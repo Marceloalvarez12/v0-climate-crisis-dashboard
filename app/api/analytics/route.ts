@@ -30,11 +30,14 @@ export async function GET() {
     .from("recursos")
     .select("id, estado, updated_at")
 
-  // 5. Resolved incidents with timestamps (for avg response time)
+  // 5. Resolved incidents for avg response time:
+  //    Only count incidents created AND resolved in the last 24h,
+  //    and only where the response time is reasonable (< 120 min) to exclude seed data
   const { data: resolved } = await supabase
     .from("incidentes")
     .select("created_at, updated_at")
     .eq("estado", "atendido")
+    .gte("created_at", since24h)
     .gte("updated_at", since24h)
     .limit(50)
 
@@ -46,9 +49,12 @@ export async function GET() {
   const allResources = recursos ?? []
   const resolvedList = resolved ?? []
 
-  // Affected people — current vs previous window
+  // Affected people — only count currently active incidents
   const affectedNow = active.reduce((s: number, i: { personas_afectadas: number }) => s + (i.personas_afectadas || 0), 0)
-  const affectedPrev = prev24.reduce((s: number, i: { personas_afectadas: number }) => s + (i.personas_afectadas || 0), 0)
+  // Delta only meaningful if there were real incidents in the previous window
+  // (prev24 incidents must have been created in that window, not just seeded)
+  const prev24Active = prev24.filter((i: { estado: string }) => i.estado === "activo")
+  const affectedPrev = prev24Active.reduce((s: number, i: { personas_afectadas: number }) => s + (i.personas_afectadas || 0), 0)
   const affectedChange = affectedPrev > 0
     ? Math.round(((affectedNow - affectedPrev) / affectedPrev) * 100)
     : 0
@@ -64,20 +70,25 @@ export async function GET() {
   else if (highCount === 1 || active.length >= 3) { riskLevel = "MEDIO"; riskProgress = 50 }
   else if (active.length > 0) { riskLevel = "BAJO-MEDIO"; riskProgress = 35 }
 
-  // Avg response time in minutes (time from created_at to updated_at for resolved incidents)
-  let avgResponseMin = 0
-  if (resolvedList.length > 0) {
-    const totalMs = resolvedList.reduce((s: number, i: { created_at: string; updated_at: string }) => {
-      const diff = new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()
-      return s + Math.max(0, diff)
+  // Avg response time in minutes — filter out seed data by capping at 120 min max per incident
+  const MAX_RESPONSE_MIN = 120
+  const validResolved = resolvedList.filter((i: { created_at: string; updated_at: string }) => {
+    const diffMin = (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()) / 60000
+    return diffMin > 0 && diffMin <= MAX_RESPONSE_MIN
+  })
+  let avgResponseMin: number | null = null
+  if (validResolved.length > 0) {
+    const totalMs = validResolved.reduce((s: number, i: { created_at: string; updated_at: string }) => {
+      return s + (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime())
     }, 0)
-    avgResponseMin = totalMs / resolvedList.length / 60000
+    avgResponseMin = parseFloat((totalMs / validResolved.length / 60000).toFixed(1))
   }
 
-  // Incident trend: current 24h vs previous 24h
+  // Incident trend: only show % if there is a real previous window to compare against
+  // If no previous data, show 0 (no trend yet)
   const incidentsTrend = prev24.length > 0
     ? Math.round(((curr24.length - prev24.length) / prev24.length) * 100)
-    : curr24.length > 0 ? 100 : 0
+    : 0
 
   // Resources
   const totalResources = allResources.length
@@ -92,8 +103,8 @@ export async function GET() {
     highCount,
     affectedNow,
     affectedChange,
-    avgResponseMin: avgResponseMin > 0 ? parseFloat(avgResponseMin.toFixed(1)) : null,
-    resolvedCount: resolvedList.length,
+    avgResponseMin,
+    resolvedCount: validResolved.length,
     activeIncidentCount: active.length,
     incidentsTrend,
     totalResources,

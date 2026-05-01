@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import useSWR from "swr"
 import { AlertTriangle, Users, Clock, TrendingUp, TrendingDown, Activity, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -24,69 +25,82 @@ interface AnalyticsData {
   resourceProgress: number
 }
 
+interface Metric {
+  id: string
+  label: string
+  value: string | number
+  change?: number
+  icon: React.ReactNode
+  color: "primary" | "accent" | "success" | "muted"
+  progress?: number
+  sublabel?: string
+}
+
 export function AnalyticsPanel() {
   const { data } = useSWR<AnalyticsData>("/api/analytics", fetcher, { refreshInterval: 2000 })
 
   const d = data
 
-  const riskColor = !d
+  // Risk color: muted when no data, red when critical, amber when high, green when safe
+  const riskColor: Metric["color"] = !d || d.activeIncidentCount === 0
     ? "muted"
     : d.criticalCount > 0 ? "primary"
     : d.highCount > 0 ? "accent"
     : "success"
 
-  const responseValue = d?.avgResponseMin != null
-    ? `${d.avgResponseMin} min`
-    : "—"
+  // Only show response time once we have real resolved incidents
+  const responseValue = d?.avgResponseMin != null ? `${d.avgResponseMin} min` : "—"
 
-  // Trend for response time: negative change is good (faster)
-  const responseTrend = d?.resolvedCount
-    ? Math.round(((d.avgResponseMin ?? 8) - 8) / 8 * 100)
-    : null
+  // Trend value: only show percentage if we have prior window data, otherwise "—"
+  const hasTrendData = d != null && (d.incidentsTrend !== 0 || d.activeIncidentCount > 0)
+  const trendValue = !d
+    ? "—"
+    : hasTrendData
+      ? (d.incidentsTrend > 0 ? `+${d.incidentsTrend}%` : d.incidentsTrend < 0 ? `${d.incidentsTrend}%` : "Estable")
+      : "—"
 
-  const trendValue = d
-    ? (d.incidentsTrend >= 0 ? `+${d.incidentsTrend}%` : `${d.incidentsTrend}%`)
-    : "—"
-
-  const metrics = [
+  const metrics: Metric[] = [
     {
       id: "risk",
       label: "Nivel de Riesgo",
-      value: d?.riskLevel ?? "—",
+      // Show BAJO when active but no critical/high, show — when no data yet
+      value: !d || d.activeIncidentCount === 0 ? "SIN DATOS" : d.riskLevel,
       icon: <AlertTriangle className="h-4 w-4" />,
-      color: riskColor as "primary" | "accent" | "success" | "muted",
-      progress: d?.riskProgress,
+      color: riskColor,
+      progress: d?.activeIncidentCount === 0 ? 0 : d?.riskProgress,
     },
     {
       id: "affected",
       label: "Personas Afectadas",
       value: d ? d.affectedNow.toLocaleString("es-AR") : "—",
-      change: d?.affectedChange,
+      // Only show change badge if it's non-zero (real comparison exists)
+      change: d?.affectedChange !== 0 ? d?.affectedChange : undefined,
       icon: <Users className="h-4 w-4" />,
-      color: "accent" as const,
+      color: "accent",
     },
     {
       id: "response",
       label: "Tiempo de Respuesta",
       value: responseValue,
-      change: responseTrend ?? undefined,
+      // No change badge for response time — no meaningful baseline yet
       icon: <Clock className="h-4 w-4" />,
-      color: "success" as const,
+      color: d?.avgResponseMin != null ? "success" : "muted",
     },
     {
       id: "incidents",
       label: "Incidentes Activos",
       value: d?.activeIncidentCount ?? "—",
-      change: d?.incidentsTrend,
+      // Only show trend badge when there's a non-zero real trend
+      change: d?.incidentsTrend !== 0 ? d?.incidentsTrend : undefined,
       icon: <Activity className="h-4 w-4" />,
-      color: "primary" as const,
+      color: d && d.activeIncidentCount > 0 ? "primary" : "muted",
     },
     {
       id: "resources",
       label: "Recursos Desplegados",
       value: d ? `${d.deployedResources}/${d.totalResources}` : "—",
       icon: <Shield className="h-4 w-4" />,
-      color: "muted" as const,
+      color: d && d.deployedResources > 0 ? "accent" : "muted",
       progress: d?.resourceProgress,
       sublabel: d && d.enCamino > 0 ? `${d.enCamino} en camino` : undefined,
     },
@@ -97,7 +111,7 @@ export function AnalyticsPanel() {
       icon: d?.incidentsTrend != null && d.incidentsTrend < 0
         ? <TrendingDown className="h-4 w-4" />
         : <TrendingUp className="h-4 w-4" />,
-      color: (d?.incidentsTrend != null && d.incidentsTrend < 0 ? "success" : "accent") as "success" | "accent",
+      color: trendValue === "—" ? "muted" : d?.incidentsTrend != null && d.incidentsTrend < 0 ? "success" : "accent",
     },
   ]
 
