@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import useSWR from "swr"
-import { AlertTriangle, Droplets, Flame, Wind, MapPin, Layers, Twitter, Thermometer, Camera, Users, Clock, MapPinned, Ambulance, Shield, Truck, Phone, Send, CheckCircle2 } from "lucide-react"
+import { AlertTriangle, Droplets, Flame, Wind, MapPin, Layers, Twitter, Thermometer, Camera, Users, Clock, MapPinned, Ambulance, Shield, Truck, Phone, Send, CheckCircle2, Rocket } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
@@ -218,6 +218,7 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
   const [activeLayers, setActiveLayers] = useState<SourceType[]>(["social", "sensor", "camera"])
   const [deployingResources, setDeployingResources] = useState(false)
   const [deploySuccess, setDeploySuccess] = useState(false)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [resources, setResources] = useState<ResourceOption[]>([
   { id: "ambulance", name: "Ambulancias SAME", icon: <Ambulance className="h-5 w-5" />, units: 3, eta: "8 min", selected: false },
   { id: "firefighters", name: "Bomberos Voluntarios", icon: <Truck className="h-5 w-5" />, units: 2, eta: "12 min", selected: false },
@@ -281,13 +282,25 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
   }
 
   const handleOpenDeploy = () => {
-    setShowDeployModal(true)
+    // "Desplegar Recursos" now opens the confirmation modal directly
+    setShowConfirmModal(true)
   }
 
   const handleCloseDeploy = () => {
     setShowDeployModal(false)
+    setShowConfirmModal(false)
     setDeploySuccess(false)
     setResources(prev => prev.map(r => ({ ...r, selected: false })))
+  }
+
+  const handleConfirmDeploy = async () => {
+    setShowConfirmModal(false)
+    setSelectedIncident(null)
+    // Trigger actual deploy logic via existing handleDeployResources path
+    setShowDeployModal(true)
+    setResources(prev => prev.map((r, i) => ({ ...r, selected: i === 0 }))) // auto-select first resource
+    await new Promise(r => setTimeout(r, 50))
+    handleDeployResources()
   }
 
   const handleDeployResources = async () => {
@@ -660,6 +673,65 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Modal */}
+      <Dialog open={showConfirmModal} onOpenChange={() => setShowConfirmModal(false)}>
+        <DialogContent className="max-w-md z-[9999]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Rocket className="h-5 w-5 text-primary" />
+              Confirmar Despliegue de Recursos
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5 py-1">
+            <p className="text-sm text-muted-foreground">
+              Esta a punto de desplegar unidades de emergencia a:
+            </p>
+            <p className="text-base font-bold text-foreground -mt-3">
+              {selectedIncident?.location}
+            </p>
+
+            {/* AI Confidence Bar */}
+            <div className="rounded-lg border border-border bg-secondary/30 p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 text-muted-foreground">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+                    </svg>
+                  </div>
+                  <span className="text-sm text-muted-foreground">Nivel de Confianza IA</span>
+                </div>
+                <span className="text-sm font-bold text-primary">94%</span>
+              </div>
+              <div className="relative h-2 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="absolute left-0 top-0 h-full rounded-full bg-primary transition-all duration-1000"
+                  style={{ width: "94%" }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 mt-2">
+            <Button
+              variant="outline"
+              className="bg-secondary/50 border-border text-foreground hover:bg-secondary"
+              onClick={() => setShowConfirmModal(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+              onClick={handleConfirmDeploy}
+            >
+              <Rocket className="h-4 w-4 mr-2" />
+              Confirmar Despliegue
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
