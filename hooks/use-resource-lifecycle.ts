@@ -13,41 +13,41 @@ async function patchRecurso(id: string, estado: string) {
 }
 
 /**
- * Despacha un recurso y encadena las transiciones de estado automaticamente:
+ * Despacha un recurso especifico (o el primero disponible si no se pasa resourceId)
+ * y encadena las transiciones de estado automaticamente:
  *   available → dispatched (inmediato)
- *   dispatched → busy      (15 segundos)
- *   busy → available       (20 segundos adicionales)
- *
- * Retorna el id del recurso despachado, o null si no habia ninguno disponible.
+ *   dispatched → busy      (50 segundos)
+ *   busy → available       (60 segundos adicionales)
  */
 export async function dispatchResourceWithLifecycle(
-  incidenteId?: string
+  incidenteId?: string,
+  resourceId?: string,
 ): Promise<string | null> {
-  // 1. Buscar primer recurso disponible
-  const res = await fetch("/api/recursos")
-  const recursos: Array<{ id: string; estado: string }> = await res.json()
-  const disponible = recursos.find((r) => r.estado === "available")
-  if (!disponible) return null
+  let recursoId = resourceId
 
-  const recursoId = disponible.id
-
-  // 2. dispatched (en camino) — inmediato
-  await patchRecurso(recursoId, "dispatched")
-  if (incidenteId) {
-    await fetch("/api/recursos", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: recursoId, estado: "dispatched", incidente_id: incidenteId }),
-    })
+  // Si no se paso un id especifico, buscar el primer recurso disponible
+  if (!recursoId) {
+    const res = await fetch("/api/recursos")
+    const recursos: Array<{ id: string; estado: string }> = await res.json()
+    const disponible = recursos.find((r) => r.estado === "available")
+    if (!disponible) return null
+    recursoId = disponible.id
   }
 
-  // 3. busy (ocupado) — 15 segundos despues
-  setTimeout(async () => {
-    await patchRecurso(recursoId, "busy")
+  // dispatched (en camino) — inmediato
+  await fetch("/api/recursos", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: recursoId, estado: "dispatched", incidente_id: incidenteId ?? null }),
+  })
 
-    // 4. available (disponible) — 20 segundos adicionales
+  // busy (ocupado) — 50 segundos despues
+  setTimeout(async () => {
+    await patchRecurso(recursoId!, "busy")
+
+    // available (disponible) — 60 segundos adicionales
     setTimeout(async () => {
-      await patchRecurso(recursoId, "available")
+      await patchRecurso(recursoId!, "available")
     }, BUSY_TO_AVAILABLE_MS)
   }, DISPATCHED_TO_BUSY_MS)
 
