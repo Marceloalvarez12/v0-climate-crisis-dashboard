@@ -150,7 +150,7 @@ export function AnalyticsPanel() {
           <span className="text-[10px] text-muted-foreground">{d ? "En vivo" : "Cargando..."}</span>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-6">
         {metrics.map((metric) => (
           <div
             key={metric.id}
