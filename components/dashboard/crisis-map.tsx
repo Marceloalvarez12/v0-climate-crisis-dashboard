@@ -227,7 +227,7 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
 
   // Fetch incidents from Supabase
   const { data: dbIncidents, error, mutate } = useSWR("/api/incidentes", fetcher, {
-    refreshInterval: 5000, // Refresh every 5 seconds for real-time feel
+    refreshInterval: 2000, // Poll every 2s so map updates within seconds of agent discovery
   })
 
   // Transform database incidents to local format

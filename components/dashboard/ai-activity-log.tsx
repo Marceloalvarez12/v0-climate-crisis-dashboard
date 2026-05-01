@@ -64,6 +64,46 @@ interface ActivityItem {
   reasoning?: ReasoningStep[]
 }
 
+// Map of alert locations to their full incident data for Supabase INSERT
+// When the agent "discovers" an alert, we insert it into the DB so the map shows it live
+const ALERT_INCIDENT_DATA: Record<string, {
+  tipo: string; severidad: string; ubicacion: string; latitud: number; longitud: number;
+  personas_afectadas: number; fuente: string; fuente_detalles: Record<string, unknown>
+}> = {
+  "Centro Historico, Tucuman": {
+    tipo: "flood", severidad: "critical",
+    ubicacion: "Centro Historico - Plaza Independencia",
+    latitud: -26.8241, longitud: -65.2226,
+    personas_afectadas: 1250, fuente: "social",
+    fuente_detalles: {
+      platform: "X (Twitter)", username: "@tucuman_alerta",
+      content: "URGENTE: Inundacion severa en Plaza Independencia. El agua supera los 50cm. Vecinos atrapados en edificios. #InundacionTucuman",
+      imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600"
+    }
+  },
+  "Barrio San Pablo, Tucuman": {
+    tipo: "flood", severidad: "critical",
+    ubicacion: "Barrio San Pablo - Canal Norte",
+    latitud: -26.8400, longitud: -65.2500,
+    personas_afectadas: 720, fuente: "social",
+    fuente_detalles: {
+      platform: "X (Twitter)", username: "@rescate_tucuman",
+      content: "Canal San Pablo completamente desbordado. Evacuacion de 180 familias en curso. Corte total de Av. Ejercito del Norte. #AlertaTucuman",
+      imageUrl: "https://images.unsplash.com/photo-1446824505046-e43605ffb17f?w=600"
+    }
+  },
+  "Villa 9 de Julio, Tucuman": {
+    tipo: "fire", severidad: "critical",
+    ubicacion: "Villa 9 de Julio - Fabrica Textil",
+    latitud: -26.7950, longitud: -65.2350,
+    personas_afectadas: 560, fuente: "camera",
+    fuente_detalles: {
+      cameraId: "CAM-V9J-023", cameraLocation: "Av. Roca y Catamarca",
+      imageUrl: "https://images.unsplash.com/photo-1486551937199-baf066858de7?w=600"
+    }
+  },
+}
+
 const initialActivities: ActivityItem[] = [
   { id: "1", type: "monitoring", message: "Sistema de monitoreo iniciado", timestamp: new Date(Date.now() - 300000) },
   { id: "2", type: "extraction", message: "Extrayendo datos de X (Twitter)...", timestamp: new Date(Date.now() - 240000) },
@@ -234,6 +274,21 @@ export function AIActivityLog() {
       }
       setActivities(prev => [...prev.slice(-20), newActivity])
       messageIndexRef.current += 1
+
+      // When the agent "discovers" an actionable alert, INSERT the incident into Supabase
+      // so it appears on the map at the exact same moment
+      if (template.type === "alert" && template.actionable && template.location) {
+        const incidentData = ALERT_INCIDENT_DATA[template.location]
+        if (incidentData) {
+          fetch("/api/incidentes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(incidentData),
+          }).catch(() => {
+            // non-blocking: map already has existing data as fallback
+          })
+        }
+      }
     }, 4000)
 
     return () => clearInterval(interval)
