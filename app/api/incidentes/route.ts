@@ -17,6 +17,8 @@ export async function GET() {
   return NextResponse.json(data)
 }
 
+const MAX_ACTIVE_INCIDENTS = 11
+
 export async function POST(request: Request) {
   const supabase = await createClient()
   const body = await request.json()
@@ -32,7 +34,17 @@ export async function POST(request: Request) {
 
   if (existing) {
     // If it exists but was resolved/attended, reactivate it
+    // but only if we haven't hit the active limit
     if (existing.estado !== "activo") {
+      const { count } = await supabase
+        .from("incidentes")
+        .select("*", { count: "exact", head: true })
+        .eq("estado", "activo")
+
+      if ((count ?? 0) >= MAX_ACTIVE_INCIDENTS) {
+        return NextResponse.json({ skipped: true, reason: "max_active_reached" }, { status: 200 })
+      }
+
       const { data, error } = await supabase
         .from("incidentes")
         .update({ estado: "activo", updated_at: new Date().toISOString() })
@@ -46,7 +58,17 @@ export async function POST(request: Request) {
     return NextResponse.json(existing)
   }
 
-  // No existing record — do a fresh INSERT
+  // Check active incident cap before a fresh INSERT
+  const { count } = await supabase
+    .from("incidentes")
+    .select("*", { count: "exact", head: true })
+    .eq("estado", "activo")
+
+  if ((count ?? 0) >= MAX_ACTIVE_INCIDENTS) {
+    return NextResponse.json({ skipped: true, reason: "max_active_reached" }, { status: 200 })
+  }
+
+  // No existing record and under the cap — do a fresh INSERT
   const { data, error } = await supabase
     .from("incidentes")
     .insert(body)
