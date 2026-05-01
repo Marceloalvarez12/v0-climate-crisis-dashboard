@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import useSWR from "swr"
 import { AlertTriangle, Droplets, Flame, Wind, MapPin, Layers, Twitter, Thermometer, Camera, Users, Clock, MapPinned, Ambulance, Shield, Truck, Phone, Send, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { dispatchResourceWithLifecycle } from "@/hooks/use-resource-lifecycle"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -348,17 +349,9 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
         body: JSON.stringify({ id: incidenteId, estado: "atendido" }),
       }).catch(() => {})
 
-      // Dispatch first available resource
-      const recursosRes = await fetch("/api/recursos")
-      const recursos: Array<{ id: string; estado: string }> = await recursosRes.json()
-      const disponible = recursos.find((r) => r.estado === "available")
-      if (disponible) {
-        await fetch("/api/recursos", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: disponible.id, estado: "dispatched", incidente_id: incidenteId }),
-        }).catch(() => {})
-      }
+      // Despachar recurso con ciclo de vida automatico:
+      // dispatched (inmediato) → busy (15s) → available (20s adicionales)
+      await dispatchResourceWithLifecycle(incidenteId).catch(() => {})
 
       // Respawn: new incident at random SMT coordinates after 8 seconds
       setTimeout(async () => {
