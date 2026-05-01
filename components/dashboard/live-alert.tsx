@@ -30,39 +30,19 @@ interface LiveAlertProps {
 }
 
 export function LiveAlert({ onDismiss, onDeployEmergency }: LiveAlertProps) {
-  const [isVisible, setIsVisible] = useState(false)
   const [secondsAgo, setSecondsAgo] = useState(0)
 
-  // Trigger alert after 30 seconds
+  // Seconds counter — starts as soon as this component is mounted (parent controls visibility)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsVisible(true)
-      // Trigger vibration if supported
-      if (navigator.vibrate) {
-        navigator.vibrate([200, 100, 200, 100, 200])
-      }
-    }, 30000)
-
-    return () => clearTimeout(timer)
-  }, [])
-
-  // Update seconds counter
-  useEffect(() => {
-    if (!isVisible) return
-    
     const interval = setInterval(() => {
       setSecondsAgo(prev => prev + 1)
     }, 1000)
-
     return () => clearInterval(interval)
-  }, [isVisible])
+  }, [])
 
   const handleDismiss = () => {
-    setIsVisible(false)
     onDismiss?.()
   }
-
-  if (!isVisible) return null
 
   return (
     <div 
@@ -159,7 +139,6 @@ export function LiveAlert({ onDismiss, onDeployEmergency }: LiveAlertProps) {
             <Button 
               className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold"
               onClick={() => {
-                setIsVisible(false)
                 onDeployEmergency?.(ALERT_INCIDENT)
               }}
             >
