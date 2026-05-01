@@ -63,11 +63,9 @@ export default function CrisisDashboard() {
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto">
           {activeTab === "map" && (
-            <div className="flex flex-col h-full gap-3 p-3">
-              {/* Map takes most of the space */}
-              <div className="min-h-[55vh]">
-                <CrisisMap />
-              </div>
+            <div className="flex flex-col">
+              {/* CrisisMap handles its own height (400px map + incident list below) */}
+              <CrisisMap />
             </div>
           )}
 
