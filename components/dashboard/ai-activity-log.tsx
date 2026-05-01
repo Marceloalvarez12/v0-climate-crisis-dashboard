@@ -7,6 +7,7 @@ import {
   ChevronDown, ChevronUp, Zap
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { dispatchResourceWithLifecycle } from "@/hooks/use-resource-lifecycle"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -457,21 +458,9 @@ export function AIActivityLog() {
           }, 8000) // aparece 8 segundos despues de ser atendido
         }
 
-        // 4. Actualizar primer recurso disponible a "dispatched" (en camino)
-        const recursosRes = await fetch("/api/recursos")
-        const recursos: Array<{ id: string; estado: string }> = await recursosRes.json()
-        const disponible = recursos.find((r) => r.estado === "available")
-        if (disponible) {
-          await fetch("/api/recursos", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              id: disponible.id,
-              estado: "dispatched",
-              incidente_id: incidente?.id ?? null,
-            }),
-          })
-        }
+        // 4. Despachar recurso con ciclo de vida automatico:
+        //    dispatched (inmediato) → busy (15s) → available (20s adicionales)
+        await dispatchResourceWithLifecycle(incidente?.id)
       } catch {
         // non-blocking
       }
