@@ -163,8 +163,45 @@ const initialActivities: ActivityItem[] = [
   { id: "4", type: "database", message: "Guardando 47 reportes en base de datos", timestamp: new Date(Date.now() - 120000) },
 ]
 
-const newMessages: Omit<ActivityItem, "id" | "timestamp">[] = [
+// Mensajes de fondo del agente — solo trabajo de monitoreo, sin alertas ni confirmaciones
+// Las alertas se inyectan por separado cuando el incidente se inserta en Supabase
+// Los mensajes "complete" se inyectan solo cuando se confirma un despliegue real
+const backgroundMessages: Omit<ActivityItem, "id" | "timestamp">[] = [
+  { type: "extraction", message: "Extrayendo datos de redes sociales..." },
+  { type: "monitoring", message: "Escaneando noticias locales de La Gaceta..." },
   { 
+    type: "reasoning", 
+    message: "IA analizando patrones de evacuacion...", 
+    confidence: 78,
+    reasoning: [
+      { step: 1, thought: "Analizando flujo de trafico en tiempo real via Google Maps API" },
+      { step: 2, thought: "Identificando rutas de evacuacion optimas...", action: "Calculando 3 rutas alternativas" },
+      { step: 3, thought: "Ruta por Av. Mate de Luna BLOQUEADA - arboles caidos reportados" },
+      { step: 4, thought: "Ruta recomendada: Av. Sarmiento -> Ruta 9 Norte", result: "Tiempo estimado evacuacion: 45 min" },
+    ]
+  },
+  { type: "database", message: "Actualizando base de datos de recursos" },
+  { type: "extraction", message: "Recopilando datos de sensores meteorologicos..." },
+  { type: "monitoring", message: "Verificando camaras de vigilancia urbana..." },
+  { 
+    type: "reasoning", 
+    message: "Prediciendo expansion de zona afectada...", 
+    confidence: 85,
+    reasoning: [
+      { step: 1, thought: "Modelo hidrologico cargado: TucumanFlood_v3.2" },
+      { step: 2, thought: "Inputs: precipitacion actual, topografia, nivel de canales", action: "Ejecutando simulacion" },
+      { step: 3, thought: "Proyeccion a 2 horas: expansion hacia Barrio Sur probable (73%)" },
+      { step: 4, thought: "Recomendacion: alertar preventivamente a 340 familias adicionales", result: "Alerta preventiva generada" },
+    ]
+  },
+  { type: "extraction", message: "Consultando API meteorologica nacional..." },
+  { type: "monitoring", message: "Analizando sensores hidrologicos del rio Sali..." },
+  { type: "database", message: "Sincronizando con base de datos de Defensa Civil..." },
+]
+
+// Alertas que se inyectan al log en el mismo momento que el incidente aparece en el mapa
+const alertMessages: Record<string, Omit<ActivityItem, "id" | "timestamp">> = {
+  "Centro Historico, Tucuman": { 
     type: "alert", 
     message: "Identificando zona de riesgo en Centro Historico", 
     actionable: true, 
@@ -178,22 +215,7 @@ const newMessages: Omit<ActivityItem, "id" | "timestamp">[] = [
       { step: 4, thought: "Correlacionando con sensores de lluvia cercanos: 85mm en ultima hora", result: "CONFIRMADO - Nivel de confianza 94%" },
     ]
   },
-  { type: "complete", message: "Coordenadas enviadas a equipos de rescate" },
-  { type: "extraction", message: "Extrayendo datos de redes sociales..." },
-  { 
-    type: "reasoning", 
-    message: "IA analizando patrones de evacuacion...", 
-    confidence: 78,
-    reasoning: [
-      { step: 1, thought: "Analizando flujo de trafico en tiempo real via Google Maps API" },
-      { step: 2, thought: "Identificando rutas de evacuacion optimas...", action: "Calculando 3 rutas alternativas" },
-      { step: 3, thought: "Ruta por Av. Mate de Luna BLOQUEADA - arboles caidos reportados" },
-      { step: 4, thought: "Ruta recomendada: Av. Sarmiento -> Ruta 9 Norte", result: "Tiempo estimado evacuacion: 45 min" },
-    ]
-  },
-  { type: "database", message: "Actualizando base de datos de recursos" },
-  { type: "monitoring", message: "Escaneando noticias locales de La Gaceta..." },
-  { 
+  "Barrio San Pablo, Tucuman": { 
     type: "alert", 
     message: "ALERTA CRITICA: Desborde detectado en Canal Norte", 
     actionable: true, 
@@ -207,20 +229,7 @@ const newMessages: Omit<ActivityItem, "id" | "timestamp">[] = [
       { step: 4, thought: "Poblacion en riesgo estimada: 720 personas en radio de 500m", result: "EVACUACION INMEDIATA REQUERIDA" },
     ]
   },
-  { type: "complete", message: "Alerta enviada a Defensa Civil" },
-  { 
-    type: "reasoning", 
-    message: "Prediciendo expansion de zona afectada...", 
-    confidence: 85,
-    reasoning: [
-      { step: 1, thought: "Modelo hidrologico cargado: TucumanFlood_v3.2" },
-      { step: 2, thought: "Inputs: precipitacion actual, topografia, nivel de canales", action: "Ejecutando simulacion" },
-      { step: 3, thought: "Proyeccion a 2 horas: expansion hacia Barrio Sur probable (73%)" },
-      { step: 4, thought: "Recomendacion: alertar preventivamente a 340 familias adicionales", result: "Alerta preventiva generada" },
-    ]
-  },
-  { type: "extraction", message: "Recopilando datos de sensores meteorologicos..." },
-  { 
+  "Villa 9 de Julio, Tucuman": { 
     type: "alert", 
     message: "Incendio reportado en Villa 9 de Julio", 
     actionable: true, 
@@ -234,7 +243,7 @@ const newMessages: Omit<ActivityItem, "id" | "timestamp">[] = [
       { step: 4, thought: "Riesgo de propagacion a zona residencial en 45 minutos si no se interviene", result: "ACCION INMEDIATA REQUERIDA" },
     ]
   },
-]
+}
 
 const getIcon = (type: ActivityItem["type"]) => {
   switch (type) {
@@ -304,8 +313,10 @@ export function AIActivityLog() {
   const messageIndexRef = useRef(0)
 
   useEffect(() => {
+    // Cycle through background messages (monitoring, extraction, analysis, etc.)
+    // Alerts are injected separately when the incident is actually inserted in Supabase
     const interval = setInterval(() => {
-      const template = newMessages[messageIndexRef.current % newMessages.length]
+      const template = backgroundMessages[messageIndexRef.current % backgroundMessages.length]
       const newActivity: ActivityItem = {
         ...template,
         id: Date.now().toString(),
@@ -314,24 +325,45 @@ export function AIActivityLog() {
       }
       setActivities(prev => [...prev.slice(-20), newActivity])
       messageIndexRef.current += 1
-
-      // When the agent "discovers" an actionable alert, INSERT the incident into Supabase
-      // so it appears on the map at the exact same moment
-      if (template.type === "alert" && template.actionable && template.location) {
-        const incidentData = ALERT_INCIDENT_DATA[template.location]
-        if (incidentData) {
-          fetch("/api/incidentes", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(incidentData),
-          }).catch(() => {
-            // non-blocking: map already has existing data as fallback
-          })
-        }
-      }
     }, 4000)
 
-    return () => clearInterval(interval)
+    // Every 90 seconds, pick an alert from ALERT_INCIDENT_DATA, insert it into Supabase
+    // AND inject the matching alert message into the log at the exact same time
+    const ALERT_LOCATIONS = Object.keys(ALERT_INCIDENT_DATA)
+    let alertIndexRef = 0
+
+    const alertInterval = setInterval(() => {
+      const location = ALERT_LOCATIONS[alertIndexRef % ALERT_LOCATIONS.length]
+      alertIndexRef += 1
+
+      const incidentData = ALERT_INCIDENT_DATA[location]
+      const alertTemplate = alertMessages[location]
+
+      // Insert incident in Supabase — both log message and map pin appear simultaneously
+      fetch("/api/incidentes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(incidentData),
+      })
+        .then((res) => res.json())
+        .then((result) => {
+          // Only inject the alert message if the incident was actually inserted (not skipped)
+          if (!result?.skipped && alertTemplate) {
+            setActivities(prev => [...prev.slice(-20), {
+              ...alertTemplate,
+              id: Date.now().toString(),
+              timestamp: new Date(),
+              isNew: true,
+            }])
+          }
+        })
+        .catch(() => {})
+    }, 90 * 1000) // every 90 seconds, one new incident at a time
+
+    return () => {
+      clearInterval(interval)
+      clearInterval(alertInterval)
+    }
   }, [])
 
   // Auto scroll to bottom
@@ -447,7 +479,7 @@ export function AIActivityLog() {
             body: JSON.stringify({ id: incidente.id, estado: "atendido" }),
           })
 
-          // 3. Respawn: insertar nuevo incidente en coordenadas aleatorias de SMT
+          // 3. Respawn: nuevo incidente en coordenadas aleatorias, 2 minutos despues de ser atendido
           setTimeout(async () => {
             const respawn = buildRespawnIncident(incidente as { tipo: string; fuente: string; fuente_detalles: Record<string, unknown> })
             await fetch("/api/incidentes", {
@@ -455,7 +487,7 @@ export function AIActivityLog() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(respawn),
             })
-          }, 8000) // aparece 8 segundos despues de ser atendido
+          }, 2 * 60 * 1000)
         }
 
         // 4. Despachar recurso con ciclo de vida automatico:
@@ -472,7 +504,7 @@ export function AIActivityLog() {
       setActivities(prev => [...prev, {
         id: Date.now().toString(),
         type: "complete",
-        message: `Recursos desplegados a ${location}`,
+        message: `Coordenadas y recursos enviados a equipos en ${location}`,
         timestamp: new Date(),
         isNew: true,
       }])

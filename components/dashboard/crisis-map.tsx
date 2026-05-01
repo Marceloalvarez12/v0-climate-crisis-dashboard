@@ -235,9 +235,9 @@ const createCustomIcon = (severity: Incident["severity"], type: Incident["type"]
 interface ResourceOption {
   id: string
   name: string
-  icon: React.ReactNode
-  units: number
-  eta: string
+  tipo: string
+  estado: string // "available" | "dispatched" | "busy"
+  ubicacion: string
   selected: boolean
 }
 
@@ -253,12 +253,12 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
   const [activeLayers, setActiveLayers] = useState<SourceType[]>(["social", "sensor", "camera"])
   const [deployingResources, setDeployingResources] = useState(false)
   const [deploySuccess, setDeploySuccess] = useState(false)
-  const [resources, setResources] = useState<ResourceOption[]>([
-  { id: "ambulance", name: "Ambulancias SAME", icon: <Ambulance className="h-5 w-5" />, units: 3, eta: "8 min", selected: false },
-  { id: "firefighters", name: "Bomberos Voluntarios", icon: <Truck className="h-5 w-5" />, units: 2, eta: "12 min", selected: false },
-  { id: "police", name: "Policia Provincial", icon: <Shield className="h-5 w-5" />, units: 4, eta: "5 min", selected: false },
-  { id: "civildefense", name: "Defensa Civil", icon: <AlertTriangle className="h-5 w-5" />, units: 1, eta: "15 min", selected: false },
-  ])
+  const [selectedResourceIds, setSelectedResourceIds] = useState<Set<string>>(new Set())
+
+  // Load resources from Supabase, refresh every 3s to reflect state changes
+  const { data: dbRecursos, mutate: mutateRecursos } = useSWR<Array<{
+    id: string; nombre: string; tipo: string; estado: string; ubicacion: string
+  }>>("/api/recursos", fetcher, { refreshInterval: 3000 })
 
   // Fetch incidents from Supabase
   const { data: dbIncidents, error, mutate } = useSWR("/api/incidentes", fetcher, {
@@ -301,10 +301,31 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
     )
   }
 
+  const getRecursoIcon = (tipo: string) => {
+    switch (tipo) {
+      case "ambulance": return <Ambulance className="h-5 w-5" />
+      case "firefighters": return <Truck className="h-5 w-5" />
+      case "police": return <Shield className="h-5 w-5" />
+      case "civildefense": return <AlertTriangle className="h-5 w-5" />
+      default: return <Shield className="h-5 w-5" />
+    }
+  }
+
+  const getEstadoLabel = (estado: string) => {
+    switch (estado) {
+      case "dispatched": return "En camino"
+      case "busy": return "Ocupado"
+      default: return "Disponible"
+    }
+  }
+
   const toggleResource = (id: string) => {
-    setResources(prev => prev.map(r => 
-      r.id === id ? { ...r, selected: !r.selected } : r
-    ))
+    setSelectedResourceIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   const handleOpenDetails = useCallback((incident: Incident) => {
@@ -321,13 +342,13 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
 
   const handleCloseDeploy = () => {
     setShowDeployModal(false)
+    setShowConfirmModal(false)
     setDeploySuccess(false)
-    setResources(prev => prev.map(r => ({ ...r, selected: false })))
+    setSelectedResourceIds(new Set())
   }
 
   const handleDeployResources = async () => {
-    const selected = resources.filter(r => r.selected)
-    if (selected.length === 0) {
+    if (selectedResourceIds.size === 0) {
       toast.error("Selecciona al menos un recurso para desplegar")
       return
     }
@@ -349,11 +370,15 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
         body: JSON.stringify({ id: incidenteId, estado: "atendido" }),
       }).catch(() => {})
 
-      // Despachar recurso con ciclo de vida automatico:
-      // dispatched (inmediato) → busy (15s) → available (20s adicionales)
-      await dispatchResourceWithLifecycle(incidenteId).catch(() => {})
+      // Despachar cada recurso seleccionado con su ciclo de vida:
+      // dispatched → busy (50s) → available (60s)
+      const dispatchPromises = Array.from(selectedResourceIds).map(resourceId =>
+        dispatchResourceWithLifecycle(incidenteId, resourceId).catch(() => {})
+      )
+      await Promise.all(dispatchPromises)
+      mutateRecursos()
 
-      // Respawn: new incident at random SMT coordinates after 8 seconds
+      // Respawn: nuevo incidente en coordenadas aleatorias, 2 minutos despues de ser atendido
       setTimeout(async () => {
         const respawn = buildRespawnIncident({ tipo: incidenteTipo, fuente: incidenteFuente })
         await fetch("/api/incidentes", {
@@ -361,12 +386,12 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(respawn),
         }).catch(() => {})
-      }, 8000)
+      }, 2 * 60 * 1000)
     }
 
     toast.success(
       `Recursos desplegados a ${selectedIncident?.location}`,
-      { description: `${selected.map(s => s.name).join(", ")}` }
+      { description: `${selectedResourceIds.size} unidad(es) en camino` }
     )
 
     setTimeout(() => {
@@ -749,44 +774,71 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
             </div>
           ) : (
             <>
-              <div className="space-y-3 py-2">
-                {resources.map((resource) => (
-                  <button
-                    key={resource.id}
-                    onClick={() => toggleResource(resource.id)}
-                    className={cn(
-                      "w-full flex items-center gap-3 p-3 rounded-lg border transition-all",
-                      resource.selected 
-                        ? "border-primary bg-primary/10" 
-                        : "border-border hover:bg-secondary/50"
-                    )}
-                  >
-                    <div className={cn(
-                      "h-10 w-10 rounded-full flex items-center justify-center shrink-0",
-                      resource.selected ? "bg-primary text-primary-foreground" : "bg-secondary"
-                    )}>
-                      {resource.icon}
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className="text-sm font-medium text-foreground">{resource.name}</p>
-                      <p className="text-xs text-muted-foreground">{resource.units} unidades disponibles</p>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant={resource.selected ? "default" : "outline"} className="text-[10px]">
-                        ETA: {resource.eta}
-                      </Badge>
-                    </div>
-                    <Checkbox checked={resource.selected} className="pointer-events-none" />
-                  </button>
-                ))}
+              <div className="max-h-72 overflow-y-auto space-y-2 py-2 pr-1 custom-scrollbar">
+                {!dbRecursos ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Cargando recursos...</p>
+                ) : dbRecursos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No hay recursos registrados</p>
+                ) : (
+                  dbRecursos.map((recurso) => {
+                    const isAvailable = recurso.estado === "available"
+                    const isSelected = selectedResourceIds.has(recurso.id)
+                    return (
+                      <button
+                        key={recurso.id}
+                        onClick={() => isAvailable && toggleResource(recurso.id)}
+                        disabled={!isAvailable}
+                        className={cn(
+                          "w-full flex items-center gap-3 p-3 rounded-lg border transition-all",
+                          !isAvailable
+                            ? "border-border opacity-50 cursor-not-allowed bg-secondary/20"
+                            : isSelected
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:bg-secondary/50"
+                        )}
+                      >
+                        <div className={cn(
+                          "h-10 w-10 rounded-full flex items-center justify-center shrink-0",
+                          !isAvailable ? "bg-secondary/50 text-muted-foreground"
+                          : isSelected ? "bg-primary text-primary-foreground"
+                          : "bg-secondary"
+                        )}>
+                          {getRecursoIcon(recurso.tipo)}
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="text-sm font-medium text-foreground">{recurso.nombre}</p>
+                          <p className="text-xs text-muted-foreground">{recurso.ubicacion}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px]",
+                              recurso.estado === "dispatched" && "border-accent/50 text-accent",
+                              recurso.estado === "busy" && "border-primary/50 text-primary",
+                              recurso.estado === "available" && "border-success/50 text-success",
+                            )}
+                          >
+                            {getEstadoLabel(recurso.estado)}
+                          </Badge>
+                        </div>
+                        {isAvailable && (
+                          <Checkbox checked={isSelected} className="pointer-events-none" />
+                        )}
+                      </button>
+                    )
+                  })
+                )}
               </div>
 
               <div className="rounded-lg bg-secondary/50 p-3">
-                <p className="text-xs text-muted-foreground mb-1">Resumen del Despliegue</p>
+                <p className="text-xs text-muted-foreground mb-1">
+                  Resumen — {dbRecursos?.filter(r => r.estado === "available").length ?? 0} disponibles de {dbRecursos?.length ?? 0}
+                </p>
                 <p className="text-sm font-medium text-foreground">
-                  {resources.filter(r => r.selected).length > 0 
-                    ? `${resources.filter(r => r.selected).map(r => r.name).join(", ")}`
-                    : "Ningún recurso seleccionado"
+                  {selectedResourceIds.size > 0
+                    ? `${selectedResourceIds.size} recurso(s) seleccionado(s)`
+                    : "Ningun recurso seleccionado"
                   }
                 </p>
               </div>
@@ -795,9 +847,9 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
                 <Button variant="outline" onClick={handleCloseDeploy}>
                   Cancelar
                 </Button>
-                <Button 
-                  onClick={handleDeployResources} 
-                  disabled={deployingResources || resources.filter(r => r.selected).length === 0}
+                <Button
+                  onClick={handleDeployResources}
+                  disabled={deployingResources || selectedResourceIds.size === 0}
                 >
                   {deployingResources ? (
                     <>
