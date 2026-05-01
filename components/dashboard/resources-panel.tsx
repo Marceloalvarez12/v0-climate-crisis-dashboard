@@ -1,30 +1,21 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { Truck, Users, Plane, Ship, Building2, HeartPulse } from "lucide-react"
+import useSWR from "swr"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
+const fetcher = (url: string) => fetch(url).then((res) => res.json())
+
 interface Resource {
   id: string
   name: string
-  type: "ambulance" | "firefighter" | "helicopter" | "boat" | "shelter" | "medical"
-  status: "available" | "en-route" | "busy"
+  type: "ambulance" | "firefighter" | "helicopter" | "boat" | "shelter" | "medical" | "police"
+  status: "available" | "dispatched" | "busy"
   location: string
   eta?: string
 }
-
-const initialResources: Resource[] = [
-  { id: "1", name: "Ambulancia 07", type: "ambulance", status: "available", location: "Base Central" },
-  { id: "2", name: "Bomberos Unidad 3", type: "firefighter", status: "en-route", location: "Ruta 9 Norte", eta: "12 min" },
-  { id: "3", name: "Helicoptero SAR-1", type: "helicopter", status: "busy", location: "Zona Inundada" },
-  { id: "4", name: "Lancha Rescate 2", type: "boat", status: "available", location: "Puerto Fluvial" },
-  { id: "5", name: "Refugio Municipal", type: "shelter", status: "available", location: "Centro Civico" },
-  { id: "6", name: "Equipo Medico A", type: "medical", status: "en-route", location: "Hospital Regional", eta: "8 min" },
-  { id: "7", name: "Ambulancia 12", type: "ambulance", status: "busy", location: "Barrio Norte" },
-  { id: "8", name: "Bomberos Unidad 5", type: "firefighter", status: "available", location: "Cuartel Sur" },
-]
 
 const getIcon = (type: Resource["type"]) => {
   switch (type) {
@@ -40,6 +31,10 @@ const getIcon = (type: Resource["type"]) => {
       return <Building2 className="h-4 w-4" />
     case "medical":
       return <HeartPulse className="h-4 w-4" />
+    case "police":
+      return <Users className="h-4 w-4" />
+    default:
+      return <Users className="h-4 w-4" />
   }
 }
 
@@ -51,7 +46,7 @@ const getStatusBadge = (status: Resource["status"]) => {
           Disponible
         </Badge>
       )
-    case "en-route":
+    case "dispatched":
       return (
         <Badge variant="outline" className="border-accent/50 bg-accent/10 text-accent text-[10px] px-1.5 py-0">
           En camino
@@ -67,32 +62,32 @@ const getStatusBadge = (status: Resource["status"]) => {
 }
 
 export function ResourcesPanel() {
-  const [resources, setResources] = useState<Resource[]>(initialResources)
+  // Fetch resources from Supabase
+  const { data: dbResources, error } = useSWR("/api/recursos", fetcher, {
+    refreshInterval: 2000,
+  })
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setResources(prev => 
-        prev.map(resource => {
-          if (Math.random() > 0.85) {
-            const statuses: Resource["status"][] = ["available", "en-route", "busy"]
-            const newStatus = statuses[Math.floor(Math.random() * statuses.length)]
-            return {
-              ...resource,
-              status: newStatus,
-              eta: newStatus === "en-route" ? `${Math.floor(Math.random() * 20) + 5} min` : undefined
-            }
-          }
-          return resource
-        })
-      )
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [])
+  // Transform database resources to local format
+  const resources: Resource[] = dbResources ? dbResources.map((r: { id: string; tipo: string; nombre: string; estado: string; ubicacion: string }) => ({
+    id: r.id,
+    name: r.nombre,
+    type: r.tipo as Resource["type"],
+    status: r.estado as Resource["status"],
+    location: r.ubicacion || "Base Central",
+    eta: r.estado === "dispatched" ? `${Math.floor(Math.random() * 15) + 5} min` : undefined
+  })) : []
 
   const availableCount = resources.filter(r => r.status === "available").length
-  const enRouteCount = resources.filter(r => r.status === "en-route").length
+  const enRouteCount = resources.filter(r => r.status === "dispatched").length
   const busyCount = resources.filter(r => r.status === "busy").length
+
+  if (error) {
+    return (
+      <div className="flex h-full flex-col rounded-lg border border-border bg-card p-4">
+        <p className="text-sm text-muted-foreground">Error cargando recursos</p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full flex-col rounded-lg border border-border bg-card">
@@ -115,39 +110,43 @@ export function ResourcesPanel() {
       </div>
       <ScrollArea className="flex-1 px-3 py-2">
         <div className="space-y-2">
-          {resources.map((resource) => (
-            <div
-              key={resource.id}
-              className={cn(
-                "rounded-md border border-border bg-secondary/30 p-2.5 transition-all",
-                resource.status === "en-route" && "border-accent/30",
-                resource.status === "busy" && "border-primary/30"
-              )}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className={cn(
-                    "shrink-0",
-                    resource.status === "available" && "text-success",
-                    resource.status === "en-route" && "text-accent",
-                    resource.status === "busy" && "text-primary"
-                  )}>
-                    {getIcon(resource.type)}
+          {resources.length === 0 ? (
+            <p className="text-xs text-muted-foreground p-2">Cargando recursos...</p>
+          ) : (
+            resources.map((resource) => (
+              <div
+                key={resource.id}
+                className={cn(
+                  "rounded-md border border-border bg-secondary/30 p-2.5 transition-all",
+                  resource.status === "dispatched" && "border-accent/30",
+                  resource.status === "busy" && "border-primary/30"
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className={cn(
+                      "shrink-0",
+                      resource.status === "available" && "text-success",
+                      resource.status === "dispatched" && "text-accent",
+                      resource.status === "busy" && "text-primary"
+                    )}>
+                      {getIcon(resource.type)}
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-foreground">{resource.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{resource.location}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-medium text-foreground">{resource.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{resource.location}</p>
-                  </div>
+                  {getStatusBadge(resource.status)}
                 </div>
-                {getStatusBadge(resource.status)}
+                {resource.eta && (
+                  <p className="mt-1.5 text-[10px] font-mono text-accent">
+                    ETA: {resource.eta}
+                  </p>
+                )}
               </div>
-              {resource.eta && (
-                <p className="mt-1.5 text-[10px] font-mono text-accent">
-                  ETA: {resource.eta}
-                </p>
-              )}
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </ScrollArea>
     </div>

@@ -64,6 +64,85 @@ interface ActivityItem {
   reasoning?: ReasoningStep[]
 }
 
+// SMT bounding box for random respawn coordinates
+const SMT_BOUNDS = { latMin: -26.84, latMax: -26.80, lngMin: -65.23, lngMax: -65.18 }
+
+const RESPAWN_ZONES = [
+  "Barrio Sur - Av. Mitre", "Las Talitas - Barrio Mutual", "Tafi Viejo - Zona Residencial",
+  "Banda del Rio Sali - Acceso Norte", "Barrio Norte - Mercado Central",
+  "Yerba Buena - Av. Aconquija", "El Manantial - Ruta Provincial 301",
+  "San Pablo - Sector Industrial", "Alberdi - Barrio Obrero", "Reduccion - Zona Sur",
+]
+const TIPOS = ["flood", "fire", "storm", "general"] as const
+const SEVERIDADES = ["critical", "high", "medium"] as const
+const FUENTES = ["social", "sensor", "camera"] as const
+
+function buildRespawnIncident(base?: { tipo?: string; fuente?: string; fuente_detalles?: Record<string, unknown> }) {
+  const lat = SMT_BOUNDS.latMin + Math.random() * (SMT_BOUNDS.latMax - SMT_BOUNDS.latMin)
+  const lng = SMT_BOUNDS.lngMin + Math.random() * (SMT_BOUNDS.lngMax - SMT_BOUNDS.lngMin)
+  const zona = RESPAWN_ZONES[Math.floor(Math.random() * RESPAWN_ZONES.length)]
+  const tipo = (base?.tipo as typeof TIPOS[number]) ?? TIPOS[Math.floor(Math.random() * TIPOS.length)]
+  const severidad = SEVERIDADES[Math.floor(Math.random() * SEVERIDADES.length)]
+  const fuente = (base?.fuente as typeof FUENTES[number]) ?? FUENTES[Math.floor(Math.random() * FUENTES.length)]
+
+  const fuente_detalles: Record<string, unknown> =
+    fuente === "social"
+      ? { platform: "X (Twitter)", username: "@alerta_tucuman", content: `Nuevo incidente detectado en ${zona}. Ciudadanos reportando la situacion. #EmergenciaTucuman`, imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600" }
+      : fuente === "sensor"
+      ? { sensorId: `WS-${Math.floor(Math.random() * 999)}`, temperature: 20 + Math.floor(Math.random() * 10), humidity: 70 + Math.floor(Math.random() * 25), windSpeed: 20 + Math.floor(Math.random() * 60), pressure: 1005 + Math.floor(Math.random() * 15) }
+      : { cameraId: `CAM-${Math.floor(Math.random() * 999)}`, cameraLocation: zona, imageUrl: "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=600" }
+
+  return {
+    tipo, severidad,
+    ubicacion: zona,
+    latitud: parseFloat(lat.toFixed(6)),
+    longitud: parseFloat(lng.toFixed(6)),
+    personas_afectadas: 50 + Math.floor(Math.random() * 800),
+    fuente, fuente_detalles,
+    estado: "activo",
+  }
+}
+
+// Map of alert locations to their full incident data for Supabase INSERT
+// When the agent "discovers" an alert, we insert it into the DB so the map shows it live
+const ALERT_INCIDENT_DATA: Record<string, {
+  tipo: string; severidad: string; ubicacion: string; latitud: number; longitud: number;
+  personas_afectadas: number; fuente: string; fuente_detalles: Record<string, unknown>
+}> = {
+  "Centro Historico, Tucuman": {
+    tipo: "flood", severidad: "critical",
+    ubicacion: "Centro Historico - Plaza Independencia",
+    latitud: -26.8241, longitud: -65.2226,
+    personas_afectadas: 1250, fuente: "social",
+    fuente_detalles: {
+      platform: "X (Twitter)", username: "@tucuman_alerta",
+      content: "URGENTE: Inundacion severa en Plaza Independencia. El agua supera los 50cm. Vecinos atrapados en edificios. #InundacionTucuman",
+      imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600"
+    }
+  },
+  "Barrio San Pablo, Tucuman": {
+    tipo: "flood", severidad: "critical",
+    ubicacion: "Barrio San Pablo - Canal Norte",
+    latitud: -26.8400, longitud: -65.2500,
+    personas_afectadas: 720, fuente: "social",
+    fuente_detalles: {
+      platform: "X (Twitter)", username: "@rescate_tucuman",
+      content: "Canal San Pablo completamente desbordado. Evacuacion de 180 familias en curso. Corte total de Av. Ejercito del Norte. #AlertaTucuman",
+      imageUrl: "https://images.unsplash.com/photo-1446824505046-e43605ffb17f?w=600"
+    }
+  },
+  "Villa 9 de Julio, Tucuman": {
+    tipo: "fire", severidad: "critical",
+    ubicacion: "Villa 9 de Julio - Fabrica Textil",
+    latitud: -26.7950, longitud: -65.2350,
+    personas_afectadas: 560, fuente: "camera",
+    fuente_detalles: {
+      cameraId: "CAM-V9J-023", cameraLocation: "Av. Roca y Catamarca",
+      imageUrl: "https://images.unsplash.com/photo-1486551937199-baf066858de7?w=600"
+    }
+  },
+}
+
 const initialActivities: ActivityItem[] = [
   { id: "1", type: "monitoring", message: "Sistema de monitoreo iniciado", timestamp: new Date(Date.now() - 300000) },
   { id: "2", type: "extraction", message: "Extrayendo datos de X (Twitter)...", timestamp: new Date(Date.now() - 240000) },
@@ -234,6 +313,21 @@ export function AIActivityLog() {
       }
       setActivities(prev => [...prev.slice(-20), newActivity])
       messageIndexRef.current += 1
+
+      // When the agent "discovers" an actionable alert, INSERT the incident into Supabase
+      // so it appears on the map at the exact same moment
+      if (template.type === "alert" && template.actionable && template.location) {
+        const incidentData = ALERT_INCIDENT_DATA[template.location]
+        if (incidentData) {
+          fetch("/api/incidentes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(incidentData),
+          }).catch(() => {
+            // non-blocking: map already has existing data as fallback
+          })
+        }
+      }
     }, 4000)
 
     return () => clearInterval(interval)
@@ -323,41 +417,89 @@ export function AIActivityLog() {
     setValidatingSatellite(null)
   }
 
-  const confirmAction = () => {
+  const confirmAction = async () => {
     if (!confirmDialog.activity) return
 
     const activityId = confirmDialog.activity.id
+    const location = confirmDialog.activity.location ?? ""
     setProcessedAlerts(prev => new Set(prev).add(activityId))
+    setConfirmDialog({ open: false, type: "deploy", activity: null })
 
     if (confirmDialog.type === "deploy") {
+      // 1. Buscar incidente activo que coincida con la ubicacion
+      try {
+        const res = await fetch("/api/incidentes")
+        const incidentes: Array<{ id: string; ubicacion: string }> = await res.json()
+
+        // Match flexible: busca si la ubicacion del activity esta contenida en la del incidente o viceversa
+        const incidente = incidentes.find((inc) => {
+          const incLoc = inc.ubicacion.toLowerCase()
+          const actLoc = location.toLowerCase()
+          return incLoc.includes(actLoc.split(",")[0].trim()) || actLoc.includes(incLoc.split("-")[0].trim())
+        })
+
+        // 2. Marcar incidente como atendido (desaparece del mapa via SWR)
+        if (incidente) {
+          await fetch("/api/incidentes", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: incidente.id, estado: "atendido" }),
+          })
+
+          // 3. Respawn: insertar nuevo incidente en coordenadas aleatorias de SMT
+          setTimeout(async () => {
+            const respawn = buildRespawnIncident(incidente as { tipo: string; fuente: string; fuente_detalles: Record<string, unknown> })
+            await fetch("/api/incidentes", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(respawn),
+            })
+          }, 8000) // aparece 8 segundos despues de ser atendido
+        }
+
+        // 4. Actualizar primer recurso disponible a "dispatched" (en camino)
+        const recursosRes = await fetch("/api/recursos")
+        const recursos: Array<{ id: string; estado: string }> = await recursosRes.json()
+        const disponible = recursos.find((r) => r.estado === "available")
+        if (disponible) {
+          await fetch("/api/recursos", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: disponible.id,
+              estado: "dispatched",
+              incidente_id: incidente?.id ?? null,
+            }),
+          })
+        }
+      } catch {
+        // non-blocking
+      }
+
       toast.success("Recursos desplegados", {
-        description: `Unidades de emergencia enviadas a ${confirmDialog.activity.location}`,
+        description: `Unidades en camino a ${location}. Incidente removido de activos.`,
       })
-      
-      const completeActivity: ActivityItem = {
+
+      setActivities(prev => [...prev, {
         id: Date.now().toString(),
         type: "complete",
-        message: `Recursos desplegados a ${confirmDialog.activity.location}`,
+        message: `Recursos desplegados a ${location}`,
         timestamp: new Date(),
         isNew: true,
-      }
-      setActivities(prev => [...prev, completeActivity])
+      }])
     } else {
       toast.success("Autoridades notificadas", {
-        description: `Defensa Civil y Bomberos alertados sobre ${confirmDialog.activity.location}`,
+        description: `Defensa Civil y Bomberos alertados sobre ${location}`,
       })
-      
-      const completeActivity: ActivityItem = {
+
+      setActivities(prev => [...prev, {
         id: Date.now().toString(),
         type: "complete",
-        message: `Autoridades notificadas sobre incidente en ${confirmDialog.activity.location}`,
+        message: `Autoridades notificadas sobre incidente en ${location}`,
         timestamp: new Date(),
         isNew: true,
-      }
-      setActivities(prev => [...prev, completeActivity])
+      }])
     }
-
-    setConfirmDialog({ open: false, type: "deploy", activity: null })
   }
 
   const dismissAlert = (activityId: string) => {

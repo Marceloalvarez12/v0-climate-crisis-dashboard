@@ -4,45 +4,45 @@ import { useState, useEffect } from "react"
 import { AlertTriangle, X, Siren, MapPin, Users, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import type { AlertIncident } from "@/app/page"
+
+// The hardcoded incident that this alert represents
+const ALERT_INCIDENT: AlertIncident = {
+  id: "live-alert-san-pablo",
+  type: "flood",
+  severity: "critical",
+  location: "Barrio San Pablo - Canal Norte",
+  coordinates: { lat: -26.8400, lng: -65.2500 },
+  affectedPeople: 720,
+  timestamp: new Date(),
+  source: "social",
+  sourceDetails: {
+    platform: "X (Twitter)",
+    username: "@rescate_tucuman",
+    content: "ACTUALIZACION: Canal San Pablo completamente desbordado en altura de calle Honduras. Evacuacion de 180 familias en curso. Bomberos Voluntarios y Defensa Civil trabajando. Corte total de Av. Ejercito del Norte. Eviten la zona. #AlertaTucuman",
+    imageUrl: "https://images.unsplash.com/photo-1446824505046-e43605ffb17f?w=600&h=400&fit=crop",
+  },
+}
 
 interface LiveAlertProps {
   onDismiss?: () => void
+  onDeployEmergency?: (incident: AlertIncident) => void
 }
 
-export function LiveAlert({ onDismiss }: LiveAlertProps) {
-  const [isVisible, setIsVisible] = useState(false)
+export function LiveAlert({ onDismiss, onDeployEmergency }: LiveAlertProps) {
   const [secondsAgo, setSecondsAgo] = useState(0)
 
-  // Trigger alert after 30 seconds
+  // Seconds counter — starts as soon as this component is mounted (parent controls visibility)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsVisible(true)
-      // Trigger vibration if supported
-      if (navigator.vibrate) {
-        navigator.vibrate([200, 100, 200, 100, 200])
-      }
-    }, 30000)
-
-    return () => clearTimeout(timer)
-  }, [])
-
-  // Update seconds counter
-  useEffect(() => {
-    if (!isVisible) return
-    
     const interval = setInterval(() => {
       setSecondsAgo(prev => prev + 1)
     }, 1000)
-
     return () => clearInterval(interval)
-  }, [isVisible])
+  }, [])
 
   const handleDismiss = () => {
-    setIsVisible(false)
     onDismiss?.()
   }
-
-  if (!isVisible) return null
 
   return (
     <div 
@@ -138,7 +138,9 @@ export function LiveAlert({ onDismiss }: LiveAlertProps) {
           <div className="flex gap-2">
             <Button 
               className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold"
-              onClick={handleDismiss}
+              onClick={() => {
+                onDeployEmergency?.(ALERT_INCIDENT)
+              }}
             >
               <Siren className="h-4 w-4 mr-2" />
               DESPLEGAR EMERGENCIA

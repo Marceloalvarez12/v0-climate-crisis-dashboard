@@ -1,8 +1,45 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
+import useSWR from "swr"
 import { AlertTriangle, Droplets, Flame, Wind, MapPin, Layers, Twitter, Thermometer, Camera, Users, Clock, MapPinned, Ambulance, Shield, Truck, Phone, Send, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json())
+
+// SMT bounding box for random respawn coordinates
+const SMT_BOUNDS = { latMin: -26.84, latMax: -26.80, lngMin: -65.23, lngMax: -65.18 }
+const RESPAWN_ZONES = [
+  "Barrio Sur - Av. Mitre", "Las Talitas - Barrio Mutual", "Tafi Viejo - Zona Residencial",
+  "Banda del Rio Sali - Acceso Norte", "Barrio Norte - Mercado Central",
+  "Yerba Buena - Av. Aconquija", "El Manantial - Ruta Provincial 301",
+  "San Pablo - Sector Industrial", "Alberdi - Barrio Obrero", "Reduccion - Zona Sur",
+]
+
+function buildRespawnIncident(base?: { tipo?: string; fuente?: string }) {
+  const lat = SMT_BOUNDS.latMin + Math.random() * (SMT_BOUNDS.latMax - SMT_BOUNDS.latMin)
+  const lng = SMT_BOUNDS.lngMin + Math.random() * (SMT_BOUNDS.lngMax - SMT_BOUNDS.lngMin)
+  const zona = RESPAWN_ZONES[Math.floor(Math.random() * RESPAWN_ZONES.length)]
+  const tipos = ["flood", "fire", "storm", "general"] as const
+  const severidades = ["critical", "high", "medium"] as const
+  const fuentes = ["social", "sensor", "camera"] as const
+  const tipo = (base?.tipo as typeof tipos[number]) ?? tipos[Math.floor(Math.random() * tipos.length)]
+  const fuente = (base?.fuente as typeof fuentes[number]) ?? fuentes[Math.floor(Math.random() * fuentes.length)]
+  const fuente_detalles: Record<string, unknown> =
+    fuente === "social"
+      ? { platform: "X (Twitter)", username: "@alerta_tucuman", content: `Nuevo incidente detectado en ${zona}. #EmergenciaTucuman`, imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600" }
+      : fuente === "sensor"
+      ? { sensorId: `WS-${Math.floor(Math.random() * 999)}`, temperature: 20 + Math.floor(Math.random() * 10), humidity: 75 + Math.floor(Math.random() * 20), windSpeed: 20 + Math.floor(Math.random() * 60), pressure: 1005 + Math.floor(Math.random() * 15) }
+      : { cameraId: `CAM-${Math.floor(Math.random() * 999)}`, cameraLocation: zona, imageUrl: "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=600" }
+  return {
+    tipo, severidad: severidades[Math.floor(Math.random() * severidades.length)],
+    ubicacion: zona,
+    latitud: parseFloat(lat.toFixed(6)),
+    longitud: parseFloat(lng.toFixed(6)),
+    personas_afectadas: 50 + Math.floor(Math.random() * 800),
+    fuente, fuente_detalles, estado: "activo",
+  }
+}
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -61,168 +98,7 @@ interface Incident {
   }
 }
 
-const incidents: Incident[] = [
-  { 
-    id: "1", 
-    type: "flood", 
-    severity: "critical", 
-    location: "Centro Historico - Plaza Independencia", 
-    coordinates: { lat: -26.8241, lng: -65.2226 }, 
-    affectedPeople: 1250, 
-    timestamp: new Date(Date.now() - 15 * 60000),
-    source: "social",
-    sourceDetails: {
-      platform: "X (Twitter)",
-      username: "@tucuman_alerta",
-      content: "URGENTE: Inundacion severa en Plaza Independencia. El agua supera los 50cm en calles San Martin y 24 de Septiembre. Vecinos atrapados en edificios del microcentro. Se necesita ayuda inmediata. Bomberos desbordados. #InundacionTucuman #EmergenciaSMT",
-      imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600&h=400&fit=crop"
-    }
-  },
-  { 
-    id: "2", 
-    type: "fire", 
-    severity: "high", 
-    location: "Barrio Norte - Deposito Industrial", 
-    coordinates: { lat: -26.8050, lng: -65.2100 }, 
-    affectedPeople: 340, 
-    timestamp: new Date(Date.now() - 8 * 60000),
-    source: "camera",
-    sourceDetails: {
-      cameraId: "CAM-BN-047",
-      cameraLocation: "Av. Mate de Luna esquina Laprida - Camara Municipal #47",
-      imageUrl: "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=600&h=400&fit=crop"
-    }
-  },
-  { 
-    id: "3", 
-    type: "storm", 
-    severity: "medium", 
-    location: "Yerba Buena - Country Jockey Club", 
-    coordinates: { lat: -26.8167, lng: -65.2833 }, 
-    affectedPeople: 890, 
-    timestamp: new Date(Date.now() - 25 * 60000),
-    source: "sensor",
-    sourceDetails: {
-      sensorId: "WS-YB-012",
-      temperature: 18,
-      humidity: 94,
-      windSpeed: 65,
-      pressure: 1008
-    }
-  },
-  { 
-    id: "4", 
-    type: "flood", 
-    severity: "high", 
-    location: "Barrio San Pablo - Canal Norte", 
-    coordinates: { lat: -26.8400, lng: -65.2500 }, 
-    affectedPeople: 720, 
-    timestamp: new Date(Date.now() - 12 * 60000),
-    source: "social",
-    sourceDetails: {
-      platform: "X (Twitter)",
-      username: "@rescate_tucuman",
-      content: "ACTUALIZACION: Canal San Pablo completamente desbordado en altura de calle Honduras. Evacuacion de 180 familias en curso. Bomberos Voluntarios y Defensa Civil trabajando. Corte total de Av. Ejercito del Norte. Eviten la zona. #AlertaTucuman",
-      imageUrl: "https://images.unsplash.com/photo-1446824505046-e43605ffb17f?w=600&h=400&fit=crop"
-    }
-  },
-  { 
-    id: "5", 
-    type: "general", 
-    severity: "low", 
-    location: "El Manantial - Ruta 301", 
-    coordinates: { lat: -26.8600, lng: -65.2700 }, 
-    affectedPeople: 150, 
-    timestamp: new Date(Date.now() - 45 * 60000),
-    source: "sensor",
-    sourceDetails: {
-      sensorId: "WS-EM-003",
-      temperature: 22,
-      humidity: 78,
-      windSpeed: 25,
-      pressure: 1015
-    }
-  },
-  { 
-    id: "6", 
-    type: "fire", 
-    severity: "critical", 
-    location: "Villa 9 de Julio - Fabrica Textil", 
-    coordinates: { lat: -26.7950, lng: -65.2350 }, 
-    affectedPeople: 560, 
-    timestamp: new Date(Date.now() - 5 * 60000),
-    source: "camera",
-    sourceDetails: {
-      cameraId: "CAM-V9J-023",
-      cameraLocation: "Av. Roca y Catamarca - Sistema de Videovigilancia Municipal",
-      imageUrl: "https://images.unsplash.com/photo-1486551937199-baf066858de7?w=600&h=400&fit=crop"
-    }
-  },
-  { 
-    id: "7", 
-    type: "storm", 
-    severity: "high", 
-    location: "Banda del Rio Sali - Zona Industrial", 
-    coordinates: { lat: -26.8480, lng: -65.1650 }, 
-    affectedPeople: 430, 
-    timestamp: new Date(Date.now() - 18 * 60000),
-    source: "social",
-    sourceDetails: {
-      platform: "X (Twitter)",
-      username: "@meteo_noa",
-      content: "ALERTA METEOROLOGICA ROJA para Banda del Rio Sali y alrededores. Registramos rafagas de viento de 85km/h. Multiples arboles caidos en Av. Mitre. Corte de energia en 12 manzanas. SMN confirma continuara las proximas 2hs. #TormentaTucuman #AlertaRoja",
-      imageUrl: "https://images.unsplash.com/photo-1527482937786-6f4c6c3fd49c?w=600&h=400&fit=crop"
-    }
-  },
-  { 
-    id: "8", 
-    type: "flood", 
-    severity: "medium", 
-    location: "Las Talitas - Barrio Mutual", 
-    coordinates: { lat: -26.7700, lng: -65.2050 }, 
-    affectedPeople: 280, 
-    timestamp: new Date(Date.now() - 35 * 60000),
-    source: "sensor",
-    sourceDetails: {
-      sensorId: "FL-LT-008",
-      temperature: 20,
-      humidity: 88,
-      windSpeed: 40,
-      pressure: 1010
-    }
-  },
-  { 
-    id: "9", 
-    type: "flood", 
-    severity: "critical", 
-    location: "Barrio Sur - Av. Roca", 
-    coordinates: { lat: -26.8350, lng: -65.2180 }, 
-    affectedPeople: 980, 
-    timestamp: new Date(Date.now() - 3 * 60000),
-    source: "social",
-    sourceDetails: {
-      platform: "X (Twitter)",
-      username: "@emergencias_tuc",
-      content: "EMERGENCIA MAXIMA en Barrio Sur. Av. Roca intransitable desde Corrientes hasta Chacabuco. Agua ingresando a viviendas. Hospital Centro de Salud Sur solicita evacuacion de pacientes. Ambulancias no pueden acceder. Necesitamos lanchas URGENTE. #SOSTucuman",
-      imageUrl: "https://images.unsplash.com/photo-1583245177184-4ab53e5e391a?w=600&h=400&fit=crop"
-    }
-  },
-  { 
-    id: "10", 
-    type: "fire", 
-    severity: "medium", 
-    location: "Tafi Viejo - Talleres Ferroviarios", 
-    coordinates: { lat: -26.7320, lng: -65.2570 }, 
-    affectedPeople: 85, 
-    timestamp: new Date(Date.now() - 22 * 60000),
-    source: "camera",
-    sourceDetails: {
-      cameraId: "CAM-TV-011",
-      cameraLocation: "Entrada Talleres Ferroviarios - Camara de Seguridad Industrial",
-      imageUrl: "https://images.unsplash.com/photo-1493246507139-91e8fad9978e?w=600&h=400&fit=crop"
-    }
-  },
-]
+// Incidents are now fetched from Supabase via SWR
 
 const getIcon = (type: Incident["type"]) => {
   switch (type) {
@@ -364,7 +240,12 @@ interface ResourceOption {
   selected: boolean
 }
 
-export function CrisisMap() {
+interface CrisisMapProps {
+  pendingIncident?: import("@/app/page").AlertIncident | null
+  onPendingIncidentHandled?: () => void
+}
+
+export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisMapProps = {}) {
   const [isClient, setIsClient] = useState(false)
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const [showDeployModal, setShowDeployModal] = useState(false)
@@ -372,15 +253,44 @@ export function CrisisMap() {
   const [deployingResources, setDeployingResources] = useState(false)
   const [deploySuccess, setDeploySuccess] = useState(false)
   const [resources, setResources] = useState<ResourceOption[]>([
-    { id: "ambulance", name: "Ambulancias SAME", icon: <Ambulance className="h-5 w-5" />, units: 3, eta: "8 min", selected: false },
-    { id: "firefighters", name: "Bomberos Voluntarios", icon: <Truck className="h-5 w-5" />, units: 2, eta: "12 min", selected: false },
-    { id: "police", name: "Policia Provincial", icon: <Shield className="h-5 w-5" />, units: 4, eta: "5 min", selected: false },
-    { id: "civildefense", name: "Defensa Civil", icon: <AlertTriangle className="h-5 w-5" />, units: 1, eta: "15 min", selected: false },
+  { id: "ambulance", name: "Ambulancias SAME", icon: <Ambulance className="h-5 w-5" />, units: 3, eta: "8 min", selected: false },
+  { id: "firefighters", name: "Bomberos Voluntarios", icon: <Truck className="h-5 w-5" />, units: 2, eta: "12 min", selected: false },
+  { id: "police", name: "Policia Provincial", icon: <Shield className="h-5 w-5" />, units: 4, eta: "5 min", selected: false },
+  { id: "civildefense", name: "Defensa Civil", icon: <AlertTriangle className="h-5 w-5" />, units: 1, eta: "15 min", selected: false },
   ])
 
+  // Fetch incidents from Supabase
+  const { data: dbIncidents, error, mutate } = useSWR("/api/incidentes", fetcher, {
+    refreshInterval: 2000, // Poll every 2s so map updates within seconds of agent discovery
+  })
+
+  // Transform database incidents to local format
+  const incidents: Incident[] = useMemo(() => {
+    if (!dbIncidents || error) return []
+    return dbIncidents.map((inc: { id: string; tipo: string; severidad: string; ubicacion: string; latitud: number; longitud: number; personas_afectadas: number; fuente: string; fuente_detalles: Record<string, unknown>; created_at: string }) => ({
+      id: inc.id,
+      type: inc.tipo as Incident["type"],
+      severity: inc.severidad as Incident["severity"],
+      location: inc.ubicacion,
+      coordinates: { lat: inc.latitud, lng: inc.longitud },
+      affectedPeople: inc.personas_afectadas,
+      timestamp: new Date(inc.created_at),
+      source: inc.fuente as SourceType,
+      sourceDetails: inc.fuente_detalles || {}
+    }))
+  }, [dbIncidents, error])
+  
   useEffect(() => {
     setIsClient(true)
   }, [])
+
+  // When LiveAlert fires "DESPLEGAR EMERGENCIA", open the detail modal with that incident
+  useEffect(() => {
+    if (!pendingIncident) return
+    // Cast the AlertIncident shape to the local Incident shape (same structure)
+    setSelectedIncident(pendingIncident as unknown as Incident)
+    onPendingIncidentHandled?.()
+  }, [pendingIncident, onPendingIncidentHandled])
 
   const toggleLayer = (layer: SourceType) => {
     setActiveLayers(prev => 
@@ -421,19 +331,51 @@ export function CrisisMap() {
       return
     }
 
+    const incidenteId = selectedIncident?.id
+    const incidenteTipo = selectedIncident?.type
+    const incidenteFuente = selectedIncident?.source
+
     setDeployingResources(true)
-    
-    // Simulate deployment
     await new Promise(resolve => setTimeout(resolve, 2000))
-    
     setDeployingResources(false)
     setDeploySuccess(true)
-    
+
+    // Mark incident as atendido in Supabase (disappears from map via SWR)
+    if (incidenteId) {
+      await fetch("/api/incidentes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: incidenteId, estado: "atendido" }),
+      }).catch(() => {})
+
+      // Dispatch first available resource
+      const recursosRes = await fetch("/api/recursos")
+      const recursos: Array<{ id: string; estado: string }> = await recursosRes.json()
+      const disponible = recursos.find((r) => r.estado === "available")
+      if (disponible) {
+        await fetch("/api/recursos", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: disponible.id, estado: "dispatched", incidente_id: incidenteId }),
+        }).catch(() => {})
+      }
+
+      // Respawn: new incident at random SMT coordinates after 8 seconds
+      setTimeout(async () => {
+        const respawn = buildRespawnIncident({ tipo: incidenteTipo, fuente: incidenteFuente })
+        await fetch("/api/incidentes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(respawn),
+        }).catch(() => {})
+      }, 8000)
+    }
+
     toast.success(
       `Recursos desplegados a ${selectedIncident?.location}`,
       { description: `${selected.map(s => s.name).join(", ")}` }
     )
-    
+
     setTimeout(() => {
       handleCloseDeploy()
     }, 1500)
