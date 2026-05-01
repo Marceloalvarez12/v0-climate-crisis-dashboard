@@ -19,11 +19,17 @@ export async function GET() {
 export async function PATCH(request: Request) {
   const supabase = await createClient()
   const body = await request.json()
-  const { id, ...updates } = body
+  const { id, estado, incidente_id } = body
+
+  const updatePayload: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (estado !== undefined) updatePayload.estado = estado
+  if (incidente_id !== undefined) updatePayload.incidente_id = incidente_id
 
   const { data, error } = await supabase
     .from("recursos")
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update(updatePayload)
     .eq("id", id)
     .select()
     .single()

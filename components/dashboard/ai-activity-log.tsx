@@ -323,41 +323,79 @@ export function AIActivityLog() {
     setValidatingSatellite(null)
   }
 
-  const confirmAction = () => {
+  const confirmAction = async () => {
     if (!confirmDialog.activity) return
 
     const activityId = confirmDialog.activity.id
+    const location = confirmDialog.activity.location ?? ""
     setProcessedAlerts(prev => new Set(prev).add(activityId))
+    setConfirmDialog({ open: false, type: "deploy", activity: null })
 
     if (confirmDialog.type === "deploy") {
+      // 1. Buscar incidente activo que coincida con la ubicacion
+      try {
+        const res = await fetch("/api/incidentes")
+        const incidentes: Array<{ id: string; ubicacion: string }> = await res.json()
+
+        // Match flexible: busca si la ubicacion del activity esta contenida en la del incidente o viceversa
+        const incidente = incidentes.find((inc) => {
+          const incLoc = inc.ubicacion.toLowerCase()
+          const actLoc = location.toLowerCase()
+          return incLoc.includes(actLoc.split(",")[0].trim()) || actLoc.includes(incLoc.split("-")[0].trim())
+        })
+
+        // 2. Marcar incidente como atendido (desaparece del mapa via SWR)
+        if (incidente) {
+          await fetch("/api/incidentes", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: incidente.id, estado: "atendido" }),
+          })
+        }
+
+        // 3. Actualizar primer recurso disponible a "dispatched" (en camino)
+        const recursosRes = await fetch("/api/recursos")
+        const recursos: Array<{ id: string; estado: string }> = await recursosRes.json()
+        const disponible = recursos.find((r) => r.estado === "available")
+        if (disponible) {
+          await fetch("/api/recursos", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: disponible.id,
+              estado: "dispatched",
+              incidente_id: incidente?.id ?? null,
+            }),
+          })
+        }
+      } catch {
+        // non-blocking: si falla la BD igual mostramos el toast
+      }
+
       toast.success("Recursos desplegados", {
-        description: `Unidades de emergencia enviadas a ${confirmDialog.activity.location}`,
+        description: `Unidades en camino a ${location}. Incidente removido de activos.`,
       })
-      
-      const completeActivity: ActivityItem = {
+
+      setActivities(prev => [...prev, {
         id: Date.now().toString(),
         type: "complete",
-        message: `Recursos desplegados a ${confirmDialog.activity.location}`,
+        message: `Recursos desplegados a ${location}`,
         timestamp: new Date(),
         isNew: true,
-      }
-      setActivities(prev => [...prev, completeActivity])
+      }])
     } else {
       toast.success("Autoridades notificadas", {
-        description: `Defensa Civil y Bomberos alertados sobre ${confirmDialog.activity.location}`,
+        description: `Defensa Civil y Bomberos alertados sobre ${location}`,
       })
-      
-      const completeActivity: ActivityItem = {
+
+      setActivities(prev => [...prev, {
         id: Date.now().toString(),
         type: "complete",
-        message: `Autoridades notificadas sobre incidente en ${confirmDialog.activity.location}`,
+        message: `Autoridades notificadas sobre incidente en ${location}`,
         timestamp: new Date(),
         isNew: true,
-      }
-      setActivities(prev => [...prev, completeActivity])
+      }])
     }
-
-    setConfirmDialog({ open: false, type: "deploy", activity: null })
   }
 
   const dismissAlert = (activityId: string) => {
