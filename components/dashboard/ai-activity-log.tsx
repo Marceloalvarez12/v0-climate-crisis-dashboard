@@ -64,6 +64,45 @@ interface ActivityItem {
   reasoning?: ReasoningStep[]
 }
 
+// SMT bounding box for random respawn coordinates
+const SMT_BOUNDS = { latMin: -26.84, latMax: -26.80, lngMin: -65.23, lngMax: -65.18 }
+
+const RESPAWN_ZONES = [
+  "Barrio Sur - Av. Mitre", "Las Talitas - Barrio Mutual", "Tafi Viejo - Zona Residencial",
+  "Banda del Rio Sali - Acceso Norte", "Barrio Norte - Mercado Central",
+  "Yerba Buena - Av. Aconquija", "El Manantial - Ruta Provincial 301",
+  "San Pablo - Sector Industrial", "Alberdi - Barrio Obrero", "Reduccion - Zona Sur",
+]
+const TIPOS = ["flood", "fire", "storm", "general"] as const
+const SEVERIDADES = ["critical", "high", "medium"] as const
+const FUENTES = ["social", "sensor", "camera"] as const
+
+function buildRespawnIncident(base?: { tipo?: string; fuente?: string; fuente_detalles?: Record<string, unknown> }) {
+  const lat = SMT_BOUNDS.latMin + Math.random() * (SMT_BOUNDS.latMax - SMT_BOUNDS.latMin)
+  const lng = SMT_BOUNDS.lngMin + Math.random() * (SMT_BOUNDS.lngMax - SMT_BOUNDS.lngMin)
+  const zona = RESPAWN_ZONES[Math.floor(Math.random() * RESPAWN_ZONES.length)]
+  const tipo = (base?.tipo as typeof TIPOS[number]) ?? TIPOS[Math.floor(Math.random() * TIPOS.length)]
+  const severidad = SEVERIDADES[Math.floor(Math.random() * SEVERIDADES.length)]
+  const fuente = (base?.fuente as typeof FUENTES[number]) ?? FUENTES[Math.floor(Math.random() * FUENTES.length)]
+
+  const fuente_detalles: Record<string, unknown> =
+    fuente === "social"
+      ? { platform: "X (Twitter)", username: "@alerta_tucuman", content: `Nuevo incidente detectado en ${zona}. Ciudadanos reportando la situacion. #EmergenciaTucuman`, imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600" }
+      : fuente === "sensor"
+      ? { sensorId: `WS-${Math.floor(Math.random() * 999)}`, temperature: 20 + Math.floor(Math.random() * 10), humidity: 70 + Math.floor(Math.random() * 25), windSpeed: 20 + Math.floor(Math.random() * 60), pressure: 1005 + Math.floor(Math.random() * 15) }
+      : { cameraId: `CAM-${Math.floor(Math.random() * 999)}`, cameraLocation: zona, imageUrl: "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=600" }
+
+  return {
+    tipo, severidad,
+    ubicacion: zona,
+    latitud: parseFloat(lat.toFixed(6)),
+    longitud: parseFloat(lng.toFixed(6)),
+    personas_afectadas: 50 + Math.floor(Math.random() * 800),
+    fuente, fuente_detalles,
+    estado: "activo",
+  }
+}
+
 // Map of alert locations to their full incident data for Supabase INSERT
 // When the agent "discovers" an alert, we insert it into the DB so the map shows it live
 const ALERT_INCIDENT_DATA: Record<string, {
@@ -406,9 +445,19 @@ export function AIActivityLog() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ id: incidente.id, estado: "atendido" }),
           })
+
+          // 3. Respawn: insertar nuevo incidente en coordenadas aleatorias de SMT
+          setTimeout(async () => {
+            const respawn = buildRespawnIncident(incidente as { tipo: string; fuente: string; fuente_detalles: Record<string, unknown> })
+            await fetch("/api/incidentes", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(respawn),
+            })
+          }, 8000) // aparece 8 segundos despues de ser atendido
         }
 
-        // 3. Actualizar primer recurso disponible a "dispatched" (en camino)
+        // 4. Actualizar primer recurso disponible a "dispatched" (en camino)
         const recursosRes = await fetch("/api/recursos")
         const recursos: Array<{ id: string; estado: string }> = await recursosRes.json()
         const disponible = recursos.find((r) => r.estado === "available")
@@ -424,7 +473,7 @@ export function AIActivityLog() {
           })
         }
       } catch {
-        // non-blocking: si falla la BD igual mostramos el toast
+        // non-blocking
       }
 
       toast.success("Recursos desplegados", {
