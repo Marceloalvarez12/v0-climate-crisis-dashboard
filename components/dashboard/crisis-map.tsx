@@ -219,6 +219,7 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
   const [deployingResources, setDeployingResources] = useState(false)
   const [deploySuccess, setDeploySuccess] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmingIncident, setConfirmingIncident] = useState<Incident | null>(null)
   const [resources, setResources] = useState<ResourceOption[]>([
   { id: "ambulance", name: "Ambulancias SAME", icon: <Ambulance className="h-5 w-5" />, units: 3, eta: "8 min", selected: false },
   { id: "firefighters", name: "Bomberos Voluntarios", icon: <Truck className="h-5 w-5" />, units: 2, eta: "12 min", selected: false },
@@ -282,25 +283,28 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
   }
 
   const handleOpenDeploy = () => {
-    // "Desplegar Recursos" now opens the confirmation modal directly
+    // Snapshot the incident before closing the detail modal
+    setConfirmingIncident(selectedIncident)
+    setSelectedIncident(null)
     setShowConfirmModal(true)
   }
 
   const handleCloseDeploy = () => {
     setShowDeployModal(false)
     setShowConfirmModal(false)
+    setConfirmingIncident(null)
     setDeploySuccess(false)
     setResources(prev => prev.map(r => ({ ...r, selected: false })))
   }
 
   const handleConfirmDeploy = async () => {
-    // Capture location before clearing state
-    const location = selectedIncident?.location ?? "ubicacion desconocida"
-    const incidentId = selectedIncident?.id
+    // Use confirmingIncident (selectedIncident was already cleared in handleOpenDeploy)
+    const location = confirmingIncident?.location ?? "ubicacion desconocida"
+    const incidentId = confirmingIncident?.id
 
-    // Close all modals immediately
+    // Close confirmation modal
     setShowConfirmModal(false)
-    setSelectedIncident(null)
+    setConfirmingIncident(null)
 
     // Update the incident status in Supabase if we have an id
     if (incidentId) {
@@ -718,7 +722,7 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
               Esta a punto de desplegar unidades de emergencia a:
             </p>
             <p className="text-base font-bold text-foreground -mt-3">
-              {selectedIncident?.location}
+              {confirmingIncident?.location}
             </p>
 
             {/* AI Confidence Bar */}
@@ -747,7 +751,12 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
             <Button
               variant="outline"
               className="bg-secondary/50 border-border text-foreground hover:bg-secondary"
-              onClick={() => setShowConfirmModal(false)}
+              onClick={() => {
+                // Restore selectedIncident so the detail modal reopens
+                setSelectedIncident(confirmingIncident)
+                setConfirmingIncident(null)
+                setShowConfirmModal(false)
+              }}
             >
               Cancelar
             </Button>
