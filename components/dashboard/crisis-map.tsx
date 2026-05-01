@@ -206,7 +206,12 @@ interface ResourceOption {
   selected: boolean
 }
 
-export function CrisisMap() {
+interface CrisisMapProps {
+  pendingIncident?: import("@/app/page").AlertIncident | null
+  onPendingIncidentHandled?: () => void
+}
+
+export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisMapProps = {}) {
   const [isClient, setIsClient] = useState(false)
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const [showDeployModal, setShowDeployModal] = useState(false)
@@ -242,8 +247,16 @@ export function CrisisMap() {
   }, [dbIncidents, error])
   
   useEffect(() => {
-  setIsClient(true)
+    setIsClient(true)
   }, [])
+
+  // When LiveAlert fires "DESPLEGAR EMERGENCIA", open the detail modal with that incident
+  useEffect(() => {
+    if (!pendingIncident) return
+    // Cast the AlertIncident shape to the local Incident shape (same structure)
+    setSelectedIncident(pendingIncident as unknown as Incident)
+    onPendingIncidentHandled?.()
+  }, [pendingIncident, onPendingIncidentHandled])
 
   const toggleLayer = (layer: SourceType) => {
     setActiveLayers(prev => 

@@ -13,14 +13,28 @@ import { Button } from "@/components/ui/button"
 import { Siren } from "lucide-react"
 import { Suspense } from "react"
 
+// Minimal incident shape needed to open the detail modal from outside CrisisMap
+export interface AlertIncident {
+  id: string
+  type: "flood" | "fire" | "storm" | "general"
+  severity: "critical" | "high" | "medium" | "low"
+  location: string
+  coordinates: { lat: number; lng: number }
+  affectedPeople: number
+  timestamp: Date
+  source: "social" | "sensor" | "camera"
+  sourceDetails: Record<string, unknown>
+}
+
 export default function CrisisDashboard() {
   const [showLiveAlert, setShowLiveAlert] = useState(false)
+  // Lifted state: incident selected from LiveAlert to open in CrisisMap detail modal
+  const [pendingIncident, setPendingIncident] = useState<AlertIncident | null>(null)
 
   // Auto-trigger alert after 25 seconds for demo
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowLiveAlert(true)
-      // Trigger vibration if supported
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate([200, 100, 200, 100, 200])
       }
@@ -28,6 +42,11 @@ export default function CrisisDashboard() {
 
     return () => clearTimeout(timer)
   }, [])
+
+  const handleDeployEmergency = (incident: AlertIncident) => {
+    setShowLiveAlert(false)
+    setPendingIncident(incident)
+  }
 
   const triggerManualAlert = () => {
     setShowLiveAlert(true)
@@ -45,7 +64,10 @@ export default function CrisisDashboard() {
 
       {/* Live Alert Overlay */}
       {showLiveAlert && (
-        <LiveAlert onDismiss={() => setShowLiveAlert(false)} />
+        <LiveAlert
+          onDismiss={() => setShowLiveAlert(false)}
+          onDeployEmergency={handleDeployEmergency}
+        />
       )}
 
       {/* Header */}
@@ -61,7 +83,10 @@ export default function CrisisDashboard() {
         {/* Center - Map */}
         <main className="flex flex-1 flex-col gap-3 overflow-hidden p-3">
           <div className="flex-1 min-h-0">
-            <CrisisMap />
+            <CrisisMap
+              pendingIncident={pendingIncident}
+              onPendingIncidentHandled={() => setPendingIncident(null)}
+            />
           </div>
           
           {/* Bottom Analytics */}
