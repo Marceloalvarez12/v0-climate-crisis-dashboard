@@ -378,19 +378,21 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
   const center: [number, number] = [-26.8241, -65.2226]
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-lg border border-border bg-card">
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-border bg-card md:relative">
       {/* Map Header */}
-      <div className="absolute left-0 right-0 top-0 z-[1000] flex items-center justify-between border-b border-border bg-card/95 px-4 py-2 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-semibold text-foreground">San Miguel de Tucuman - Mapa de Incidentes</h2>
+      <div className="absolute left-0 right-0 top-0 z-[1000] flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-border bg-card/95 px-3 py-2 backdrop-blur-sm">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+          <h2 className="truncate text-xs font-semibold text-foreground sm:text-sm">
+            San Miguel de Tucuman - Mapa de Incidentes
+          </h2>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
           {/* Layer Filter */}
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs border-border">
-                <Layers className="h-3.5 w-3.5" />
+              <Button variant="outline" size="sm" className="h-6 gap-1 border-border px-2 text-[10px]">
+                <Layers className="h-3 w-3" />
                 Capas ({activeLayers.length})
               </Button>
             </PopoverTrigger>
@@ -417,22 +419,22 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
               </div>
             </PopoverContent>
           </Popover>
-          <Badge variant="outline" className="border-primary/50 bg-primary/10 text-primary text-[10px]">
+          <Badge variant="outline" className="hidden border-primary/50 bg-primary/10 text-primary text-[10px] sm:inline-flex">
             {filteredIncidents.filter(i => i.severity === "critical").length} Criticos
           </Badge>
-          <Badge variant="outline" className="border-accent/50 bg-accent/10 text-accent text-[10px]">
+          <Badge variant="outline" className="hidden border-accent/50 bg-accent/10 text-accent text-[10px] sm:inline-flex">
             {filteredIncidents.filter(i => i.severity === "high").length} Altos
           </Badge>
         </div>
       </div>
 
-      {/* Incident List Panel - Top Right */}
-      <div className="absolute right-3 top-14 z-[1000] w-72 max-h-[420px] rounded-lg border border-border bg-card/95 backdrop-blur-sm shadow-xl">
+      {/* Incident List Panel — static on mobile, floating on md+ */}
+      <div className="relative z-10 mt-0 w-full rounded-none border-b border-border bg-card/95 backdrop-blur-sm shadow-none md:absolute md:right-3 md:top-14 md:z-[1000] md:w-72 md:max-h-[420px] md:rounded-lg md:border md:shadow-xl">
         <div className="flex items-center justify-between border-b border-border bg-card px-3 py-2 rounded-t-lg">
           <p className="text-xs font-semibold text-foreground">Incidentes Activos ({filteredIncidents.length})</p>
           <Badge variant="outline" className="text-[9px] border-primary/50 text-primary animate-pulse">En vivo</Badge>
         </div>
-        <div className="overflow-y-auto max-h-[370px] p-2 space-y-1.5 custom-scrollbar">
+        <div className="overflow-y-auto max-h-48 p-2 space-y-1.5 custom-scrollbar md:max-h-[370px]">
           {filteredIncidents.map((incident) => (
             <button
               key={incident.id}
@@ -465,7 +467,7 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
 
       {/* Leaflet Map */}
       {isClient ? (
-        <div className="h-full w-full pt-10">
+        <div className="h-[400px] w-full shrink-0 pt-10 md:h-full md:flex-1">
           <link
             rel="stylesheet"
             href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -539,7 +541,7 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
           </MapContainer>
         </div>
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-secondary/20">
+        <div className="flex h-[400px] w-full shrink-0 items-center justify-center bg-secondary/20 md:h-full md:flex-1">
           <div className="flex flex-col items-center gap-2">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             <p className="text-sm text-muted-foreground">Cargando mapa...</p>
@@ -547,8 +549,8 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
         </div>
       )}
 
-      {/* Legend - Bottom Left */}
-      <div className="absolute bottom-3 left-3 z-[1000] rounded-md border border-border bg-card/95 p-2 backdrop-blur-sm">
+      {/* Legend - hidden on mobile, visible bottom-left on md+ */}
+      <div className="absolute bottom-3 left-3 z-[1000] hidden rounded-md border border-border bg-card/95 p-2 backdrop-blur-sm md:block">
         <p className="mb-1.5 text-[10px] font-medium text-muted-foreground">Severidad</p>
         <div className="flex flex-col gap-1">
           {[
