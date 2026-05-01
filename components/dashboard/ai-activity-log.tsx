@@ -315,18 +315,18 @@ export function AIActivityLog() {
       setActivities(prev => [...prev.slice(-20), newActivity])
       messageIndexRef.current += 1
 
-      // When the agent "discovers" an actionable alert, INSERT the incident into Supabase
-      // so it appears on the map at the exact same moment
+      // When the agent "discovers" an actionable alert, wait 2 minutes then INSERT
+      // the incident into Supabase so it appears on the map one by one with delay
       if (template.type === "alert" && template.actionable && template.location) {
         const incidentData = ALERT_INCIDENT_DATA[template.location]
         if (incidentData) {
-          fetch("/api/incidentes", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(incidentData),
-          }).catch(() => {
-            // non-blocking: map already has existing data as fallback
-          })
+          setTimeout(() => {
+            fetch("/api/incidentes", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(incidentData),
+            }).catch(() => {})
+          }, 2 * 60 * 1000) // 2 minutes after the agent announces it
         }
       }
     }, 4000)
@@ -447,7 +447,7 @@ export function AIActivityLog() {
             body: JSON.stringify({ id: incidente.id, estado: "atendido" }),
           })
 
-          // 3. Respawn: insertar nuevo incidente en coordenadas aleatorias de SMT
+          // 3. Respawn: nuevo incidente en coordenadas aleatorias, 2 minutos despues de ser atendido
           setTimeout(async () => {
             const respawn = buildRespawnIncident(incidente as { tipo: string; fuente: string; fuente_detalles: Record<string, unknown> })
             await fetch("/api/incidentes", {
@@ -455,7 +455,7 @@ export function AIActivityLog() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(respawn),
             })
-          }, 8000) // aparece 8 segundos despues de ser atendido
+          }, 2 * 60 * 1000)
         }
 
         // 4. Despachar recurso con ciclo de vida automatico:

@@ -378,7 +378,7 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
       await Promise.all(dispatchPromises)
       mutateRecursos()
 
-      // Respawn: new incident at random SMT coordinates after 8 seconds
+      // Respawn: nuevo incidente en coordenadas aleatorias, 2 minutos despues de ser atendido
       setTimeout(async () => {
         const respawn = buildRespawnIncident({ tipo: incidenteTipo, fuente: incidenteFuente })
         await fetch("/api/incidentes", {
@@ -386,7 +386,7 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(respawn),
         }).catch(() => {})
-      }, 8000)
+      }, 2 * 60 * 1000)
     }
 
     toast.success(
