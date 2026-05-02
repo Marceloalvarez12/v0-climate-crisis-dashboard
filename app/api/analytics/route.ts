@@ -31,30 +31,25 @@ export async function GET() {
     .from("recursos")
     .select("id, estado, updated_at")
 
-  // 5. Avg response time — STATIC (from mock-data.ts)
-  //    Para integrar la version real desde la DB, descomentar el bloque de abajo
-  //    y reemplazar `avgResponseMin` con `avgResponseMinDB ?? STATIC_RESPONSE_TIME_MIN`.
-  //
-  // --- INTEGRACION DB (descomentar cuando haya datos reales) ---
-  // const { data: resolved } = await supabase
-  //   .from("incidentes")
-  //   .select("created_at, updated_at")
-  //   .eq("estado", "atendido")
-  //   .order("updated_at", { ascending: false })
-  //   .limit(50)
-  //
-  // const validResolved = (resolved ?? []).filter((i: { created_at: string; updated_at: string }) => {
-  //   const diffMin = (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()) / 60000
-  //   return diffMin >= 1 && diffMin <= 120
-  // })
-  // const avgResponseMinDB: number | null = validResolved.length > 0
-  //   ? parseFloat((
-  //       validResolved.reduce((s: number, i: { created_at: string; updated_at: string }) =>
-  //         s + (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()) / 60000, 0
-  //       ) / validResolved.length
-  //     ).toFixed(1))
-  //   : null
-  // --- FIN INTEGRACION DB ---
+  // 5. Avg response time — try to calculate from resolved incidents, fallback to static
+  const { data: resolved } = await supabase
+    .from("incidentes")
+    .select("created_at, updated_at")
+    .eq("estado", "atendido")
+    .order("updated_at", { ascending: false })
+    .limit(50)
+
+  const validResolved = (resolved ?? []).filter((i: { created_at: string; updated_at: string }) => {
+    const diffMin = (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()) / 60000
+    return diffMin >= 1 && diffMin <= 120
+  })
+  const avgResponseMinDB: number | null = validResolved.length > 0
+    ? parseFloat((
+        validResolved.reduce((s: number, i: { created_at: string; updated_at: string }) =>
+          s + (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()) / 60000, 0
+        ) / validResolved.length
+      ).toFixed(1))
+    : null
 
   // --- Calculations ---
 
@@ -78,20 +73,23 @@ export async function GET() {
   const highCount    = active.filter((i: { severidad: string }) => i.severidad === "high").length
   const mediumCount  = active.filter((i: { severidad: string }) => i.severidad === "medium").length
   const lowCount     = active.filter((i: { severidad: string }) => i.severidad === "low").length
-  let riskLevel = "BAJO"
+  let riskLevel = "LOW"
   let riskProgress = 20
-  if (criticalCount >= 2) { riskLevel = "CRITICO"; riskProgress = 95 }
-  else if (criticalCount === 1) { riskLevel = "CRITICO"; riskProgress = 85 }
-  else if (highCount >= 2) { riskLevel = "ALTO"; riskProgress = 70 }
-  else if (highCount === 1 || active.length >= 3) { riskLevel = "MEDIO"; riskProgress = 50 }
-  else if (active.length > 0) { riskLevel = "BAJO-MEDIO"; riskProgress = 35 }
+  if (criticalCount >= 2) { riskLevel = "CRITICAL"; riskProgress = 95 }
+  else if (criticalCount === 1) { riskLevel = "CRITICAL"; riskProgress = 85 }
+  else if (highCount >= 2) { riskLevel = "HIGH"; riskProgress = 70 }
+  else if (highCount === 1 || active.length >= 3) { riskLevel = "MEDIUM"; riskProgress = 50 }
+  else if (active.length > 0) { riskLevel = "LOW-MEDIUM"; riskProgress = 35 }
 
-  // Avg response time — static reference value from mock-data.ts
-  const avgResponseMin: number = STATIC_RESPONSE_TIME_MIN
+  // Avg response time — dynamic from DB when data exists, fallback to static reference
+  const avgResponseMin: number = avgResponseMinDB ?? STATIC_RESPONSE_TIME_MIN
 
-  // Incident trend: compare last 24h vs prev 24h
-  // If prev window has 0 incidents (app just started), return null so UI hides the badge
-  const incidentsTrend = prev24.length > 0
+  // Incident trend: compare last 24h vs prev 24h.
+  // Trend: only meaningful when BOTH 24h windows have incidents.
+  // If curr24 === 0 the result is always 0% or -100%, which is misleading in quiet
+  // periods or when running on seeded data with old timestamps — return null so the
+  // UI shows "Stable" instead of a spurious negative percentage.
+  const incidentsTrend = curr24.length > 0 && prev24.length > 0
     ? Math.round(((curr24.length - prev24.length) / prev24.length) * 100)
     : null
 

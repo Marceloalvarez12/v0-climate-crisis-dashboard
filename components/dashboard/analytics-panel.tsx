@@ -55,11 +55,11 @@ export function AnalyticsPanel() {
       : `${d.avgResponseMin} min`
     : "—"
 
-  // Trend: null means no previous window data yet — show "Sin datos"
+  // Trend: null means no reliable comparison window — show "Stable"
   const trendValue = !d
     ? "—"
     : d.incidentsTrend === null
-      ? "No Incidents"
+      ? "Stable"
       : d.incidentsTrend > 0
         ? `+${d.incidentsTrend}%`
         : d.incidentsTrend < 0
@@ -89,9 +89,9 @@ export function AnalyticsPanel() {
       id: "response",
       label: "Response Time",
       value: responseValue,
-      // No change badge for response time — no meaningful baseline yet
       icon: <Clock className="h-4 w-4" />,
       color: d?.avgResponseMin != null ? "success" : "muted",
+      sublabel: "avg. last 50 incidents",
     },
     {
       id: "incidents",
