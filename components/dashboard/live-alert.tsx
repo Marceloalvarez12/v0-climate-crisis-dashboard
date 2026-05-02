@@ -4,10 +4,10 @@ import { useState, useEffect } from "react"
 import { AlertTriangle, X, Siren, MapPin, Users, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import type { AlertIncident } from "@/app/page"
+import type { Incident } from "@/lib/types"
 
 // The hardcoded incident that this alert represents
-const ALERT_INCIDENT: AlertIncident = {
+const ALERT_INCIDENT: Incident = {
   id: "live-alert-san-pablo",
   type: "flood",
   severity: "critical",
@@ -26,7 +26,7 @@ const ALERT_INCIDENT: AlertIncident = {
 
 interface LiveAlertProps {
   onDismiss?: () => void
-  onDeployEmergency?: (incident: AlertIncident) => void
+  onDeployEmergency?: (incident: Incident) => void
 }
 
 export function LiveAlert({ onDismiss, onDeployEmergency }: LiveAlertProps) {

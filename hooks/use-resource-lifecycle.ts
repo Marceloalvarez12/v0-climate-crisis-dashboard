@@ -1,22 +1,14 @@
 "use client"
 
-import { RESOURCE_DISPATCHED_TO_BUSY_MS, RESOURCE_BUSY_TO_AVAILABLE_MS } from "@/lib/mock-data"
-
-// Aliases locales para legibilidad
-const DISPATCHED_TO_BUSY_MS = RESOURCE_DISPATCHED_TO_BUSY_MS
-const BUSY_TO_AVAILABLE_MS  = RESOURCE_BUSY_TO_AVAILABLE_MS
-
-async function patchRecurso(id: string, estado: string) {
-  await fetch("/api/recursos", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, estado }),
-  })
-}
+import {
+  RESOURCE_DISPATCHED_TO_BUSY_MS,
+  RESOURCE_BUSY_TO_AVAILABLE_MS,
+} from "@/lib/mock-data"
+import { fetchRecursos, patchRecurso } from "@/lib/api"
 
 /**
- * Despacha un recurso especifico (o el primero disponible si no se pasa resourceId)
- * y encadena las transiciones de estado automaticamente:
+ * Despacha un recurso específico (o el primero disponible si no se pasa resourceId)
+ * y encadena las transiciones de estado automáticamente:
  *   available → dispatched (inmediato)
  *   dispatched → busy      (50 segundos)
  *   busy → available       (60 segundos adicionales)
@@ -27,31 +19,29 @@ export async function dispatchResourceWithLifecycle(
 ): Promise<string | null> {
   let recursoId = resourceId
 
-  // Si no se paso un id especifico, buscar el primer recurso disponible
+  // Si no se pasó un id específico, buscar el primer recurso disponible
   if (!recursoId) {
-    const res = await fetch("/api/recursos")
-    const recursos: Array<{ id: string; estado: string }> = await res.json()
+    const recursos = await fetchRecursos()
     const disponible = recursos.find((r) => r.estado === "available")
     if (!disponible) return null
     recursoId = disponible.id
   }
 
   // dispatched (en camino) — inmediato
-  await fetch("/api/recursos", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: recursoId, estado: "dispatched", incidente_id: incidenteId ?? null }),
+  await patchRecurso(recursoId, {
+    estado: "dispatched",
+    incidente_id: incidenteId ?? null,
   })
 
-  // busy (ocupado) — 50 segundos despues
+  // busy (ocupado) — 50 segundos después
   setTimeout(async () => {
-    await patchRecurso(recursoId!, "busy")
+    await patchRecurso(recursoId!, { estado: "busy" })
 
     // available (disponible) — 60 segundos adicionales
     setTimeout(async () => {
-      await patchRecurso(recursoId!, "available")
-    }, BUSY_TO_AVAILABLE_MS)
-  }, DISPATCHED_TO_BUSY_MS)
+      await patchRecurso(recursoId!, { estado: "available" })
+    }, RESOURCE_BUSY_TO_AVAILABLE_MS)
+  }, RESOURCE_DISPATCHED_TO_BUSY_MS)
 
   return recursoId
 }

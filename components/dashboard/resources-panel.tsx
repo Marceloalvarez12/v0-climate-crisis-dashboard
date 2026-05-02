@@ -3,10 +3,9 @@
 import { Truck, Users, Plane, Ship, Building2, HeartPulse } from "lucide-react"
 import useSWR from "swr"
 import { cn } from "@/lib/utils"
+import { fetcher } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 interface Resource {
   id: string

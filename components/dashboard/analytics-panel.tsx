@@ -1,11 +1,9 @@
 "use client"
 
-import React from "react"
 import useSWR from "swr"
 import { AlertTriangle, Users, Clock, TrendingUp, TrendingDown, Activity, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+import { fetcher } from "@/lib/api"
 
 interface AnalyticsData {
   riskLevel: string
