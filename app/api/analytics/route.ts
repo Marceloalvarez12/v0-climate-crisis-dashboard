@@ -71,25 +71,26 @@ export async function GET() {
   else if (highCount === 1 || active.length >= 3) { riskLevel = "MEDIO"; riskProgress = 50 }
   else if (active.length > 0) { riskLevel = "BAJO-MEDIO"; riskProgress = 35 }
 
-  // Avg response time in minutes — filter out seed data by capping at 120 min max per incident
-  const MAX_RESPONSE_MIN = 120
+  // Avg response time — only require a positive diff (no artificial cap)
+  // Incidents marked atendido via bulk reset have updated_at == the reset timestamp,
+  // so we skip those by requiring diff > 1 minute (real dispatch takes at least that)
   const validResolved = resolvedList.filter((i: { created_at: string; updated_at: string }) => {
     const diffMin = (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()) / 60000
-    return diffMin > 0 && diffMin <= MAX_RESPONSE_MIN
+    return diffMin >= 1
   })
   let avgResponseMin: number | null = null
   if (validResolved.length > 0) {
-    const totalMs = validResolved.reduce((s: number, i: { created_at: string; updated_at: string }) => {
-      return s + (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime())
+    const totalMin = validResolved.reduce((s: number, i: { created_at: string; updated_at: string }) => {
+      return s + (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()) / 60000
     }, 0)
-    avgResponseMin = parseFloat((totalMs / validResolved.length / 60000).toFixed(1))
+    avgResponseMin = parseFloat((totalMin / validResolved.length).toFixed(1))
   }
 
-  // Incident trend: only show % if there is a real previous window to compare against
-  // If no previous data, show 0 (no trend yet)
+  // Incident trend: compare last 24h vs prev 24h
+  // If prev window has 0 incidents (app just started), return null so UI hides the badge
   const incidentsTrend = prev24.length > 0
     ? Math.round(((curr24.length - prev24.length) / prev24.length) * 100)
-    : 0
+    : null
 
   // Resources
   const totalResources = allResources.length

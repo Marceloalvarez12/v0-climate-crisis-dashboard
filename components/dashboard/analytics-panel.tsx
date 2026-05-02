@@ -19,7 +19,7 @@ interface AnalyticsData {
   avgResponseMin: number | null
   resolvedCount: number
   activeIncidentCount: number
-  incidentsTrend: number
+  incidentsTrend: number | null
   totalResources: number
   deployedResources: number
   enCamino: number
@@ -50,16 +50,23 @@ export function AnalyticsPanel() {
     : d.highCount > 0 ? "accent"
     : "success"
 
-  // Only show response time once we have real resolved incidents
-  const responseValue = d?.avgResponseMin != null ? `${d.avgResponseMin} min` : "—"
+  // Response time: show in hours if >= 60 min, minutes otherwise
+  const responseValue = d?.avgResponseMin != null
+    ? d.avgResponseMin >= 60
+      ? `${(d.avgResponseMin / 60).toFixed(1)}h`
+      : `${d.avgResponseMin} min`
+    : "—"
 
-  // Trend value: only show percentage if we have prior window data, otherwise "—"
-  const hasTrendData = d != null && (d.incidentsTrend !== 0 || d.activeIncidentCount > 0)
+  // Trend: null means no previous window data yet — show "Sin datos"
   const trendValue = !d
     ? "—"
-    : hasTrendData
-      ? (d.incidentsTrend > 0 ? `+${d.incidentsTrend}%` : d.incidentsTrend < 0 ? `${d.incidentsTrend}%` : "Estable")
-      : "—"
+    : d.incidentsTrend === null
+      ? "Sin datos"
+      : d.incidentsTrend > 0
+        ? `+${d.incidentsTrend}%`
+        : d.incidentsTrend < 0
+          ? `${d.incidentsTrend}%`
+          : "Estable"
 
   const metrics: Metric[] = [
     {
@@ -92,7 +99,7 @@ export function AnalyticsPanel() {
       id: "incidents",
       label: "Incidentes Activos",
       value: d?.activeIncidentCount ?? "—",
-      change: d?.incidentsTrend !== 0 ? d?.incidentsTrend : undefined,
+      change: d?.incidentsTrend != null && d.incidentsTrend !== 0 ? d.incidentsTrend : undefined,
       icon: <Activity className="h-4 w-4" />,
       color: d && d.activeIncidentCount > 0 ? "primary" : "muted",
       // severity breakdown shown as sublabel
@@ -121,7 +128,9 @@ export function AnalyticsPanel() {
       icon: d?.incidentsTrend != null && d.incidentsTrend < 0
         ? <TrendingDown className="h-4 w-4" />
         : <TrendingUp className="h-4 w-4" />,
-      color: trendValue === "—" ? "muted" : d?.incidentsTrend != null && d.incidentsTrend < 0 ? "success" : "accent",
+      color: !d || d.incidentsTrend === null
+        ? "muted"
+        : d.incidentsTrend < 0 ? "success" : d.incidentsTrend > 0 ? "primary" : "muted",
     },
   ]
 
