@@ -8,12 +8,14 @@ export async function POST() {
 
   const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
-  // Find active incidents created more than 60 minutes ago
+  // Find active incidents whose updated_at is older than 60 minutes.
+  // updated_at is always writable and gets reset to NOW() every time an
+  // incident is spawned or reactivated, so this timer starts fresh each time.
   const { data: stale, error: fetchError } = await supabase
     .from("incidentes")
     .select("id, ubicacion")
     .eq("estado", "activo")
-    .lt("created_at", cutoff)
+    .lt("updated_at", cutoff)
 
   if (fetchError) {
     return NextResponse.json({ error: fetchError.message }, { status: 500 })

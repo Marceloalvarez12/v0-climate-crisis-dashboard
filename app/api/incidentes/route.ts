@@ -45,10 +45,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ skipped: true, reason: "max_active_reached" }, { status: 200 })
       }
 
-      const now = new Date().toISOString()
       const { data, error } = await supabase
         .from("incidentes")
-        .update({ estado: "activo", updated_at: now, created_at: now })
+        .update({ estado: "activo", updated_at: new Date().toISOString() })
         .eq("id", existing.id)
         .select()
         .single()
@@ -88,16 +87,9 @@ export async function PATCH(request: Request) {
   const body = await request.json()
   const { id, ...updates } = body
 
-  const now = new Date().toISOString()
-  // If reactivating an incident, reset created_at so the 60-min auto-resolve
-  // timer starts from this moment, not the original creation date
-  const timestampFields = updates.estado === "activo"
-    ? { updated_at: now, created_at: now }
-    : { updated_at: now }
-
   const { data, error } = await supabase
     .from("incidentes")
-    .update({ ...updates, ...timestampFields })
+    .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select()
     .single()
