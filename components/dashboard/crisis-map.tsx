@@ -353,6 +353,9 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
   }
 
   const handleOpenDeploy = () => {
+    // Always reset to a clean state before opening for a new incident
+    setDeploySuccess(false)
+    setSelectedCounts({})
     mutateRecursos()
     setShowDeployModal(true)
   }
