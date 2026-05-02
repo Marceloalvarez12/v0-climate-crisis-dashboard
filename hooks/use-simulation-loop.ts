@@ -4,12 +4,12 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useSWRConfig } from "swr"
 import { buildRespawnIncident, SOCIAL_REPORTS, CAMERA_REPORTS, SENSOR_REPORTS } from "@/lib/mock-data"
 
-// Pool unificado construido desde mock-data para que el simulation loop
-// use exactamente los mismos datos que el resto del sistema
-const INCIDENT_POOL = [
-  ...SOCIAL_REPORTS.map(r => ({ tipo: r.tipo, severidad: "high" as const, ubicacion: r.zona.nombre, personas_afectadas: 300 + Math.floor(Math.random() * 600), fuente: "social" as const, fuente_detalles: { platform: "X (Twitter)", username: r.fuente, content: r.texto, imageUrl: r.imageUrl } })),
-  ...CAMERA_REPORTS.map(r => ({ tipo: r.tipo, severidad: "critical" as const, ubicacion: r.zona.nombre, personas_afectadas: 200 + Math.floor(Math.random() * 400), fuente: "camera" as const, fuente_detalles: { cameraId: r.cameraId, cameraLocation: r.zona.nombre, imageUrl: r.imageUrl } })),
-  ...SENSOR_REPORTS.map(r => ({ tipo: r.tipo, severidad: "medium" as const, ubicacion: r.zona.nombre, personas_afectadas: 100 + Math.floor(Math.random() * 300), fuente: "sensor" as const, fuente_detalles: { sensorId: r.sensorId, temperature: r.temperature, humidity: r.humidity, windSpeed: r.windSpeed, pressure: r.pressure } })),
+// Plantillas base sin valores aleatorios — los aleatorios se calculan en spawnIncident()
+// para que cada llamada genere valores distintos
+const INCIDENT_TEMPLATES = [
+  ...SOCIAL_REPORTS.map(r  => ({ tipo: r.tipo,  fuente: "social"  as const, ubicacion: r.zona.nombre, fuente_detalles: { platform: "X (Twitter)", username: r.fuente, content: r.texto, imageUrl: r.imageUrl } })),
+  ...CAMERA_REPORTS.map(r => ({ tipo: r.tipo,  fuente: "camera"  as const, ubicacion: r.zona.nombre, fuente_detalles: { cameraId: r.cameraId, cameraLocation: r.zona.nombre, imageUrl: r.imageUrl } })),
+  ...SENSOR_REPORTS.map(r  => ({ tipo: r.tipo,  fuente: "sensor"  as const, ubicacion: r.zona.nombre, fuente_detalles: { sensorId: r.sensorId, temperature: r.temperature, humidity: r.humidity, windSpeed: r.windSpeed, pressure: r.pressure } })),
 ]
 
 export interface SimulationEvent {
@@ -35,7 +35,7 @@ export function useSimulationLoop() {
   const [isRunning, setIsRunning] = useState(false)
   const [events, setEvents] = useState<SimulationEvent[]>([])
   const [activeDispatches, setActiveDispatches] = useState<ActiveDispatch[]>([])
-  const [incidentPool] = useState(INCIDENT_POOL)
+  const [incidentPool] = useState(INCIDENT_TEMPLATES)
 
   const spawnTimerRef = useRef<NodeJS.Timeout | null>(null)
   const dispatchTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
@@ -44,16 +44,19 @@ export function useSimulationLoop() {
     setEvents(prev => [{ ...event, timestamp: new Date() }, ...prev].slice(0, 20))
   }, [])
 
-  // Crea un nuevo incidente en Supabase usando buildRespawnIncident para coordenadas y datos
+  // Crea un nuevo incidente en Supabase — combina coordenadas/zona aleatorias
+  // de buildRespawnIncident con los detalles de la plantilla elegida
   const spawnIncident = useCallback(async () => {
     const template = incidentPool[Math.floor(Math.random() * incidentPool.length)]
+    // buildRespawnIncident genera coordenadas, zona, severidad y personas_afectadas aleatorios
     const respawn = buildRespawnIncident({ tipo: template.tipo, fuente: template.fuente })
 
     try {
       const res = await fetch("/api/incidentes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...respawn, ...template, estado: "activo" }),
+        // respawn first so template.fuente_detalles overrides the generic ones
+        body: JSON.stringify({ ...respawn, fuente_detalles: template.fuente_detalles, estado: "activo" }),
       })
       const data = await res.json()
       mutate("/api/incidentes")

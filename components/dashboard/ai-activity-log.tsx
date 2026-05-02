@@ -8,7 +8,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { dispatchResourceWithLifecycle } from "@/hooks/use-resource-lifecycle"
-import { buildRespawnIncident, AGENT_ALERTS } from "@/lib/mock-data"
+import { AGENT_ALERTS } from "@/lib/mock-data"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
