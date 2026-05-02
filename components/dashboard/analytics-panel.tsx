@@ -12,6 +12,8 @@ interface AnalyticsData {
   riskProgress: number
   criticalCount: number
   highCount: number
+  mediumCount: number
+  lowCount: number
   affectedNow: number
   affectedChange: number
   avgResponseMin: number | null
@@ -90,10 +92,18 @@ export function AnalyticsPanel() {
       id: "incidents",
       label: "Incidentes Activos",
       value: d?.activeIncidentCount ?? "—",
-      // Only show trend badge when there's a non-zero real trend
       change: d?.incidentsTrend !== 0 ? d?.incidentsTrend : undefined,
       icon: <Activity className="h-4 w-4" />,
       color: d && d.activeIncidentCount > 0 ? "primary" : "muted",
+      // severity breakdown shown as sublabel
+      sublabel: d && d.activeIncidentCount > 0
+        ? [
+            d.criticalCount > 0  ? `${d.criticalCount} crit` : null,
+            d.highCount > 0      ? `${d.highCount} alto` : null,
+            d.mediumCount > 0    ? `${d.mediumCount} medio` : null,
+            d.lowCount > 0       ? `${d.lowCount} bajo` : null,
+          ].filter(Boolean).join(" · ") || undefined
+        : undefined,
     },
     {
       id: "resources",

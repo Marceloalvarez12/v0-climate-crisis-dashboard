@@ -462,6 +462,12 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
           <Badge variant="outline" className="hidden border-accent/50 bg-accent/10 text-accent text-[10px] sm:inline-flex">
             {filteredIncidents.filter(i => i.severity === "high").length} Altos
           </Badge>
+          <Badge variant="outline" className="hidden border-yellow-500/50 bg-yellow-500/10 text-yellow-400 text-[10px] sm:inline-flex">
+            {filteredIncidents.filter(i => i.severity === "medium").length} Medios
+          </Badge>
+          <Badge variant="outline" className="hidden border-success/50 bg-success/10 text-success text-[10px] sm:inline-flex">
+            {filteredIncidents.filter(i => i.severity === "low").length} Bajos
+          </Badge>
         </div>
       </div>
 

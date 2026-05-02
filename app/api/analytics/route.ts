@@ -31,14 +31,13 @@ export async function GET() {
     .select("id, estado, updated_at")
 
   // 5. Resolved incidents for avg response time:
-  //    Only count incidents created AND resolved in the last 24h,
-  //    and only where the response time is reasonable (< 120 min) to exclude seed data
+  //    Take the most recent 50 atendidos, filter out seed data by requiring
+  //    a positive diff and capping at MAX_RESPONSE_MIN
   const { data: resolved } = await supabase
     .from("incidentes")
     .select("created_at, updated_at")
     .eq("estado", "atendido")
-    .gte("created_at", since24h)
-    .gte("updated_at", since24h)
+    .order("updated_at", { ascending: false })
     .limit(50)
 
   // --- Calculations ---
@@ -61,7 +60,9 @@ export async function GET() {
 
   // Risk level
   const criticalCount = active.filter((i: { severidad: string }) => i.severidad === "critical").length
-  const highCount = active.filter((i: { severidad: string }) => i.severidad === "high").length
+  const highCount    = active.filter((i: { severidad: string }) => i.severidad === "high").length
+  const mediumCount  = active.filter((i: { severidad: string }) => i.severidad === "medium").length
+  const lowCount     = active.filter((i: { severidad: string }) => i.severidad === "low").length
   let riskLevel = "BAJO"
   let riskProgress = 20
   if (criticalCount >= 2) { riskLevel = "CRITICO"; riskProgress = 95 }
@@ -101,6 +102,8 @@ export async function GET() {
     riskProgress,
     criticalCount,
     highCount,
+    mediumCount,
+    lowCount,
     affectedNow,
     affectedChange,
     avgResponseMin,
