@@ -2,121 +2,15 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useSWRConfig } from "swr"
+import { buildRespawnIncident, SOCIAL_REPORTS, CAMERA_REPORTS, SENSOR_REPORTS } from "@/lib/mock-data"
 
-// Pool de incidentes simulados basados en datos reales de la app
+// Pool unificado construido desde mock-data para que el simulation loop
+// use exactamente los mismos datos que el resto del sistema
 const INCIDENT_POOL = [
-  {
-    tipo: "flood",
-    severidad: "critical",
-    ubicacion: "Centro Historico - Plaza Independencia",
-    personas_afectadas: 1250,
-    fuente: "social",
-    fuente_detalles: {
-      platform: "X (Twitter)",
-      username: "@tucuman_alerta",
-      content: "URGENTE: Inundacion severa en Plaza Independencia. El agua supera los 50cm. Vecinos atrapados en edificios. #InundacionTucuman",
-      imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600",
-    },
-  },
-  {
-    tipo: "fire",
-    severidad: "high",
-    ubicacion: "Barrio Norte - Deposito Industrial",
-    personas_afectadas: 340,
-    fuente: "camera",
-    fuente_detalles: {
-      cameraId: "CAM-BN-047",
-      cameraLocation: "Av. Mate de Luna esquina Laprida",
-      imageUrl: "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=600",
-    },
-  },
-  {
-    tipo: "storm",
-    severidad: "high",
-    ubicacion: "Banda del Rio Sali - Zona Industrial",
-    personas_afectadas: 430,
-    fuente: "social",
-    fuente_detalles: {
-      platform: "X (Twitter)",
-      username: "@meteo_noa",
-      content: "Alerta roja por tormenta electrica. Vientos de 85km/h. Arboles caidos en Av. Mitre. #TormentaTucuman",
-      imageUrl: "https://images.unsplash.com/photo-1527482937786-6f4c6c3fd49c?w=600",
-    },
-  },
-  {
-    tipo: "flood",
-    severidad: "high",
-    ubicacion: "Barrio San Pablo - Canal Norte",
-    personas_afectadas: 720,
-    fuente: "social",
-    fuente_detalles: {
-      platform: "X (Twitter)",
-      username: "@rescate_tucuman",
-      content: "Canal San Pablo desbordado. Evacuacion de 180 familias en curso. Corte total de Av. Ejercito del Norte.",
-      imageUrl: "https://images.unsplash.com/photo-1446824505046-e43605ffb17f?w=600",
-    },
-  },
-  {
-    tipo: "fire",
-    severidad: "critical",
-    ubicacion: "Villa 9 de Julio - Fabrica Textil",
-    personas_afectadas: 560,
-    fuente: "camera",
-    fuente_detalles: {
-      cameraId: "CAM-V9J-023",
-      cameraLocation: "Av. Roca y Catamarca - Videovigilancia Municipal",
-      imageUrl: "https://images.unsplash.com/photo-1486551937199-baf066858de7?w=600",
-    },
-  },
-  {
-    tipo: "flood",
-    severidad: "critical",
-    ubicacion: "Barrio Sur - Av. Roca",
-    personas_afectadas: 980,
-    fuente: "social",
-    fuente_detalles: {
-      platform: "X (Twitter)",
-      username: "@emergencias_tuc",
-      content: "EMERGENCIA MAXIMA en Barrio Sur. Hospital solicita evacuacion. Ambulancias no pueden acceder. #SOSTucuman",
-      imageUrl: "https://images.unsplash.com/photo-1583245177184-4ab53e5e391a?w=600",
-    },
-  },
-  {
-    tipo: "storm",
-    severidad: "medium",
-    ubicacion: "Yerba Buena - Country Jockey Club",
-    personas_afectadas: 890,
-    fuente: "sensor",
-    fuente_detalles: {
-      sensorId: "WS-YB-012",
-      temperature: 18,
-      humidity: 94,
-      windSpeed: 65,
-      pressure: 1008,
-    },
-  },
-  {
-    tipo: "general",
-    severidad: "low",
-    ubicacion: "El Manantial - Ruta 301",
-    personas_afectadas: 150,
-    fuente: "sensor",
-    fuente_detalles: {
-      sensorId: "WS-EM-003",
-      temperature: 22,
-      humidity: 78,
-      windSpeed: 25,
-      pressure: 1015,
-    },
-  },
+  ...SOCIAL_REPORTS.map(r => ({ tipo: r.tipo, severidad: "high" as const, ubicacion: r.zona.nombre, personas_afectadas: 300 + Math.floor(Math.random() * 600), fuente: "social" as const, fuente_detalles: { platform: "X (Twitter)", username: r.fuente, content: r.texto, imageUrl: r.imageUrl } })),
+  ...CAMERA_REPORTS.map(r => ({ tipo: r.tipo, severidad: "critical" as const, ubicacion: r.zona.nombre, personas_afectadas: 200 + Math.floor(Math.random() * 400), fuente: "camera" as const, fuente_detalles: { cameraId: r.cameraId, cameraLocation: r.zona.nombre, imageUrl: r.imageUrl } })),
+  ...SENSOR_REPORTS.map(r => ({ tipo: r.tipo, severidad: "medium" as const, ubicacion: r.zona.nombre, personas_afectadas: 100 + Math.floor(Math.random() * 300), fuente: "sensor" as const, fuente_detalles: { sensorId: r.sensorId, temperature: r.temperature, humidity: r.humidity, windSpeed: r.windSpeed, pressure: r.pressure } })),
 ]
-
-// Coordenadas aleatorias dentro de San Miguel de Tucuman
-function randomCoords() {
-  const lat = +((-26.80) - Math.random() * 0.04).toFixed(6) // entre -26.80 y -26.84
-  const lng = +((-65.18) - Math.random() * 0.05).toFixed(6) // entre -65.18 y -65.23
-  return { lat, lng }
-}
 
 export interface SimulationEvent {
   type: "incident_created" | "resource_dispatched" | "resource_arrived" | "incident_resolved" | "incident_respawned"
@@ -150,21 +44,16 @@ export function useSimulationLoop() {
     setEvents(prev => [{ ...event, timestamp: new Date() }, ...prev].slice(0, 20))
   }, [])
 
-  // Crea un nuevo incidente en Supabase con coordenadas dadas
-  const spawnIncident = useCallback(async (coords?: { lat: number; lng: number }) => {
+  // Crea un nuevo incidente en Supabase usando buildRespawnIncident para coordenadas y datos
+  const spawnIncident = useCallback(async () => {
     const template = incidentPool[Math.floor(Math.random() * incidentPool.length)]
-    const { lat, lng } = coords || randomCoords()
+    const respawn = buildRespawnIncident({ tipo: template.tipo, fuente: template.fuente })
 
     try {
       const res = await fetch("/api/incidentes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...template,
-          latitud: lat,
-          longitud: lng,
-          estado: "activo",
-        }),
+        body: JSON.stringify({ ...respawn, ...template, estado: "activo" }),
       })
       const data = await res.json()
       mutate("/api/incidentes")
@@ -239,7 +128,7 @@ export function useSimulationLoop() {
       await fetch("/api/incidentes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: incidentId, estado: "resuelto" }),
+        body: JSON.stringify({ id: incidentId, estado: "atendido" }),
       })
       mutate("/api/incidentes")
       addEvent({
