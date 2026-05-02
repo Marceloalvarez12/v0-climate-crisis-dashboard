@@ -160,7 +160,9 @@ export function useSimulationLoop() {
     dispatchTimersRef.current.set(available.id, timer)
   }, [mutate, addEvent, spawnIncident])
 
-  // Inicia el loop: primer incidente inmediato, luego cada 15 seg
+  // Inicia el loop: primer incidente inmediato, luego cada 4 minutos
+  const SPAWN_INTERVAL_MS = 4 * 60 * 1000 // 4 minutos
+
   const startSimulation = useCallback(async () => {
     setIsRunning(true)
     setEvents([])
@@ -170,7 +172,7 @@ export function useSimulationLoop() {
 
     spawnTimerRef.current = setInterval(async () => {
       await spawnIncident()
-    }, 15000)
+    }, SPAWN_INTERVAL_MS)
   }, [spawnIncident])
 
   // Detiene el loop y limpia timers
