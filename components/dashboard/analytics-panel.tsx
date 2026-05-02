@@ -61,7 +61,7 @@ export function AnalyticsPanel() {
   const trendValue = !d
     ? "—"
     : d.incidentsTrend === null
-      ? "Sin datos"
+      ? "Sin Incidentes"
       : d.incidentsTrend > 0
         ? `+${d.incidentsTrend}%`
         : d.incidentsTrend < 0

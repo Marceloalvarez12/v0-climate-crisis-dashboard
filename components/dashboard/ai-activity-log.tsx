@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
+import { useSWRConfig } from "swr"
 import { 
   Bot, Search, MapPin, AlertTriangle, Database, Radio, CheckCircle2, 
   Rocket, Bell, X, Brain, Sparkles, Target, Satellite, Loader2,
@@ -207,6 +208,39 @@ export function AIActivityLog() {
   const [satelliteModal, setSatelliteModal] = useState<SatelliteValidation | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const messageIndexRef = useRef(0)
+  const { mutate } = useSWRConfig()
+
+  // Auto-resolve incidents older than 60 minutes — runs every 60 seconds
+  useEffect(() => {
+    const autoResolve = async () => {
+      try {
+        const res = await fetch("/api/incidentes/auto-resolve", { method: "POST" })
+        const data = await res.json()
+        if (data.resolved > 0) {
+          // Revalidate map and analytics
+          mutate("/api/incidentes")
+          mutate("/api/analytics")
+          // Inject a log message for each auto-resolved incident
+          data.locations?.forEach((loc: string) => {
+            setActivities(prev => [...prev.slice(-20), {
+              id: Date.now().toString() + loc,
+              type: "complete" as const,
+              message: `Incidente en ${loc} cerrado automaticamente (60 min sin atencion)`,
+              timestamp: new Date(),
+              isNew: true,
+            }])
+          })
+        }
+      } catch {
+        // non-blocking
+      }
+    }
+
+    // Run immediately on mount, then every 60 seconds
+    autoResolve()
+    const interval = setInterval(autoResolve, 60 * 1000)
+    return () => clearInterval(interval)
+  }, [mutate])
 
   useEffect(() => {
     // Cycle through background messages (monitoring, extraction, analysis, etc.)
