@@ -362,7 +362,6 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
 
   const handleCloseDeploy = () => {
     setShowDeployModal(false)
-    setShowConfirmModal(false)
     setDeploySuccess(false)
     setSelectedCounts({})
     // Force revalidation so next open shows fresh server state
@@ -435,10 +434,9 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
       { description: `${idsToDispatch.length} unidad(es) en camino` }
     )
 
-    // Wait briefly so user sees success, then close and reset everything
+    // Wait briefly so user sees the success screen, then close and reset
     setTimeout(() => {
       setShowDeployModal(false)
-      setShowConfirmModal(false)
       setDeploySuccess(false)
       setSelectedCounts({})
       mutateRecursos()
