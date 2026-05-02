@@ -36,7 +36,7 @@ export function AlertActions({ activity, onDeploy, onNotify, onDismiss }: AlertA
         onClick={() => onDeploy(activity)}
       >
         <Rocket className="h-3 w-3" />
-        Desplegar
+        Deploy
       </Button>
       <Button
         size="sm"
@@ -45,7 +45,7 @@ export function AlertActions({ activity, onDeploy, onNotify, onDismiss }: AlertA
         onClick={() => onNotify(activity)}
       >
         <Bell className="h-3 w-3" />
-        Notificar
+        Notify
       </Button>
       <Button
         size="sm"
@@ -84,12 +84,12 @@ export function ConfirmActionDialog({ state, onChange, onConfirm }: ConfirmActio
             {state.type === "deploy" ? (
               <>
                 <Rocket className="h-5 w-5 text-primary" />
-                Confirmar Despliegue de Recursos
+                Confirm Resource Deployment
               </>
             ) : (
               <>
                 <Bell className="h-5 w-5 text-accent" />
-                Confirmar Notificación a Autoridades
+                Confirm Authority Notification
               </>
             )}
           </AlertDialogTitle>
@@ -97,18 +97,18 @@ export function ConfirmActionDialog({ state, onChange, onConfirm }: ConfirmActio
             <div className="space-y-3">
               {state.type === "deploy" ? (
                 <>
-                  <p>Está a punto de desplegar unidades de emergencia a:</p>
+                  <p>You are about to deploy emergency units to:</p>
                   <p className="font-semibold text-foreground">{state.activity?.location}</p>
                 </>
               ) : (
                 <>
-                  <p>Notificar a las siguientes autoridades:</p>
+                  <p>Notify the following authorities:</p>
                   <ul className="text-sm space-y-1">
-                    <li>- Defensa Civil de Tucumán</li>
-                    <li>- Cuerpo de Bomberos</li>
-                    <li>- Policía de Tucumán</li>
+                    <li>- Civil Defense of Tucumán</li>
+                    <li>- Fire Department</li>
+                    <li>- Tucumán Police</li>
                   </ul>
-                  <p className="font-semibold text-foreground">Ubicación: {state.activity?.location}</p>
+                  <p className="font-semibold text-foreground">Location: {state.activity?.location}</p>
                 </>
               )}
 
@@ -117,7 +117,7 @@ export function ConfirmActionDialog({ state, onChange, onConfirm }: ConfirmActio
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
                       <Brain className="h-3 w-3" />
-                      Nivel de Confianza IA
+                      AI Confidence Level
                     </span>
                     <span className="text-sm font-bold text-purple-400">{state.activity.confidence}%</span>
                   </div>
@@ -128,9 +128,9 @@ export function ConfirmActionDialog({ state, onChange, onConfirm }: ConfirmActio
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm}>
-            {state.type === "deploy" ? "Confirmar Despliegue" : "Confirmar Notificación"}
+            {state.type === "deploy" ? "Confirm Deployment" : "Confirm Notification"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

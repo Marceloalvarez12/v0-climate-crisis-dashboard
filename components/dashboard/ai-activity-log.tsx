@@ -48,8 +48,8 @@ function geminiAnalysisToActivity(analysis: GeminiAnalysis): Omit<ActivityItem, 
     reasoning: [
       {
         step:    1,
-        thought: `Recolectados ${analysis.relatedPostIds.length} posts de redes sociales con palabras clave de emergencia`,
-        action:  "Escaneo multi-plataforma (MockConnector activo · X, Facebook, Instagram en espera de API keys)",
+        thought: `Collected ${analysis.relatedPostIds.length} social media posts with emergency keywords`,
+        action:  "Multi-platform scan (MockConnector active · X, Facebook, Instagram awaiting API keys)",
       },
       {
         step:    2,
@@ -57,9 +57,9 @@ function geminiAnalysisToActivity(analysis: GeminiAnalysis): Omit<ActivityItem, 
       },
       ...(analysis.suggestedActions.length > 0 ? [{
         step:    3,
-        thought: "Acciones recomendadas por el sistema de IA:",
+        thought: "Actions recommended by the AI system:",
         action:  analysis.suggestedActions.join(" · "),
-        result:  `Confianza Gemini: ${analysis.confidence}% · ~${analysis.affectedPeopleEst} personas en riesgo`,
+        result:  `Gemini Confidence: ${analysis.confidence}% · ~${analysis.affectedPeopleEst} people at risk`,
       }] : []),
     ],
   }
@@ -95,13 +95,13 @@ export function AIActivityLog() {
   useAutoResolve({
     onResolved: (locations) => {
       locations.forEach((loc) => {
-        addActivity({ type: "complete", message: `Incidente en ${loc} cerrado automáticamente (60 min sin atención)` })
+        addActivity({ type: "complete", message: `Incident at ${loc} automatically closed (60 min without attention)` })
       })
     },
     onResourcesReset: (nombres) => {
       addActivity({
         type:    "complete",
-        message: `Recursos liberados automáticamente: ${nombres.join(", ")}`,
+        message: `Resources automatically released: ${nombres.join(", ")}`,
       })
     },
   })
@@ -126,23 +126,23 @@ export function AIActivityLog() {
     setIsAgentScanning(true)
 
     // 1. Mensaje de inicio
-    addActivity({ type: "extraction", message: "Iniciando escaneo de redes sociales con Gemini 2.0 Flash..." })
+    addActivity({ type: "extraction", message: "Starting social media scan with Gemini 2.0 Flash..." })
     await new Promise((r) => setTimeout(r, 800))
-    addActivity({ type: "monitoring", message: "Recolectando posts: X (Twitter) · Facebook · Instagram · feeds locales..." })
+    addActivity({ type: "monitoring", message: "Collecting posts: X (Twitter) · Facebook · Instagram · local feeds..." })
 
     try {
       const res    = await fetch("/api/agent", { method: "POST" })
       const result = await res.json() as AgentScanResult
 
       if (result.error) {
-        addActivity({ type: "monitoring", message: `Error en escaneo: ${result.error}` })
+        addActivity({ type: "monitoring", message: `Scan error: ${result.error}` })
         return
       }
 
       // 2. Resumen de recolección
       addActivity({
         type:    "database",
-        message: `${result.postsCollected} posts recolectados y enviados a Gemini para análisis`,
+        message: `${result.postsCollected} posts collected and sent to Gemini for analysis`,
       })
 
       // 3. Mostrar incidentes encontrados como alertas accionables
@@ -151,7 +151,7 @@ export function AIActivityLog() {
       if (activeIncidents.length === 0) {
         addActivity({
           type:    "complete",
-          message: `Escaneo completado: ${result.postsCollected} posts analizados. Sin incidentes detectados.`,
+          message: `Scan complete: ${result.postsCollected} posts analyzed. No incidents detected.`,
         })
       } else {
         for (const analysis of activeIncidents) {
@@ -160,7 +160,7 @@ export function AIActivityLog() {
         }
       }
     } catch (err) {
-      addActivity({ type: "monitoring", message: "Error de conexión con el agente Gemini — reintentando en el próximo ciclo" })
+      addActivity({ type: "monitoring", message: "Connection error with Gemini agent — retrying on next cycle" })
       console.error("[AIActivityLog/Gemini]", err)
     } finally {
       agentScanningRef.current = false
@@ -260,20 +260,20 @@ export function AIActivityLog() {
         await dispatchResourceWithLifecycle(incidente?.id)
       } catch { /* no-op */ }
 
-      toast.success("Recursos desplegados", {
-        description: `Unidades en camino a ${location}. Incidente removido de activos.`,
+      toast.success("Resources deployed", {
+        description: `Units on their way to ${location}. Incident removed from active.`,
       })
-      addActivity({ type: "complete", message: `Coordenadas y recursos enviados a equipos en ${location}` })
+      addActivity({ type: "complete", message: `Coordinates and resources sent to teams at ${location}` })
     } else {
-      toast.success("Autoridades notificadas", {
-        description: `Defensa Civil y Bomberos alertados sobre ${location}`,
+      toast.success("Authorities notified", {
+        description: `Civil Defense and Fire Dept. alerted about ${location}`,
       })
-      addActivity({ type: "complete", message: `Autoridades notificadas sobre incidente en ${location}` })
+      addActivity({ type: "complete", message: `Authorities notified about incident at ${location}` })
     }
   }
 
   const formatTime = (date: Date) =>
-    date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -285,7 +285,7 @@ export function AIActivityLog() {
           <div className="h-2 w-2 rounded-full bg-success" />
           <div className="absolute inset-0 h-2 w-2 rounded-full bg-success animate-pulse-ring" />
         </div>
-        <h2 className="text-sm font-semibold text-foreground">Agente de IA en Vivo</h2>
+        <h2 className="text-sm font-semibold text-foreground">Live AI Agent</h2>
 
         <div className="ml-auto flex items-center gap-1.5">
           {isAgentScanning && (
@@ -301,7 +301,7 @@ export function AIActivityLog() {
             </Badge>
           )}
           <Badge variant="outline" className="text-[10px] border-success/50 text-success">
-            Activo
+            Active
           </Badge>
         </div>
       </div>
@@ -367,7 +367,7 @@ export function AIActivityLog() {
                       {isProcessed && activity.actionable && (
                         <div className="flex items-center gap-1 mt-1.5">
                           <CheckCircle2 className="h-3 w-3 text-success" />
-                          <span className="text-[10px] text-success">Acción tomada</span>
+                          <span className="text-[10px] text-success">Action taken</span>
                         </div>
                       )}
                     </div>

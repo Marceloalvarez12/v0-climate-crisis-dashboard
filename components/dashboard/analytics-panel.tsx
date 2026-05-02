@@ -59,27 +59,27 @@ export function AnalyticsPanel() {
   const trendValue = !d
     ? "—"
     : d.incidentsTrend === null
-      ? "Sin Incidentes"
+      ? "No Incidents"
       : d.incidentsTrend > 0
         ? `+${d.incidentsTrend}%`
         : d.incidentsTrend < 0
           ? `${d.incidentsTrend}%`
-          : "Estable"
+          : "Stable"
 
   const metrics: Metric[] = [
     {
       id: "risk",
-      label: "Nivel de Riesgo",
+      label: "Risk Level",
       // Show BAJO when active but no critical/high, show — when no data yet
-      value: !d || d.activeIncidentCount === 0 ? "SIN INCIDENTES" : d.riskLevel,
+      value: !d || d.activeIncidentCount === 0 ? "NO INCIDENTS" : d.riskLevel,
       icon: <AlertTriangle className="h-4 w-4" />,
       color: riskColor,
       progress: d?.activeIncidentCount === 0 ? 0 : d?.riskProgress,
     },
     {
       id: "affected",
-      label: "Personas Afectadas",
-      value: d ? d.affectedNow.toLocaleString("es-AR") : "—",
+      label: "Affected People",
+      value: d ? d.affectedNow.toLocaleString("en-US") : "—",
       // Only show change badge if it's non-zero (real comparison exists)
       change: d?.affectedChange !== 0 ? d?.affectedChange : undefined,
       icon: <Users className="h-4 w-4" />,
@@ -87,7 +87,7 @@ export function AnalyticsPanel() {
     },
     {
       id: "response",
-      label: "Tiempo de Respuesta",
+      label: "Response Time",
       value: responseValue,
       // No change badge for response time — no meaningful baseline yet
       icon: <Clock className="h-4 w-4" />,
@@ -95,7 +95,7 @@ export function AnalyticsPanel() {
     },
     {
       id: "incidents",
-      label: "Incidentes Activos",
+      label: "Active Incidents",
       value: d?.activeIncidentCount ?? "—",
       change: d?.incidentsTrend != null && d.incidentsTrend !== 0 ? d.incidentsTrend : undefined,
       icon: <Activity className="h-4 w-4" />,
@@ -104,24 +104,24 @@ export function AnalyticsPanel() {
       sublabel: d && d.activeIncidentCount > 0
         ? [
             d.criticalCount > 0  ? `${d.criticalCount} crit` : null,
-            d.highCount > 0      ? `${d.highCount} alto` : null,
-            d.mediumCount > 0    ? `${d.mediumCount} medio` : null,
-            d.lowCount > 0       ? `${d.lowCount} bajo` : null,
+            d.highCount > 0      ? `${d.highCount} high` : null,
+            d.mediumCount > 0    ? `${d.mediumCount} med` : null,
+            d.lowCount > 0       ? `${d.lowCount} low` : null,
           ].filter(Boolean).join(" · ") || undefined
         : undefined,
     },
     {
       id: "resources",
-      label: "Recursos Desplegados",
+      label: "Deployed Resources",
       value: d ? `${d.deployedResources}/${d.totalResources}` : "—",
       icon: <Shield className="h-4 w-4" />,
       color: d && d.deployedResources > 0 ? "accent" : "muted",
       progress: d?.resourceProgress,
-      sublabel: d && d.enCamino > 0 ? `${d.enCamino} en camino` : undefined,
+      sublabel: d && d.enCamino > 0 ? `${d.enCamino} en route` : undefined,
     },
     {
       id: "trend",
-      label: "Tendencia 24h",
+      label: "24h Trend",
       value: trendValue,
       icon: d?.incidentsTrend != null && d.incidentsTrend < 0
         ? <TrendingDown className="h-4 w-4" />
@@ -161,10 +161,10 @@ export function AnalyticsPanel() {
   return (
     <div className="rounded-lg border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-4 py-2">
-        <h2 className="text-sm font-semibold text-foreground">Analiticas en Tiempo Real</h2>
+        <h2 className="text-sm font-semibold text-foreground">Real-Time Analytics</h2>
         <div className="flex items-center gap-1.5">
           <div className={cn("h-1.5 w-1.5 rounded-full", d ? "bg-success animate-pulse" : "bg-muted-foreground")} />
-          <span className="text-[10px] text-muted-foreground">{d ? "En vivo" : "Cargando..."}</span>
+          <span className="text-[10px] text-muted-foreground">{d ? "Live" : "Loading..."}</span>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-6">

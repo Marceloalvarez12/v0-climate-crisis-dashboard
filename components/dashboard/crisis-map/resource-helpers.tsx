@@ -21,11 +21,11 @@ export function RecursoIcon({ tipo }: { tipo: string }) {
 
 export function tipoRecursoLabel(tipo: string): string {
   switch (tipo) {
-    case "ambulance":   return "Ambulancias SAME"
-    case "firefighter": return "Bomberos Voluntarios"
-    case "police":      return "Policía Provincial"
-    case "boat":        return "Lanchas de Rescate"
-    case "helicopter":  return "Helicópteros"
+    case "ambulance":   return "SAME Ambulances"
+    case "firefighter": return "Volunteer Firefighters"
+    case "police":      return "Provincial Police"
+    case "boat":        return "Rescue Boats"
+    case "helicopter":  return "Helicopters"
     default:            return tipo
   }
 }

@@ -30,10 +30,10 @@ const MAP_CENTER: [number, number] = [-26.8241, -65.2226]
 const SOURCE_TYPES: IncidentSource[] = ["social", "sensor", "camera"]
 
 const SEVERITY_LEGENDS = [
-  { label: "Crítico", color: "bg-primary" },
-  { label: "Alto",    color: "bg-accent" },
-  { label: "Medio",   color: "bg-yellow-500" },
-  { label: "Bajo",    color: "bg-success" },
+  { label: "Critical", color: "bg-primary" },
+  { label: "High",     color: "bg-accent" },
+  { label: "Medium",   color: "bg-yellow-500" },
+  { label: "Low",      color: "bg-success" },
 ]
 
 // ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ export function CrisisMap() {
 
   const handleDeployResources = async () => {
     const totalSelected = Object.values(selectedCounts).reduce((a, b) => a + b, 0)
-    if (totalSelected === 0) { toast.error("Selecciona al menos un recurso para desplegar"); return }
+    if (totalSelected === 0) { toast.error("Select at least one resource to deploy"); return }
 
     const incidenteId    = selectedIncident?.id
     const incidenteTipo  = selectedIncident?.type
@@ -142,8 +142,8 @@ export function CrisisMap() {
       }, 2 * 60 * 1000)
     }
 
-    toast.success(`Recursos desplegados a ${selectedIncident?.location}`, {
-      description: `${idsToDispatch.length} unidad(es) en camino`,
+    toast.success(`Resources deployed to ${selectedIncident?.location}`, {
+      description: `${idsToDispatch.length} unit(s) on their way`,
     })
 
     setTimeout(() => {
@@ -162,7 +162,7 @@ export function CrisisMap() {
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
           <h2 className="truncate text-xs font-semibold text-foreground sm:text-sm">
-            San Miguel de Tucumán — Mapa de Incidentes
+            San Miguel de Tucumán — Incident Map
           </h2>
         </div>
 
@@ -172,12 +172,12 @@ export function CrisisMap() {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="h-6 gap-1 border-border px-2 text-[10px]">
                 <Layers className="h-3 w-3" />
-                Capas ({activeLayers.length})
+                Layers ({activeLayers.length})
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-56 p-3" align="end">
               <div className="space-y-3">
-                <p className="text-xs font-medium text-foreground">Filtrar por Fuente</p>
+                <p className="text-xs font-medium text-foreground">Filter by Source</p>
                 <div className="space-y-2">
                   {SOURCE_TYPES.map((layer) => (
                     <label key={layer} className="flex items-center gap-2 cursor-pointer">
@@ -207,7 +207,7 @@ export function CrisisMap() {
               medium:   "border-yellow-500/50 bg-yellow-500/10 text-yellow-400",
               low:      "border-success/50 bg-success/10 text-success",
             }
-            const labelMap = { critical: "Críticos", high: "Altos", medium: "Medios", low: "Bajos" }
+            const labelMap = { critical: "Critical", high: "High", medium: "Medium", low: "Low" }
             return (
               <Badge
                 key={sev}
@@ -224,8 +224,8 @@ export function CrisisMap() {
       {/* ── Incident list panel ────────────────────────────────────── */}
       <div className="relative z-10 mt-0 w-full rounded-none border-b border-border bg-card/95 backdrop-blur-sm shadow-none md:absolute md:right-3 md:top-14 md:z-[1000] md:w-72 md:max-h-[420px] md:rounded-lg md:border md:shadow-xl">
         <div className="flex items-center justify-between border-b border-border bg-card px-3 py-2 rounded-t-lg">
-          <p className="text-xs font-semibold text-foreground">Incidentes Activos ({filteredIncidents.length})</p>
-          <Badge variant="outline" className="text-[9px] border-primary/50 text-primary animate-pulse">En vivo</Badge>
+          <p className="text-xs font-semibold text-foreground">Active Incidents ({filteredIncidents.length})</p>
+          <Badge variant="outline" className="text-[9px] border-primary/50 text-primary animate-pulse">Live</Badge>
         </div>
         <div className="overflow-y-auto max-h-48 p-2 space-y-1.5 custom-scrollbar md:max-h-[370px]">
           {filteredIncidents.map((incident) => (
@@ -248,7 +248,7 @@ export function CrisisMap() {
                     <Badge variant="outline" className="text-[9px] h-4 px-1">
                       {incidentTypeLabel(incident.type)}
                     </Badge>
-                    <span className="text-[9px] text-muted-foreground">{incident.affectedPeople} afectados</span>
+                    <span className="text-[9px] text-muted-foreground">{incident.affectedPeople} affected</span>
                   </div>
                 </div>
               </div>
@@ -285,14 +285,14 @@ export function CrisisMap() {
         <div className="flex h-[400px] w-full shrink-0 items-center justify-center bg-secondary/20 md:h-full md:flex-1">
           <div className="flex flex-col items-center gap-2">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="text-sm text-muted-foreground">Cargando mapa...</p>
+            <p className="text-sm text-muted-foreground">Loading map...</p>
           </div>
         </div>
       )}
 
       {/* ── Legend ──────────────────────────────────────────────────── */}
       <div className="absolute bottom-3 left-3 z-[1000] hidden rounded-md border border-border bg-card/95 p-2 backdrop-blur-sm md:block">
-        <p className="mb-1.5 text-[10px] font-medium text-muted-foreground">Severidad</p>
+        <p className="mb-1.5 text-[10px] font-medium text-muted-foreground">Severity</p>
         <div className="flex flex-col gap-1">
           {SEVERITY_LEGENDS.map(({ label, color }) => (
             <div key={label} className="flex items-center gap-1.5">

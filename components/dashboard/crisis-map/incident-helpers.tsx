@@ -54,9 +54,9 @@ export function SourceIcon({ source }: { source: IncidentSource }) {
 
 export function sourceLabel(source: IncidentSource): string {
   switch (source) {
-    case "social":  return "Redes Sociales"
-    case "sensor":  return "Sensores"
-    case "camera":  return "Cámaras"
+    case "social":  return "Social Media"
+    case "sensor":  return "Sensors"
+    case "camera":  return "Cameras"
   }
 }
 
@@ -66,18 +66,18 @@ export function sourceLabel(source: IncidentSource): string {
 
 export function incidentTypeLabel(type: IncidentType): string {
   switch (type) {
-    case "flood":   return "Inundación"
-    case "fire":    return "Incendio"
-    case "storm":   return "Tormenta"
+    case "flood":   return "Flood"
+    case "fire":    return "Fire"
+    case "storm":   return "Storm"
     case "general": return "General"
   }
 }
 
 export function incidentSeverityLabel(severity: string): string {
   switch (severity) {
-    case "critical": return "Crítica"
-    case "high":     return "Alta"
-    case "medium":   return "Media"
-    default:         return "Baja"
+    case "critical": return "Critical"
+    case "high":     return "High"
+    case "medium":   return "Medium"
+    default:         return "Low"
   }
 }

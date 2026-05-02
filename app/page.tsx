@@ -15,10 +15,10 @@ import { cn } from "@/lib/utils"
 type MobileTab = "map" | "agent" | "resources" | "analytics"
 
 const MOBILE_TABS: { id: MobileTab; label: string; icon: React.ReactNode }[] = [
-  { id: "map",       label: "Mapa",      icon: <Map className="h-5 w-5" /> },
-  { id: "agent",     label: "Agente IA", icon: <Bot className="h-5 w-5" /> },
-  { id: "resources", label: "Recursos",  icon: <Shield className="h-5 w-5" /> },
-  { id: "analytics", label: "Datos",     icon: <BarChart2 className="h-5 w-5" /> },
+  { id: "map",       label: "Map",       icon: <Map className="h-5 w-5" /> },
+  { id: "agent",     label: "AI Agent",  icon: <Bot className="h-5 w-5" /> },
+  { id: "resources", label: "Resources", icon: <Shield className="h-5 w-5" /> },
+  { id: "analytics", label: "Analytics", icon: <BarChart2 className="h-5 w-5" /> },
 ]
 
 export default function CrisisDashboard() {

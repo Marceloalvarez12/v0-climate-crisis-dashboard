@@ -36,7 +36,7 @@ export function ReasoningPanel({
         onClick={onToggle}
       >
         <Brain className="h-3 w-3" />
-        {isExpanded ? "Ocultar" : "Ver"} Razonamiento
+        {isExpanded ? "Hide" : "View"} Reasoning
         {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       </Button>
 
@@ -44,7 +44,7 @@ export function ReasoningPanel({
         <div className="mt-2 p-2.5 rounded-md bg-purple-500/5 border border-purple-500/20 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="flex items-center gap-1.5 mb-2">
             <Sparkles className="h-3 w-3 text-purple-400" />
-            <span className="text-[10px] font-medium text-purple-400">Cadena de Razonamiento</span>
+            <span className="text-[10px] font-medium text-purple-400">Reasoning Chain</span>
           </div>
 
           <div className="space-y-2">
@@ -90,7 +90,7 @@ export function ReasoningPanel({
                 ) : (
                   <>
                     <Satellite className="h-3 w-3 mr-1" />
-                    Validar con Imagen Satelital
+                    Validate with Satellite Image
                   </>
                 )}
               </Button>

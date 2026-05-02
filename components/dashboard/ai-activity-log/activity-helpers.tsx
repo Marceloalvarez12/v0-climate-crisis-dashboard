@@ -43,13 +43,13 @@ export function activityIconColor(type: ActivityItem["type"]): string {
 export function SeverityBadge({ severity }: { severity?: ActivityItem["severity"] }) {
   switch (severity) {
     case "critical":
-      return <Badge variant="destructive" className="text-[9px] h-4 px-1">CRITICO</Badge>
+      return <Badge variant="destructive" className="text-[9px] h-4 px-1">CRITICAL</Badge>
     case "high":
-      return <Badge className="bg-accent text-accent-foreground text-[9px] h-4 px-1">ALTO</Badge>
+      return <Badge className="bg-accent text-accent-foreground text-[9px] h-4 px-1">HIGH</Badge>
     case "medium":
-      return <Badge className="bg-yellow-500 text-black text-[9px] h-4 px-1">MEDIO</Badge>
+      return <Badge className="bg-yellow-500 text-black text-[9px] h-4 px-1">MEDIUM</Badge>
     case "low":
-      return <Badge variant="secondary" className="text-[9px] h-4 px-1">BAJO</Badge>
+      return <Badge variant="secondary" className="text-[9px] h-4 px-1">LOW</Badge>
     default:
       return null
   }

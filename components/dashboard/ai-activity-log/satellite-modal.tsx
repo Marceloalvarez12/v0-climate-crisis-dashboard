@@ -23,7 +23,7 @@ export function SatelliteModal({ validation, onClose }: SatelliteModalProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Satellite className="h-5 w-5 text-blue-400" />
-            Validación Satelital - Sentinel-2
+            Satellite Validation - Sentinel-2
           </DialogTitle>
         </DialogHeader>
 
@@ -65,22 +65,22 @@ export function SatelliteModal({ validation, onClose }: SatelliteModalProps) {
             <div className="grid grid-cols-2 gap-3">
               {[
                 {
-                  label: "Detección de Agua",
-                  value: validation.analysisData.waterDetected ? "CONFIRMADO" : "No detectado",
+                  label: "Water Detection",
+                  value: validation.analysisData.waterDetected ? "CONFIRMED" : "Not detected",
                   color: validation.analysisData.waterDetected ? "text-blue-400" : "text-muted-foreground",
                 },
                 {
-                  label: "Anomalía Térmica",
-                  value: validation.analysisData.thermalAnomaly ? "DETECTADA" : "Normal",
+                  label: "Thermal Anomaly",
+                  value: validation.analysisData.thermalAnomaly ? "DETECTED" : "Normal",
                   color: validation.analysisData.thermalAnomaly ? "text-primary" : "text-muted-foreground",
                 },
                 {
-                  label: "Área Afectada",
+                  label: "Affected Area",
                   value: `${validation.analysisData.affectedAreaKm2} km²`,
                   color: "text-accent",
                 },
                 {
-                  label: "Daño Vegetación",
+                  label: "Vegetation Damage",
                   value: validation.analysisData.vegetationDamage,
                   color: "text-yellow-400",
                 },
@@ -98,14 +98,14 @@ export function SatelliteModal({ validation, onClose }: SatelliteModalProps) {
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-400" />
                   <div>
-                    <p className="text-sm font-semibold text-green-400">Validación Exitosa</p>
+                    <p className="text-sm font-semibold text-green-400">Validation Successful</p>
                     <p className="text-[10px] text-muted-foreground">
-                      Imagen satelital confirma la anomalía reportada
+                      Satellite image confirms the reported anomaly
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] text-muted-foreground">Confianza actualizada</p>
+                  <p className="text-[10px] text-muted-foreground">Updated confidence</p>
                   <p className="text-xl font-bold text-green-400">98%</p>
                 </div>
               </div>
@@ -113,8 +113,8 @@ export function SatelliteModal({ validation, onClose }: SatelliteModalProps) {
 
             {/* Metadata */}
             <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2 border-t border-border">
-              <span>Cobertura de nubes: {validation.analysisData.cloudCoverage}%</span>
-              <span>Captura: {new Date(validation.analysisData.captureTime).toLocaleString("es-AR")}</span>
+              <span>Cloud coverage: {validation.analysisData.cloudCoverage}%</span>
+              <span>Captured: {new Date(validation.analysisData.captureTime).toLocaleString("en-US")}</span>
             </div>
           </div>
         )}

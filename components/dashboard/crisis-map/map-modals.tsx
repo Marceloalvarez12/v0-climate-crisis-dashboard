@@ -54,7 +54,7 @@ export function IncidentDetailModal({
                 <div>
                   <span className="text-base">{incident.location}</span>
                   <p className="text-xs font-normal text-muted-foreground mt-0.5">
-                    {incidentTypeLabel(incident.type)} — Severidad {incidentSeverityLabel(incident.severity)}
+                    {incidentTypeLabel(incident.type)} — Severity {incidentSeverityLabel(incident.severity)}
                   </p>
                 </div>
               </DialogTitle>
@@ -63,13 +63,13 @@ export function IncidentDetailModal({
             <div className="space-y-4">
               {/* Stats */}
               <div className="grid grid-cols-3 gap-3">
-                <StatCard icon={<Users className="h-4 w-4 mx-auto mb-1 text-primary" />} label="Afectados">
+                <StatCard icon={<Users className="h-4 w-4 mx-auto mb-1 text-primary" />} label="Affected">
                   {incident.affectedPeople.toLocaleString()}
                 </StatCard>
-                <StatCard icon={<Clock className="h-4 w-4 mx-auto mb-1 text-accent" />} label="Reportado">
-                  {incident.timestamp.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+                <StatCard icon={<Clock className="h-4 w-4 mx-auto mb-1 text-accent" />} label="Reported">
+                  {incident.timestamp.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                 </StatCard>
-                <StatCard icon={<MapPinned className="h-4 w-4 mx-auto mb-1 text-blue-400" />} label="Coordenadas" small>
+                <StatCard icon={<MapPinned className="h-4 w-4 mx-auto mb-1 text-blue-400" />} label="Coordinates" small>
                   {incident.coordinates.lat.toFixed(4)}, {incident.coordinates.lng.toFixed(4)}
                 </StatCard>
               </div>
@@ -78,7 +78,7 @@ export function IncidentDetailModal({
               <div className="rounded-lg border border-border bg-secondary/30 p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <SourceIcon source={incident.source} />
-                  <span className="text-sm font-medium">Fuente: {sourceLabel(incident.source)}</span>
+                  <span className="text-sm font-medium">Source: {sourceLabel(incident.source)}</span>
                   <Badge variant="outline" className="ml-auto text-[10px]">
                     {incident.source === "social"
                       ? incident.sourceDetails.platform
@@ -94,11 +94,11 @@ export function IncidentDetailModal({
               <div className="flex gap-2">
                 <Button className="flex-1" variant="default" onClick={onOpenDeploy}>
                   <Send className="h-4 w-4 mr-2" />
-                  Desplegar Recursos
+                  Deploy Resources
                 </Button>
                 <Button className="flex-1" variant="outline">
                   <Phone className="h-4 w-4 mr-2" />
-                  Contactar Autoridades
+                  Contact Authorities
                 </Button>
               </div>
             </div>
@@ -140,7 +140,7 @@ function SourceDetail({ incident }: { incident: Incident }) {
           <div className="relative aspect-video rounded-lg overflow-hidden">
             <img src={sd.imageUrl} alt="Imagen del incidente" className="w-full h-full object-cover" />
             <div className="absolute bottom-2 right-2">
-              <Badge className="bg-black/70 text-white text-[10px]">Imagen adjunta al tweet</Badge>
+              <Badge className="bg-black/70 text-white text-[10px]">Image attached to tweet</Badge>
             </div>
           </div>
         )}
@@ -150,10 +150,10 @@ function SourceDetail({ incident }: { incident: Incident }) {
 
   if (source === "sensor") {
     const fields = [
-      { label: "Temperatura", value: `${sd.temperature}°C` },
-      { label: "Humedad",     value: `${sd.humidity}%` },
-      { label: "Viento",      value: `${sd.windSpeed} km/h` },
-      { label: "Presión",     value: `${sd.pressure} hPa` },
+      { label: "Temperature", value: `${sd.temperature}°C` },
+      { label: "Humidity",    value: `${sd.humidity}%` },
+      { label: "Wind",        value: `${sd.windSpeed} km/h` },
+      { label: "Pressure",    value: `${sd.pressure} hPa` },
     ]
     return (
       <div className="space-y-3">
@@ -166,7 +166,7 @@ function SourceDetail({ incident }: { incident: Incident }) {
           ))}
         </div>
         <p className="text-xs text-muted-foreground text-center">
-          Datos en tiempo real del sensor {sd.sensorId}
+          Real-time data from sensor {sd.sensorId}
         </p>
       </div>
     )
@@ -175,19 +175,19 @@ function SourceDetail({ incident }: { incident: Incident }) {
   // camera
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">Ubicación: {sd.cameraLocation}</p>
+      <p className="text-xs text-muted-foreground">Location: {sd.cameraLocation}</p>
       {sd.imageUrl && (
         <div className="relative aspect-video rounded-lg overflow-hidden">
           <img src={sd.imageUrl} alt="Captura de cámara" className="w-full h-full object-cover" />
           <div className="absolute top-2 left-2">
-            <Badge className="bg-red-500/90 text-white text-[10px] animate-pulse">EN VIVO</Badge>
+            <Badge className="bg-red-500/90 text-white text-[10px] animate-pulse">LIVE</Badge>
           </div>
           <div className="absolute bottom-2 right-2">
             <Badge className="bg-black/70 text-white text-[10px]">{sd.cameraId}</Badge>
           </div>
           <div className="absolute bottom-2 left-2">
             <Badge className="bg-black/70 text-white text-[10px]">
-              {new Date().toLocaleTimeString("es-AR")}
+              {new Date().toLocaleTimeString("en-US")}
             </Badge>
           </div>
         </div>
@@ -242,10 +242,10 @@ export function DeployModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Send className="h-5 w-5 text-primary" />
-            Desplegar Recursos de Emergencia
+            Deploy Emergency Resources
           </DialogTitle>
           <DialogDescription>
-            Selecciona los recursos a enviar a{" "}
+            Select the resources to send to{" "}
             <span className="font-medium text-foreground">{incident?.location}</span>
           </DialogDescription>
         </DialogHeader>
@@ -255,18 +255,18 @@ export function DeployModal({
             <div className="h-16 w-16 rounded-full bg-success/20 flex items-center justify-center">
               <CheckCircle2 className="h-8 w-8 text-success" />
             </div>
-            <p className="text-lg font-semibold text-foreground">Recursos Desplegados</p>
+            <p className="text-lg font-semibold text-foreground">Resources Deployed</p>
             <p className="text-sm text-muted-foreground text-center">
-              Las unidades han sido notificadas y están en camino
+              Units have been notified and are on their way
             </p>
           </div>
         ) : (
           <>
             <div className="space-y-2 py-2">
               {!dbRecursos ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Cargando recursos...</p>
+                <p className="text-sm text-muted-foreground text-center py-4">Loading resources...</p>
               ) : resourceGroups.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay recursos registrados</p>
+                <p className="text-sm text-muted-foreground text-center py-4">No resources registered</p>
               ) : (
                 resourceGroups.map((group) => {
                   const available = group.availableIds.length
@@ -299,11 +299,11 @@ export function DeployModal({
                         <p className="text-sm font-medium text-foreground">{tipoRecursoLabel(group.tipo)}</p>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className={cn("text-xs font-semibold", available > 0 ? "text-success" : "text-muted-foreground")}>
-                            {available} disponible{available !== 1 ? "s" : ""}
+                            {available} available{available !== 1 ? "s" : ""}
                           </span>
                           {busy > 0 && (
                             <span className="text-[10px] text-muted-foreground">
-                              · {busy} ocupado{busy !== 1 ? "s" : ""}
+                              · {busy} busy{busy !== 1 ? "" : ""}
                             </span>
                           )}
                         </div>
@@ -335,29 +335,29 @@ export function DeployModal({
 
             {/* Summary */}
             <div className="rounded-lg bg-secondary/50 p-3">
-              <p className="text-xs text-muted-foreground mb-1">Resumen del despliegue</p>
+              <p className="text-xs text-muted-foreground mb-1">Deployment summary</p>
               <p className="text-sm font-medium text-foreground">
                 {totalSelected > 0
                   ? Object.entries(selectedCounts)
                       .filter(([, v]) => v > 0)
                       .map(([tipo, v]) => `${v} ${tipoRecursoLabel(tipo)}`)
                       .join(", ")
-                  : "Ningún recurso seleccionado"}
+                  : "No resources selected"}
               </p>
             </div>
 
             <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={onClose}>Cancelar</Button>
+              <Button variant="outline" onClick={onClose}>Cancel</Button>
               <Button onClick={onDeploy} disabled={deployingResources || totalSelected === 0}>
                 {deployingResources ? (
                   <>
                     <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Desplegando...
+                    Deploying...
                   </>
                 ) : (
                   <>
                     <Send className="h-4 w-4 mr-2" />
-                    Confirmar Despliegue
+                    Confirm Deployment
                   </>
                 )}
               </Button>

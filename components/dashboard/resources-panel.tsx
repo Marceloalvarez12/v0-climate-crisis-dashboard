@@ -42,19 +42,19 @@ const getStatusBadge = (status: Resource["status"]) => {
     case "available":
       return (
         <Badge variant="outline" className="border-success/50 bg-success/10 text-success text-[10px] px-1.5 py-0">
-          Disponible
+          Available
         </Badge>
       )
     case "dispatched":
       return (
         <Badge variant="outline" className="border-accent/50 bg-accent/10 text-accent text-[10px] px-1.5 py-0">
-          En camino
+          En route
         </Badge>
       )
     case "busy":
       return (
         <Badge variant="outline" className="border-primary/50 bg-primary/10 text-primary text-[10px] px-1.5 py-0">
-          Ocupado
+          Busy
         </Badge>
       )
   }
@@ -72,7 +72,7 @@ export function ResourcesPanel() {
     name: r.nombre,
     type: r.tipo as Resource["type"],
     status: r.estado as Resource["status"],
-    location: r.ubicacion || "Base Central",
+    location: r.ubicacion || "Central Base",
     eta: r.estado === "dispatched" ? `${Math.floor(Math.random() * 15) + 5} min` : undefined
   })) : []
 
@@ -83,7 +83,7 @@ export function ResourcesPanel() {
   if (error) {
     return (
       <div className="flex h-full flex-col rounded-lg border border-border bg-card p-4">
-        <p className="text-sm text-muted-foreground">Error cargando recursos</p>
+        <p className="text-sm text-muted-foreground">Error loading resources</p>
       </div>
     )
   }
@@ -91,7 +91,7 @@ export function ResourcesPanel() {
   return (
     <div className="flex h-full flex-col rounded-lg border border-border bg-card">
       <div className="border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">Recursos Disponibles</h2>
+        <h2 className="text-sm font-semibold text-foreground">Available Resources</h2>
         <div className="mt-2 flex items-center gap-3 text-[10px]">
           <span className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-success" />
@@ -110,7 +110,7 @@ export function ResourcesPanel() {
       <ScrollArea className="flex-1 px-3 py-2">
         <div className="space-y-2">
           {resources.length === 0 ? (
-            <p className="text-xs text-muted-foreground p-2">Cargando recursos...</p>
+            <p className="text-xs text-muted-foreground p-2">Loading resources...</p>
           ) : (
             resources.map((resource) => (
               <div

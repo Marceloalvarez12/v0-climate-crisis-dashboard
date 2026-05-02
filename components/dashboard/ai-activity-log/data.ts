@@ -5,22 +5,22 @@ import type { ActivityItem, ReasoningStep } from "./types"
 // ---------------------------------------------------------------------------
 
 export const initialActivities: ActivityItem[] = [
-  { id: "1", type: "monitoring", message: "Sistema de monitoreo iniciado",         timestamp: new Date(Date.now() - 300_000) },
-  { id: "2", type: "extraction", message: "Extrayendo datos de X (Twitter)...",    timestamp: new Date(Date.now() - 240_000) },
+  { id: "1", type: "monitoring", message: "Monitoring system started",          timestamp: new Date(Date.now() - 300_000) },
+  { id: "2", type: "extraction", message: "Extracting data from X (Twitter)...", timestamp: new Date(Date.now() - 240_000) },
   {
     id: "3",
     type: "reasoning",
-    message: "Analizando menciones de inundaciones en Tucumán",
+    message: "Analyzing flood mentions in Tucumán",
     timestamp: new Date(Date.now() - 180_000),
     confidence: 92,
     reasoning: [
-      { step: 1, thought: "Detectados 47 tweets con palabras clave: 'inundacion', 'agua', 'evacuacion' en San Miguel de Tucumán" },
-      { step: 2, thought: "Geolocalizando tweets... 38 tienen coordenadas verificables" },
-      { step: 3, thought: "Cruzando con datos históricos de zonas inundables...", action: "Consultando base de datos municipal" },
-      { step: 4, thought: "Patrón detectado: 89% de reportes concentrados en radio de 2km del Centro Histórico", result: "ALERTA VALIDADA" },
+      { step: 1, thought: "Detected 47 tweets with keywords: 'inundacion', 'agua', 'evacuacion' in San Miguel de Tucumán" },
+      { step: 2, thought: "Geolocating tweets... 38 have verifiable coordinates" },
+      { step: 3, thought: "Cross-referencing with historical flood zone data...", action: "Querying municipal database" },
+      { step: 4, thought: "Pattern detected: 89% of reports concentrated within 2km radius of the Historic Center", result: "ALERT VALIDATED" },
     ] satisfies ReasoningStep[],
   },
-  { id: "4", type: "database", message: "Guardando 47 reportes en base de datos", timestamp: new Date(Date.now() - 120_000) },
+  { id: "4", type: "database", message: "Saving 47 reports to database", timestamp: new Date(Date.now() - 120_000) },
 ]
 
 // ---------------------------------------------------------------------------
@@ -29,34 +29,34 @@ export const initialActivities: ActivityItem[] = [
 // ---------------------------------------------------------------------------
 
 export const backgroundMessages: Omit<ActivityItem, "id" | "timestamp">[] = [
-  { type: "extraction", message: "Extrayendo datos de redes sociales..." },
-  { type: "monitoring", message: "Escaneando noticias locales de La Gaceta..." },
+  { type: "extraction", message: "Extracting social media data..." },
+  { type: "monitoring", message: "Scanning local news from La Gaceta..." },
   {
     type: "reasoning",
-    message: "IA analizando patrones de evacuación...",
+    message: "AI analyzing evacuation patterns...",
     confidence: 78,
     reasoning: [
-      { step: 1, thought: "Analizando flujo de tráfico en tiempo real via Google Maps API" },
-      { step: 2, thought: "Identificando rutas de evacuación óptimas...", action: "Calculando 3 rutas alternativas" },
-      { step: 3, thought: "Ruta por Av. Mate de Luna BLOQUEADA - árboles caídos reportados" },
-      { step: 4, thought: "Ruta recomendada: Av. Sarmiento → Ruta 9 Norte", result: "Tiempo estimado evacuación: 45 min" },
+      { step: 1, thought: "Analyzing real-time traffic flow via Google Maps API" },
+      { step: 2, thought: "Identifying optimal evacuation routes...", action: "Calculating 3 alternative routes" },
+      { step: 3, thought: "Route via Av. Mate de Luna BLOCKED - fallen trees reported" },
+      { step: 4, thought: "Recommended route: Av. Sarmiento → Ruta 9 Norte", result: "Estimated evacuation time: 45 min" },
     ] satisfies ReasoningStep[],
   },
-  { type: "database",   message: "Actualizando base de datos de recursos" },
-  { type: "extraction", message: "Recopilando datos de sensores meteorológicos..." },
-  { type: "monitoring", message: "Verificando cámaras de vigilancia urbana..." },
+  { type: "database",   message: "Updating resources database" },
+  { type: "extraction", message: "Collecting meteorological sensor data..." },
+  { type: "monitoring", message: "Checking urban surveillance cameras..." },
   {
     type: "reasoning",
-    message: "Prediciendo expansión de zona afectada...",
+    message: "Predicting expansion of affected area...",
     confidence: 85,
     reasoning: [
-      { step: 1, thought: "Modelo hidrológico cargado: TucumanFlood_v3.2" },
-      { step: 2, thought: "Inputs: precipitación actual, topografía, nivel de canales", action: "Ejecutando simulación" },
-      { step: 3, thought: "Proyección a 2 horas: expansión hacia Barrio Sur probable (73%)" },
-      { step: 4, thought: "Recomendación: alertar preventivamente a 340 familias adicionales", result: "Alerta preventiva generada" },
+      { step: 1, thought: "Hydrological model loaded: TucumanFlood_v3.2" },
+      { step: 2, thought: "Inputs: current precipitation, topography, canal levels", action: "Running simulation" },
+      { step: 3, thought: "2-hour projection: expansion toward Barrio Sur likely (73%)" },
+      { step: 4, thought: "Recommendation: preventively alert 340 additional families", result: "Preventive alert generated" },
     ] satisfies ReasoningStep[],
   },
-  { type: "extraction", message: "Consultando API meteorológica nacional..." },
-  { type: "monitoring", message: "Analizando sensores hidrológicos del río Salí..." },
-  { type: "database",   message: "Sincronizando con base de datos de Defensa Civil..." },
+  { type: "extraction", message: "Querying national meteorological API..." },
+  { type: "monitoring", message: "Analyzing hydrological sensors of Río Salí..." },
+  { type: "database",   message: "Syncing with Civil Defense database..." },
 ]

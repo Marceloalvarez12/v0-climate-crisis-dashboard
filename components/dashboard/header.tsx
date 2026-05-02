@@ -35,20 +35,20 @@ export function DashboardHeader() {
           <Zap className="h-4 w-4 text-primary" />
         </div>
         <div className="min-w-0">
-          <h1 className="truncate text-sm font-bold text-foreground sm:text-base">Centro de Crisis Climaticas</h1>
-          <p className="hidden text-[10px] text-muted-foreground sm:block">Sistema de Monitoreo de Agente IA</p>
+          <h1 className="truncate text-sm font-bold text-foreground sm:text-base">Climate Crisis Center</h1>
+          <p className="hidden text-[10px] text-muted-foreground sm:block">AI Agent Monitoring System</p>
         </div>
       </div>
 
       <div className="flex items-center gap-2">
         <div className="hidden items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 sm:flex">
           <Radio className="h-3 w-3 text-success animate-pulse" />
-          <span className="text-xs text-muted-foreground">Sistema Activo</span>
+          <span className="text-xs text-muted-foreground">System Active</span>
         </div>
 
         {currentTime && (
           <div className="hidden rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 font-mono text-xs text-foreground md:block">
-            {currentTime.toLocaleString("es-AR", {
+            {currentTime.toLocaleString("en-US", {
               day: "2-digit",
               month: "2-digit",
               year: "numeric",
