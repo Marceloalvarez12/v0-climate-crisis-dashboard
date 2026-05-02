@@ -296,6 +296,19 @@ export function buildRespawnIncident(base?: { tipo?: string; fuente?: string }) 
  */
 export const STATIC_RESPONSE_TIME_MIN = 18
 
+/**
+ * Tiempos del ciclo de vida de un recurso despachado (ms).
+ * Compartidos por use-resource-lifecycle.ts y use-simulation-loop.ts
+ * para garantizar consistencia entre despacho manual y simulacion.
+ *
+ * Flujo: available → dispatched (50s) → busy (60s) → available
+ */
+export const RESOURCE_DISPATCHED_TO_BUSY_MS  = 50_000  // 50s en camino → ocupado
+export const RESOURCE_BUSY_TO_AVAILABLE_MS   = 60_000  // 60s ocupado   → disponible
+
+/** Intervalo entre spawns de incidentes en la simulacion automatica */
+export const SIMULATION_SPAWN_INTERVAL_MS = 4 * 60 * 1000  // 4 minutos
+
 /** Estima severidad a partir del texto de un reporte social (logica del agente IA) */
 export function analizarSeveridad(texto: string): IncidentSeveridad {
   const t = texto.toLowerCase()

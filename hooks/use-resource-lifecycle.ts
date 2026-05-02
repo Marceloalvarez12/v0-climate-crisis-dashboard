@@ -1,8 +1,10 @@
 "use client"
 
-// Tiempos de transicion de estado del recurso
-const DISPATCHED_TO_BUSY_MS = 50_000  // 50s: "en camino" → "ocupado"
-const BUSY_TO_AVAILABLE_MS  = 60_000  // 60s: "ocupado"   → "disponible"
+import { RESOURCE_DISPATCHED_TO_BUSY_MS, RESOURCE_BUSY_TO_AVAILABLE_MS } from "@/lib/mock-data"
+
+// Aliases locales para legibilidad
+const DISPATCHED_TO_BUSY_MS = RESOURCE_DISPATCHED_TO_BUSY_MS
+const BUSY_TO_AVAILABLE_MS  = RESOURCE_BUSY_TO_AVAILABLE_MS
 
 async function patchRecurso(id: string, estado: string) {
   await fetch("/api/recursos", {

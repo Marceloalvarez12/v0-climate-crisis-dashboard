@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useSWRConfig } from "swr"
-import { buildRespawnIncident, SOCIAL_REPORTS, CAMERA_REPORTS, SENSOR_REPORTS } from "@/lib/mock-data"
+import {
+  buildRespawnIncident, SOCIAL_REPORTS, CAMERA_REPORTS, SENSOR_REPORTS,
+  RESOURCE_DISPATCHED_TO_BUSY_MS, RESOURCE_BUSY_TO_AVAILABLE_MS,
+  SIMULATION_SPAWN_INTERVAL_MS,
+} from "@/lib/mock-data"
 
 // Plantillas base sin valores aleatorios — los aleatorios se calculan en spawnIncident()
 // para que cada llamada genere valores distintos
@@ -97,7 +101,7 @@ export function useSimulationLoop() {
       incidentLocation,
       dispatchedAt: new Date(),
       status: "en_camino",
-      etaSeconds: 10,
+      etaSeconds: RESOURCE_DISPATCHED_TO_BUSY_MS / 1000,
     }
     setActiveDispatches(prev => [...prev, dispatch])
     addEvent({
@@ -107,7 +111,7 @@ export function useSimulationLoop() {
       resourceId: available.id,
     })
 
-    // Despues de 10 segundos: recurso llega, incidente se resuelve, nuevo incidente aparece
+    // Despues de DISPATCHED_TO_BUSY_MS (50s): recurso llega al incidente
     const timer = setTimeout(async () => {
       // 1. Recurso pasa a "ocupado"
       await fetch("/api/recursos", {
@@ -127,7 +131,7 @@ export function useSimulationLoop() {
         resourceId: available.id,
       })
 
-      // 2. Incidente se marca como resuelto (desaparece del mapa)
+      // 2. Incidente se marca como atendido (desaparece del mapa)
       await fetch("/api/incidentes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -140,39 +144,33 @@ export function useSimulationLoop() {
         incidentId,
       })
 
-      // 3. Nuevo incidente aparece en coordenadas aleatorias
+      // 3. Despues de BUSY_TO_AVAILABLE_MS (60s): recurso vuelve a disponible
       setTimeout(async () => {
-        const newIncident = await spawnIncident()
-        if (newIncident) {
-          addEvent({
-            type: "incident_respawned",
-            message: `Nuevo incidente detectado en ${newIncident.ubicacion}`,
-            incidentId: newIncident.id,
-          })
-        }
-        // Limpia el despacho
+        await fetch("/api/recursos", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: available.id, estado: "available", incidente_id: null }),
+        })
+        mutate("/api/recursos")
         setActiveDispatches(prev => prev.filter(d => d.resourceId !== available.id))
-      }, 1500)
+      }, RESOURCE_BUSY_TO_AVAILABLE_MS)
 
       dispatchTimersRef.current.delete(available.id)
-    }, 10000)
+    }, RESOURCE_DISPATCHED_TO_BUSY_MS)
 
     dispatchTimersRef.current.set(available.id, timer)
   }, [mutate, addEvent, spawnIncident])
 
-  // Inicia el loop: primer incidente inmediato, luego cada 4 minutos
-  const SPAWN_INTERVAL_MS = 4 * 60 * 1000 // 4 minutos
-
+  // Inicia el loop: primer incidente inmediato, luego cada SIMULATION_SPAWN_INTERVAL_MS
   const startSimulation = useCallback(async () => {
     setIsRunning(true)
     setEvents([])
 
-    // Primer incidente inmediato
     await spawnIncident()
 
     spawnTimerRef.current = setInterval(async () => {
       await spawnIncident()
-    }, SPAWN_INTERVAL_MS)
+    }, SIMULATION_SPAWN_INTERVAL_MS)
   }, [spawnIncident])
 
   // Detiene el loop y limpia timers
