@@ -73,7 +73,7 @@ export function AnalyticsPanel() {
       id: "risk",
       label: "Nivel de Riesgo",
       // Show BAJO when active but no critical/high, show — when no data yet
-      value: !d || d.activeIncidentCount === 0 ? "SIN DATOS" : d.riskLevel,
+      value: !d || d.activeIncidentCount === 0 ? "SIN INCIDENTES" : d.riskLevel,
       icon: <AlertTriangle className="h-4 w-4" />,
       color: riskColor,
       progress: d?.activeIncidentCount === 0 ? 0 : d?.riskProgress,
