@@ -320,7 +320,7 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
       case "firefighter": return <Truck className="h-5 w-5" />
       case "police":      return <Shield className="h-5 w-5" />
       case "boat":        return <AlertTriangle className="h-5 w-5" />
-      case "helicopter":  return <Activity className="h-5 w-5" />
+      case "helicopter":  return <Wind className="h-5 w-5" />
       default:            return <Shield className="h-5 w-5" />
     }
   }

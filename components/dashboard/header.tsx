@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
 export function DashboardHeader() {
-  const [currentTime, setCurrentTime] = useState(new Date())
+  const [currentTime, setCurrentTime] = useState<Date | null>(null)
   const [alertCount, setAlertCount] = useState(3)
 
   useEffect(() => {
+    setCurrentTime(new Date())
     const interval = setInterval(() => {
       setCurrentTime(new Date())
     }, 1000)
@@ -45,16 +46,18 @@ export function DashboardHeader() {
           <span className="text-xs text-muted-foreground">Sistema Activo</span>
         </div>
 
-        <div className="hidden rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 font-mono text-xs text-foreground md:block">
-          {currentTime.toLocaleString("es-AR", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })}
-        </div>
+        {currentTime && (
+          <div className="hidden rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 font-mono text-xs text-foreground md:block">
+            {currentTime.toLocaleString("es-AR", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })}
+          </div>
+        )}
 
         <Button variant="ghost" size="icon" className="relative h-8 w-8">
           <Bell className="h-4 w-4" />
