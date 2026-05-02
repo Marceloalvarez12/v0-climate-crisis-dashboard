@@ -283,6 +283,19 @@ export function buildRespawnIncident(base?: { tipo?: string; fuente?: string }) 
   }
 }
 
+// ---------------------------------------------------------------------------
+// Metricas estaticas de referencia
+// Cuando se integren APIs reales, reemplazar estos valores con llamadas al backend.
+// ---------------------------------------------------------------------------
+
+/**
+ * Tiempo de respuesta promedio en minutos.
+ * Representa el tiempo historico promedio entre la deteccion de un incidente
+ * y el despacho de recursos. Valor de referencia basado en datos operacionales.
+ * Para conectar una fuente real: reemplazar con una llamada a la API de turnos/despachos.
+ */
+export const STATIC_RESPONSE_TIME_MIN = 18
+
 /** Estima severidad a partir del texto de un reporte social (logica del agente IA) */
 export function analizarSeveridad(texto: string): IncidentSeveridad {
   const t = texto.toLowerCase()

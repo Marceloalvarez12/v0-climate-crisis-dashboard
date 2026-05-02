@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { STATIC_RESPONSE_TIME_MIN } from "@/lib/mock-data"
 
 export async function GET() {
   const supabase = await createClient()
@@ -30,15 +31,8 @@ export async function GET() {
     .from("recursos")
     .select("id, estado, updated_at")
 
-  // 5. Resolved incidents for avg response time:
-  //    Take the most recent 50 atendidos, filter out seed data by requiring
-  //    a positive diff and capping at MAX_RESPONSE_MIN
-  const { data: resolved } = await supabase
-    .from("incidentes")
-    .select("created_at, updated_at")
-    .eq("estado", "atendido")
-    .order("updated_at", { ascending: false })
-    .limit(50)
+  // 5. Avg response time comes from mock-data.ts (static reference value).
+  //    To connect a real source, update STATIC_RESPONSE_TIME_MIN in lib/mock-data.ts.
 
   // --- Calculations ---
 
@@ -46,7 +40,6 @@ export async function GET() {
   const curr24 = incidents24h ?? []
   const prev24 = incidents48h ?? []
   const allResources = recursos ?? []
-  const resolvedList = resolved ?? []
 
   // Affected people — only count currently active incidents
   const affectedNow = active.reduce((s: number, i: { personas_afectadas: number }) => s + (i.personas_afectadas || 0), 0)
@@ -71,20 +64,8 @@ export async function GET() {
   else if (highCount === 1 || active.length >= 3) { riskLevel = "MEDIO"; riskProgress = 50 }
   else if (active.length > 0) { riskLevel = "BAJO-MEDIO"; riskProgress = 35 }
 
-  // Avg response time — only require a positive diff (no artificial cap)
-  // Incidents marked atendido via bulk reset have updated_at == the reset timestamp,
-  // so we skip those by requiring diff > 1 minute (real dispatch takes at least that)
-  const validResolved = resolvedList.filter((i: { created_at: string; updated_at: string }) => {
-    const diffMin = (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()) / 60000
-    return diffMin >= 1
-  })
-  let avgResponseMin: number | null = null
-  if (validResolved.length > 0) {
-    const totalMin = validResolved.reduce((s: number, i: { created_at: string; updated_at: string }) => {
-      return s + (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()) / 60000
-    }, 0)
-    avgResponseMin = parseFloat((totalMin / validResolved.length).toFixed(1))
-  }
+  // Avg response time — static reference value from mock-data.ts
+  const avgResponseMin: number = STATIC_RESPONSE_TIME_MIN
 
   // Incident trend: compare last 24h vs prev 24h
   // If prev window has 0 incidents (app just started), return null so UI hides the badge
@@ -108,7 +89,6 @@ export async function GET() {
     affectedNow,
     affectedChange,
     avgResponseMin,
-    resolvedCount: validResolved.length,
     activeIncidentCount: active.length,
     incidentsTrend,
     totalResources,
