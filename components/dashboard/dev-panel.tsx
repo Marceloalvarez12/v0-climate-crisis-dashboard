@@ -248,7 +248,7 @@ export function DevPanel() {
 
         <div className="border-t border-cyan-500/10 pt-2 flex justify-between">
           <span className="text-[10px] font-mono text-muted-foreground">
-            Ciclo: <span className="text-cyan-400">15s spawn / 10s respuesta</span>
+            Ciclo: <span className="text-cyan-400">4min spawn / 50s camino / 60s busy</span>
           </span>
           <span className="text-[10px] font-mono text-muted-foreground">?dev=true</span>
         </div>

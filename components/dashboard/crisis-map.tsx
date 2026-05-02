@@ -5,42 +5,10 @@ import useSWR from "swr"
 import { AlertTriangle, Droplets, Flame, Wind, MapPin, Layers, Twitter, Thermometer, Camera, Users, Clock, MapPinned, Ambulance, Shield, Truck, Phone, Send, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { dispatchResourceWithLifecycle } from "@/hooks/use-resource-lifecycle"
+import { buildRespawnIncident } from "@/lib/mock-data"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
-// SMT bounding box for random respawn coordinates
-const SMT_BOUNDS = { latMin: -26.84, latMax: -26.80, lngMin: -65.23, lngMax: -65.18 }
-const RESPAWN_ZONES = [
-  "Barrio Sur - Av. Mitre", "Las Talitas - Barrio Mutual", "Tafi Viejo - Zona Residencial",
-  "Banda del Rio Sali - Acceso Norte", "Barrio Norte - Mercado Central",
-  "Yerba Buena - Av. Aconquija", "El Manantial - Ruta Provincial 301",
-  "San Pablo - Sector Industrial", "Alberdi - Barrio Obrero", "Reduccion - Zona Sur",
-]
-
-function buildRespawnIncident(base?: { tipo?: string; fuente?: string }) {
-  const lat = SMT_BOUNDS.latMin + Math.random() * (SMT_BOUNDS.latMax - SMT_BOUNDS.latMin)
-  const lng = SMT_BOUNDS.lngMin + Math.random() * (SMT_BOUNDS.lngMax - SMT_BOUNDS.lngMin)
-  const zona = RESPAWN_ZONES[Math.floor(Math.random() * RESPAWN_ZONES.length)]
-  const tipos = ["flood", "fire", "storm", "general"] as const
-  const severidades = ["critical", "high", "medium"] as const
-  const fuentes = ["social", "sensor", "camera"] as const
-  const tipo = (base?.tipo as typeof tipos[number]) ?? tipos[Math.floor(Math.random() * tipos.length)]
-  const fuente = (base?.fuente as typeof fuentes[number]) ?? fuentes[Math.floor(Math.random() * fuentes.length)]
-  const fuente_detalles: Record<string, unknown> =
-    fuente === "social"
-      ? { platform: "X (Twitter)", username: "@alerta_tucuman", content: `Nuevo incidente detectado en ${zona}. #EmergenciaTucuman`, imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600" }
-      : fuente === "sensor"
-      ? { sensorId: `WS-${Math.floor(Math.random() * 999)}`, temperature: 20 + Math.floor(Math.random() * 10), humidity: 75 + Math.floor(Math.random() * 20), windSpeed: 20 + Math.floor(Math.random() * 60), pressure: 1005 + Math.floor(Math.random() * 15) }
-      : { cameraId: `CAM-${Math.floor(Math.random() * 999)}`, cameraLocation: zona, imageUrl: "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=600" }
-  return {
-    tipo, severidad: severidades[Math.floor(Math.random() * severidades.length)],
-    ubicacion: zona,
-    latitud: parseFloat(lat.toFixed(6)),
-    longitud: parseFloat(lng.toFixed(6)),
-    personas_afectadas: 50 + Math.floor(Math.random() * 800),
-    fuente, fuente_detalles, estado: "activo",
-  }
-}
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -362,7 +330,6 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
 
   const handleCloseDeploy = () => {
     setShowDeployModal(false)
-    setShowConfirmModal(false)
     setDeploySuccess(false)
     setSelectedCounts({})
     // Force revalidation so next open shows fresh server state
@@ -435,10 +402,9 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
       { description: `${idsToDispatch.length} unidad(es) en camino` }
     )
 
-    // Wait briefly so user sees success, then close and reset everything
+    // Wait briefly so user sees the success screen, then close and reset
     setTimeout(() => {
       setShowDeployModal(false)
-      setShowConfirmModal(false)
       setDeploySuccess(false)
       setSelectedCounts({})
       mutateRecursos()
@@ -495,6 +461,12 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
           </Badge>
           <Badge variant="outline" className="hidden border-accent/50 bg-accent/10 text-accent text-[10px] sm:inline-flex">
             {filteredIncidents.filter(i => i.severity === "high").length} Altos
+          </Badge>
+          <Badge variant="outline" className="hidden border-yellow-500/50 bg-yellow-500/10 text-yellow-400 text-[10px] sm:inline-flex">
+            {filteredIncidents.filter(i => i.severity === "medium").length} Medios
+          </Badge>
+          <Badge variant="outline" className="hidden border-success/50 bg-success/10 text-success text-[10px] sm:inline-flex">
+            {filteredIncidents.filter(i => i.severity === "low").length} Bajos
           </Badge>
         </div>
       </div>

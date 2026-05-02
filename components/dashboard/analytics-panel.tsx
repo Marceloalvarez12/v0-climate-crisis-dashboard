@@ -12,12 +12,14 @@ interface AnalyticsData {
   riskProgress: number
   criticalCount: number
   highCount: number
+  mediumCount: number
+  lowCount: number
   affectedNow: number
   affectedChange: number
   avgResponseMin: number | null
   resolvedCount: number
   activeIncidentCount: number
-  incidentsTrend: number
+  incidentsTrend: number | null
   totalResources: number
   deployedResources: number
   enCamino: number
@@ -48,23 +50,30 @@ export function AnalyticsPanel() {
     : d.highCount > 0 ? "accent"
     : "success"
 
-  // Only show response time once we have real resolved incidents
-  const responseValue = d?.avgResponseMin != null ? `${d.avgResponseMin} min` : "—"
+  // Response time: show in hours if >= 60 min, minutes otherwise
+  const responseValue = d?.avgResponseMin != null
+    ? d.avgResponseMin >= 60
+      ? `${(d.avgResponseMin / 60).toFixed(1)}h`
+      : `${d.avgResponseMin} min`
+    : "—"
 
-  // Trend value: only show percentage if we have prior window data, otherwise "—"
-  const hasTrendData = d != null && (d.incidentsTrend !== 0 || d.activeIncidentCount > 0)
+  // Trend: null means no previous window data yet — show "Sin datos"
   const trendValue = !d
     ? "—"
-    : hasTrendData
-      ? (d.incidentsTrend > 0 ? `+${d.incidentsTrend}%` : d.incidentsTrend < 0 ? `${d.incidentsTrend}%` : "Estable")
-      : "—"
+    : d.incidentsTrend === null
+      ? "Sin Incidentes"
+      : d.incidentsTrend > 0
+        ? `+${d.incidentsTrend}%`
+        : d.incidentsTrend < 0
+          ? `${d.incidentsTrend}%`
+          : "Estable"
 
   const metrics: Metric[] = [
     {
       id: "risk",
       label: "Nivel de Riesgo",
       // Show BAJO when active but no critical/high, show — when no data yet
-      value: !d || d.activeIncidentCount === 0 ? "SIN DATOS" : d.riskLevel,
+      value: !d || d.activeIncidentCount === 0 ? "SIN INCIDENTES" : d.riskLevel,
       icon: <AlertTriangle className="h-4 w-4" />,
       color: riskColor,
       progress: d?.activeIncidentCount === 0 ? 0 : d?.riskProgress,
@@ -90,10 +99,18 @@ export function AnalyticsPanel() {
       id: "incidents",
       label: "Incidentes Activos",
       value: d?.activeIncidentCount ?? "—",
-      // Only show trend badge when there's a non-zero real trend
-      change: d?.incidentsTrend !== 0 ? d?.incidentsTrend : undefined,
+      change: d?.incidentsTrend != null && d.incidentsTrend !== 0 ? d.incidentsTrend : undefined,
       icon: <Activity className="h-4 w-4" />,
       color: d && d.activeIncidentCount > 0 ? "primary" : "muted",
+      // severity breakdown shown as sublabel
+      sublabel: d && d.activeIncidentCount > 0
+        ? [
+            d.criticalCount > 0  ? `${d.criticalCount} crit` : null,
+            d.highCount > 0      ? `${d.highCount} alto` : null,
+            d.mediumCount > 0    ? `${d.mediumCount} medio` : null,
+            d.lowCount > 0       ? `${d.lowCount} bajo` : null,
+          ].filter(Boolean).join(" · ") || undefined
+        : undefined,
     },
     {
       id: "resources",
@@ -111,7 +128,9 @@ export function AnalyticsPanel() {
       icon: d?.incidentsTrend != null && d.incidentsTrend < 0
         ? <TrendingDown className="h-4 w-4" />
         : <TrendingUp className="h-4 w-4" />,
-      color: trendValue === "—" ? "muted" : d?.incidentsTrend != null && d.incidentsTrend < 0 ? "success" : "accent",
+      color: !d || d.incidentsTrend === null
+        ? "muted"
+        : d.incidentsTrend < 0 ? "success" : d.incidentsTrend > 0 ? "primary" : "muted",
     },
   ]
 

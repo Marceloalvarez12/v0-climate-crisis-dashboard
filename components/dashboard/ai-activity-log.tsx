@@ -8,6 +8,8 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { dispatchResourceWithLifecycle } from "@/hooks/use-resource-lifecycle"
+import { useAutoResolve } from "@/hooks/use-auto-resolve"
+import { AGENT_ALERTS } from "@/lib/mock-data"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -65,84 +67,7 @@ interface ActivityItem {
   reasoning?: ReasoningStep[]
 }
 
-// SMT bounding box for random respawn coordinates
-const SMT_BOUNDS = { latMin: -26.84, latMax: -26.80, lngMin: -65.23, lngMax: -65.18 }
-
-const RESPAWN_ZONES = [
-  "Barrio Sur - Av. Mitre", "Las Talitas - Barrio Mutual", "Tafi Viejo - Zona Residencial",
-  "Banda del Rio Sali - Acceso Norte", "Barrio Norte - Mercado Central",
-  "Yerba Buena - Av. Aconquija", "El Manantial - Ruta Provincial 301",
-  "San Pablo - Sector Industrial", "Alberdi - Barrio Obrero", "Reduccion - Zona Sur",
-]
-const TIPOS = ["flood", "fire", "storm", "general"] as const
-const SEVERIDADES = ["critical", "high", "medium"] as const
-const FUENTES = ["social", "sensor", "camera"] as const
-
-function buildRespawnIncident(base?: { tipo?: string; fuente?: string; fuente_detalles?: Record<string, unknown> }) {
-  const lat = SMT_BOUNDS.latMin + Math.random() * (SMT_BOUNDS.latMax - SMT_BOUNDS.latMin)
-  const lng = SMT_BOUNDS.lngMin + Math.random() * (SMT_BOUNDS.lngMax - SMT_BOUNDS.lngMin)
-  const zona = RESPAWN_ZONES[Math.floor(Math.random() * RESPAWN_ZONES.length)]
-  const tipo = (base?.tipo as typeof TIPOS[number]) ?? TIPOS[Math.floor(Math.random() * TIPOS.length)]
-  const severidad = SEVERIDADES[Math.floor(Math.random() * SEVERIDADES.length)]
-  const fuente = (base?.fuente as typeof FUENTES[number]) ?? FUENTES[Math.floor(Math.random() * FUENTES.length)]
-
-  const fuente_detalles: Record<string, unknown> =
-    fuente === "social"
-      ? { platform: "X (Twitter)", username: "@alerta_tucuman", content: `Nuevo incidente detectado en ${zona}. Ciudadanos reportando la situacion. #EmergenciaTucuman`, imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600" }
-      : fuente === "sensor"
-      ? { sensorId: `WS-${Math.floor(Math.random() * 999)}`, temperature: 20 + Math.floor(Math.random() * 10), humidity: 70 + Math.floor(Math.random() * 25), windSpeed: 20 + Math.floor(Math.random() * 60), pressure: 1005 + Math.floor(Math.random() * 15) }
-      : { cameraId: `CAM-${Math.floor(Math.random() * 999)}`, cameraLocation: zona, imageUrl: "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=600" }
-
-  return {
-    tipo, severidad,
-    ubicacion: zona,
-    latitud: parseFloat(lat.toFixed(6)),
-    longitud: parseFloat(lng.toFixed(6)),
-    personas_afectadas: 50 + Math.floor(Math.random() * 800),
-    fuente, fuente_detalles,
-    estado: "activo",
-  }
-}
-
-// Map of alert locations to their full incident data for Supabase INSERT
-// When the agent "discovers" an alert, we insert it into the DB so the map shows it live
-const ALERT_INCIDENT_DATA: Record<string, {
-  tipo: string; severidad: string; ubicacion: string; latitud: number; longitud: number;
-  personas_afectadas: number; fuente: string; fuente_detalles: Record<string, unknown>
-}> = {
-  "Centro Historico, Tucuman": {
-    tipo: "flood", severidad: "critical",
-    ubicacion: "Centro Historico - Plaza Independencia",
-    latitud: -26.8241, longitud: -65.2226,
-    personas_afectadas: 1250, fuente: "social",
-    fuente_detalles: {
-      platform: "X (Twitter)", username: "@tucuman_alerta",
-      content: "URGENTE: Inundacion severa en Plaza Independencia. El agua supera los 50cm. Vecinos atrapados en edificios. #InundacionTucuman",
-      imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600"
-    }
-  },
-  "Barrio San Pablo, Tucuman": {
-    tipo: "flood", severidad: "critical",
-    ubicacion: "Barrio San Pablo - Canal Norte",
-    latitud: -26.8400, longitud: -65.2500,
-    personas_afectadas: 720, fuente: "social",
-    fuente_detalles: {
-      platform: "X (Twitter)", username: "@rescate_tucuman",
-      content: "Canal San Pablo completamente desbordado. Evacuacion de 180 familias en curso. Corte total de Av. Ejercito del Norte. #AlertaTucuman",
-      imageUrl: "https://images.unsplash.com/photo-1446824505046-e43605ffb17f?w=600"
-    }
-  },
-  "Villa 9 de Julio, Tucuman": {
-    tipo: "fire", severidad: "critical",
-    ubicacion: "Villa 9 de Julio - Fabrica Textil",
-    latitud: -26.7950, longitud: -65.2350,
-    personas_afectadas: 560, fuente: "camera",
-    fuente_detalles: {
-      cameraId: "CAM-V9J-023", cameraLocation: "Av. Roca y Catamarca",
-      imageUrl: "https://images.unsplash.com/photo-1486551937199-baf066858de7?w=600"
-    }
-  },
-}
+// ALERT_INCIDENT_DATA y buildRespawnIncident viven en lib/mock-data.ts
 
 const initialActivities: ActivityItem[] = [
   { id: "1", type: "monitoring", message: "Sistema de monitoreo iniciado", timestamp: new Date(Date.now() - 300000) },
@@ -199,51 +124,23 @@ const backgroundMessages: Omit<ActivityItem, "id" | "timestamp">[] = [
   { type: "database", message: "Sincronizando con base de datos de Defensa Civil..." },
 ]
 
-// Alertas que se inyectan al log en el mismo momento que el incidente aparece en el mapa
-const alertMessages: Record<string, Omit<ActivityItem, "id" | "timestamp">> = {
-  "Centro Historico, Tucuman": { 
-    type: "alert", 
-    message: "Identificando zona de riesgo en Centro Historico", 
-    actionable: true, 
-    location: "Centro Historico, Tucuman", 
-    severity: "critical",
-    confidence: 94,
-    reasoning: [
-      { step: 1, thought: "Tweet de @tucuman_alerta reporta inundacion severa" },
-      { step: 2, thought: "Verificando fuente... Usuario verificado con historial confiable (Score: 8.7/10)" },
-      { step: 3, thought: "Imagen adjunta analizada con Vision AI: agua visible en calles, nivel estimado 40-60cm", action: "Procesando imagen con modelo de deteccion" },
-      { step: 4, thought: "Correlacionando con sensores de lluvia cercanos: 85mm en ultima hora", result: "CONFIRMADO - Nivel de confianza 94%" },
-    ]
-  },
-  "Barrio San Pablo, Tucuman": { 
-    type: "alert", 
-    message: "ALERTA CRITICA: Desborde detectado en Canal Norte", 
-    actionable: true, 
-    location: "Barrio San Pablo, Tucuman", 
-    severity: "critical",
-    confidence: 97,
-    reasoning: [
-      { step: 1, thought: "Sensor FL-CN-001 reporta nivel de agua critico: 4.2m (umbral: 3.5m)" },
-      { step: 2, thought: "Confirmando con camara de seguridad CAM-SP-012...", action: "Analizando feed en vivo" },
-      { step: 3, thought: "Vision AI detecta desbordamiento activo - agua ingresando a zona residencial" },
-      { step: 4, thought: "Poblacion en riesgo estimada: 720 personas en radio de 500m", result: "EVACUACION INMEDIATA REQUERIDA" },
-    ]
-  },
-  "Villa 9 de Julio, Tucuman": { 
-    type: "alert", 
-    message: "Incendio reportado en Villa 9 de Julio", 
-    actionable: true, 
-    location: "Villa 9 de Julio, Tucuman", 
-    severity: "critical",
-    confidence: 91,
-    reasoning: [
-      { step: 1, thought: "Camara CAM-V9J-023 detecta humo y llamas en sector industrial" },
-      { step: 2, thought: "Cruzando con reportes de redes sociales: 12 menciones en ultimos 5 minutos" },
-      { step: 3, thought: "Servicio meteorologico indica vientos de 25km/h direccion NE", action: "Calculando propagacion" },
-      { step: 4, thought: "Riesgo de propagacion a zona residencial en 45 minutos si no se interviene", result: "ACCION INMEDIATA REQUERIDA" },
-    ]
-  },
-}
+// Construir el mapa de alertas desde AGENT_ALERTS (lib/mock-data.ts)
+// Shape compatible con ActivityItem para inyectarlo directamente al log
+const alertMessages: Record<string, Omit<ActivityItem, "id" | "timestamp">> =
+  Object.fromEntries(
+    AGENT_ALERTS.map((a) => [
+      a.location,
+      {
+        type: "alert" as const,
+        message: a.agentMessage,
+        actionable: true,
+        location: a.location,
+        severity: "critical" as const,
+        confidence: a.confidence,
+        reasoning: a.reasoning,
+      },
+    ])
+  )
 
 const getIcon = (type: ActivityItem["type"]) => {
   switch (type) {
@@ -311,6 +208,20 @@ export function AIActivityLog() {
   const [satelliteModal, setSatelliteModal] = useState<SatelliteValidation | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const messageIndexRef = useRef(0)
+  // Auto-resolve incidents older than 60 min — delegated to the standalone hook
+  useAutoResolve({
+    onResolved: (locations) => {
+      locations.forEach((loc) => {
+        setActivities(prev => [...prev.slice(-20), {
+          id: Date.now().toString() + loc,
+          type: "complete" as const,
+          message: `Incidente en ${loc} cerrado automaticamente (60 min sin atencion)`,
+          timestamp: new Date(),
+          isNew: true,
+        }])
+      })
+    },
+  })
 
   useEffect(() => {
     // Cycle through background messages (monitoring, extraction, analysis, etc.)
@@ -327,23 +238,21 @@ export function AIActivityLog() {
       messageIndexRef.current += 1
     }, 4000)
 
-    // Every 90 seconds, pick an alert from ALERT_INCIDENT_DATA, insert it into Supabase
+    // Every 90 seconds, pick an alert from AGENT_ALERTS, insert the incident into Supabase
     // AND inject the matching alert message into the log at the exact same time
-    const ALERT_LOCATIONS = Object.keys(ALERT_INCIDENT_DATA)
     let alertIndexRef = 0
 
     const alertInterval = setInterval(() => {
-      const location = ALERT_LOCATIONS[alertIndexRef % ALERT_LOCATIONS.length]
+      const alert = AGENT_ALERTS[alertIndexRef % AGENT_ALERTS.length]
       alertIndexRef += 1
 
-      const incidentData = ALERT_INCIDENT_DATA[location]
-      const alertTemplate = alertMessages[location]
+      const alertTemplate = alertMessages[alert.location]
 
       // Insert incident in Supabase — both log message and map pin appear simultaneously
       fetch("/api/incidentes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(incidentData),
+        body: JSON.stringify(alert.incidentData),
       })
         .then((res) => res.json())
         .then((result) => {
