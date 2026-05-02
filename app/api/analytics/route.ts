@@ -31,8 +31,30 @@ export async function GET() {
     .from("recursos")
     .select("id, estado, updated_at")
 
-  // 5. Avg response time comes from mock-data.ts (static reference value).
-  //    To connect a real source, update STATIC_RESPONSE_TIME_MIN in lib/mock-data.ts.
+  // 5. Avg response time — STATIC (from mock-data.ts)
+  //    Para integrar la version real desde la DB, descomentar el bloque de abajo
+  //    y reemplazar `avgResponseMin` con `avgResponseMinDB ?? STATIC_RESPONSE_TIME_MIN`.
+  //
+  // --- INTEGRACION DB (descomentar cuando haya datos reales) ---
+  // const { data: resolved } = await supabase
+  //   .from("incidentes")
+  //   .select("created_at, updated_at")
+  //   .eq("estado", "atendido")
+  //   .order("updated_at", { ascending: false })
+  //   .limit(50)
+  //
+  // const validResolved = (resolved ?? []).filter((i: { created_at: string; updated_at: string }) => {
+  //   const diffMin = (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()) / 60000
+  //   return diffMin >= 1 && diffMin <= 120
+  // })
+  // const avgResponseMinDB: number | null = validResolved.length > 0
+  //   ? parseFloat((
+  //       validResolved.reduce((s: number, i: { created_at: string; updated_at: string }) =>
+  //         s + (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()) / 60000, 0
+  //       ) / validResolved.length
+  //     ).toFixed(1))
+  //   : null
+  // --- FIN INTEGRACION DB ---
 
   // --- Calculations ---
 
