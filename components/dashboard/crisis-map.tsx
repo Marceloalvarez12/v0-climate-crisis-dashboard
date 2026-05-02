@@ -362,6 +362,8 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
     setShowConfirmModal(false)
     setDeploySuccess(false)
     setSelectedCounts({})
+    // Force revalidation so next open shows fresh server state
+    mutateRecursos()
   }
 
   const handleDeployResources = async () => {
@@ -411,8 +413,8 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
         dispatchResourceWithLifecycle(incidenteId, resourceId).catch(() => {})
       )
       await Promise.all(dispatchPromises)
-      // Revalidate to get the real server state after all PATCHs are done
-      mutateRecursos()
+      // Force revalidation to get real server state (clears optimistic update)
+      await mutateRecursos()
 
       // Respawn: nuevo incidente en coordenadas aleatorias, 2 minutos despues de ser atendido
       setTimeout(async () => {
@@ -430,9 +432,14 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
       { description: `${idsToDispatch.length} unidad(es) en camino` }
     )
 
+    // Wait briefly so user sees success, then close and reset everything
     setTimeout(() => {
-      handleCloseDeploy()
-    }, 1500)
+      setShowDeployModal(false)
+      setShowConfirmModal(false)
+      setDeploySuccess(false)
+      setSelectedCounts({})
+      mutateRecursos()
+    }, 2000)
   }
 
   const filteredIncidents = incidents.filter(i => activeLayers.includes(i.source))
