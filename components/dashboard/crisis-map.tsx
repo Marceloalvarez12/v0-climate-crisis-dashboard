@@ -353,6 +353,7 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
   }
 
   const handleOpenDeploy = () => {
+    mutateRecursos()
     setShowDeployModal(true)
   }
 
@@ -374,17 +375,27 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
     const incidenteTipo = selectedIncident?.type
     const incidenteFuente = selectedIncident?.source
 
-    setDeployingResources(true)
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setDeployingResources(false)
-    setDeploySuccess(true)
-
-    // Collect the actual IDs to dispatch based on counts
+    // Collect the actual IDs to dispatch based on counts BEFORE any async work
     const idsToDispatch: string[] = []
     for (const group of resourceGroups) {
       const count = selectedCounts[group.tipo] ?? 0
       idsToDispatch.push(...group.availableIds.slice(0, count))
     }
+
+    setDeployingResources(true)
+
+    // Optimistically update the SWR cache so the modal counters drop immediately
+    // while the real PATCHs happen in the background
+    if (dbRecursos) {
+      const optimistic = dbRecursos.map(r =>
+        idsToDispatch.includes(r.id) ? { ...r, estado: "dispatched" } : r
+      )
+      mutateRecursos(optimistic, false)
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    setDeployingResources(false)
+    setDeploySuccess(true)
 
     // Mark incident as atendido in Supabase (disappears from map via SWR)
     if (incidenteId) {
@@ -400,6 +411,7 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
         dispatchResourceWithLifecycle(incidenteId, resourceId).catch(() => {})
       )
       await Promise.all(dispatchPromises)
+      // Revalidate to get the real server state after all PATCHs are done
       mutateRecursos()
 
       // Respawn: nuevo incidente en coordenadas aleatorias, 2 minutos despues de ser atendido
