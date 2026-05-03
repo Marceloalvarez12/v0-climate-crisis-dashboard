@@ -2,6 +2,10 @@
 
 Real-time emergency management dashboard for San Miguel de Tucumán, Argentina. Monitors climate crisis events (floods, fires, storms, civil unrest), dispatches resources, and uses AI to analyze social media for incident detection.
 
+## The Challenge & Solution
+
+During climate crises, emergency call centers collapse and critical information gets buried in social media chaos. **Crisis Dashboard** solves this by deploying autonomous AI agents (Gemini 1.5 Flash) that constantly scan unstructured social data, score incident severity, and automatically plot verified threats on a live map for immediate B2G (Business-to-Government) resource dispatch.
+
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router, TypeScript)
@@ -60,6 +64,13 @@ lib/
         └── mock-connector.ts  # For development without live social data
 ```
 
+### Agent Data Flow
+
+1. **Ingestion** — `social-media-agent` pulls unstructured data via connectors (X, Instagram, Facebook)
+2. **Analysis** — `gemini-analyzer` evaluates sentiment, extracts coordinates, and assigns severity score
+3. **Action** — High-confidence signals are pushed to Supabase as verified `incidentes`
+4. **Resolution** — `use-simulation-loop` triggers the nearest `recursos` (ambulances, fire trucks, helicopters) and tracks ETAs in real-time
+
 ## Features
 
 ### Live Incident Map
@@ -113,6 +124,15 @@ When a DB incident is resolved, a new simulated incident respawns at a random Tu
 
 ### Location Concurrency Rule
 The simulator enforces that a single location cannot have two active incidents simultaneously. The `occupiedLocationsRef` Set tracks this without relying on async state.
+
+### Database Setup
+The app works out-of-the-box using the built-in incident simulator (`use-incident-simulator`). Simulated incidents are generated every 4 minutes with random types, locations in Tucumán, and severity levels. If you have a Supabase instance connected, incidents and resources are also synced to the database in real-time.
+
+To use live Supabase data instead of simulation:
+1. Create a Supabase project at [supabase.com](https://supabase.com)
+2. Run the SQL schema from the Database Schema section below
+3. Set your `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` env vars
+4. Disable or adjust the simulator interval in `use-incident-simulator.ts`
 
 ## Environment Variables
 
