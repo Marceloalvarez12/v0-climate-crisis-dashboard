@@ -292,7 +292,9 @@ export function AIActivityLog() {
         }
 
         await dispatchResourceWithLifecycle(incidente?.id)
-      } catch { /* no-op */ }
+      } catch (err) {
+          console.error("[ai-activity-log] Error in handleDispatch:", err)
+        }
 
       toast.success("Resources deployed", {
         description: `Units on their way to ${location}. Incident removed from active.`,

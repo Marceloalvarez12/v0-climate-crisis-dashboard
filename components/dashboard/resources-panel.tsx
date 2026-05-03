@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect, useMemo } from "react"
 import { Truck, Users, Plane, Ship, Building2, HeartPulse } from "lucide-react"
 import useSWR from "swr"
 import { cn } from "@/lib/utils"
@@ -67,13 +68,39 @@ export function ResourcesPanel() {
   })
 
   // Transform database resources to local format
+  const [dispatchedETAs, setDispatchedETAs] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDispatchedETAs((prev) => {
+        const next = { ...prev }
+        let changed = false
+        Object.keys(next).forEach((id) => {
+          const match = next[id].match(/(\d+)/)
+          if (match) {
+            const val = parseInt(match[1])
+            if (val > 1) {
+              next[id] = `${val - 1} min`
+              changed = true
+            } else {
+              delete next[id]
+              changed = true
+            }
+          }
+        })
+        return changed ? next : prev
+      })
+    }, 60000)
+    return () => clearInterval(interval)
+  }, [])
+
   const resources: Resource[] = dbResources ? dbResources.map((r: { id: string; tipo: string; nombre: string; estado: string; ubicacion: string }) => ({
     id: r.id,
     name: r.nombre,
     type: r.tipo as Resource["type"],
     status: r.estado as Resource["status"],
     location: r.ubicacion || "Central Base",
-    eta: r.estado === "dispatched" ? `${Math.floor(Math.random() * 15) + 5} min` : undefined
+    eta: r.estado === "dispatched" ? (dispatchedETAs[r.id] ?? `${Math.floor(Math.random() * 15) + 5} min`) : undefined
   })) : []
 
   const availableCount = resources.filter(r => r.status === "available").length

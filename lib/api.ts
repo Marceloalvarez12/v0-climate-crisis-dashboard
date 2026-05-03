@@ -8,7 +8,11 @@
 import type { DbIncident, DbResource } from "@/lib/types"
 
 // SWR fetcher genérico
-export const fetcher = (url: string) => fetch(url).then((res) => res.json())
+export const fetcher = (url: string) =>
+  fetch(url).then((res) => {
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
+    return res.json()
+  })
 
 // ---------------------------------------------------------------------------
 // Incidentes
@@ -20,6 +24,7 @@ export async function patchIncidente(id: string, updates: Record<string, unknown
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, ...updates }),
   })
+  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
   return res.json() as Promise<DbIncident>
 }
 
@@ -29,6 +34,7 @@ export async function createIncidente(body: Record<string, unknown>) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   })
+  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
   return res.json() as Promise<DbIncident & { skipped?: boolean }>
 }
 
@@ -38,6 +44,7 @@ export async function createIncidente(body: Record<string, unknown>) {
 
 export async function fetchRecursos(): Promise<DbResource[]> {
   const res = await fetch("/api/recursos")
+  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
   return res.json()
 }
 
@@ -50,5 +57,6 @@ export async function patchRecurso(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, ...updates }),
   })
+  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
   return res.json() as Promise<DbResource>
 }

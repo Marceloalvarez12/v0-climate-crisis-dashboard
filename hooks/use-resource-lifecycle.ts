@@ -6,42 +6,52 @@ import {
 } from "@/lib/mock-data"
 import { fetchRecursos, patchRecurso } from "@/lib/api"
 
-/**
- * Despacha un recurso específico (o el primero disponible si no se pasa resourceId)
- * y encadena las transiciones de estado automáticamente:
- *   available → dispatched (inmediato)
- *   dispatched → busy      (50 segundos)
- *   busy → available       (60 segundos adicionales)
- */
+const activeTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
 export async function dispatchResourceWithLifecycle(
   incidenteId?: string,
   resourceId?: string,
-): Promise<string | null> {
+): Promise<{ recursoId: string | null; cleanup: () => void }> {
   let recursoId = resourceId
 
-  // Si no se pasó un id específico, buscar el primer recurso disponible
   if (!recursoId) {
     const recursos = await fetchRecursos()
     const disponible = recursos.find((r) => r.estado === "available")
-    if (!disponible) return null
+    if (!disponible) return { recursoId: null, cleanup: () => {} }
     recursoId = disponible.id
   }
 
-  // dispatched (en camino) — inmediato
   await patchRecurso(recursoId, {
     estado: "dispatched",
     incidente_id: incidenteId ?? null,
   })
 
-  // busy (ocupado) — 50 segundos después
-  setTimeout(async () => {
+  const busyTimer = setTimeout(async () => {
     await patchRecurso(recursoId!, { estado: "busy" })
-
-    // available (disponible) — 60 segundos adicionales
-    setTimeout(async () => {
+    const availableTimer = setTimeout(async () => {
       await patchRecurso(recursoId!, { estado: "available" })
+      activeTimers.delete(recursoId!)
     }, RESOURCE_BUSY_TO_AVAILABLE_MS)
+    activeTimers.set(recursoId!, availableTimer)
   }, RESOURCE_DISPATCHED_TO_BUSY_MS)
 
-  return recursoId
+  activeTimers.set(recursoId!, busyTimer)
+
+  const cleanup = () => {
+    const timer = activeTimers.get(recursoId!)
+    if (timer) {
+      clearTimeout(timer)
+      activeTimers.delete(recursoId!)
+    }
+  }
+
+  return { recursoId, cleanup }
+}
+
+export function cleanupResourceLifecycle(recursoId: string) {
+  const timer = activeTimers.get(recursoId)
+  if (timer) {
+    clearTimeout(timer)
+    activeTimers.delete(recursoId)
+  }
 }

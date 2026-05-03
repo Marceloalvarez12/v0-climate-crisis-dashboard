@@ -42,7 +42,8 @@ const SEVERITY_LEGENDS = [
 // ---------------------------------------------------------------------------
 
 export function CrisisMap() {
-  const [isClient,           setIsClient]           = useState(false)
+  const [isClient, setIsClient] = useState(false)
+  const [leafletCssLoaded, setLeafletCssLoaded] = useState(false)
   const [selectedIncident,   setSelectedIncident]   = useState<Incident | null>(null)
   const [showDeployModal,    setShowDeployModal]     = useState(false)
   const [activeLayers,       setActiveLayers]       = useState<IncidentSource[]>(SOURCE_TYPES)
@@ -62,20 +63,26 @@ export function CrisisMap() {
   })
 
   // Mezclamos DB + Simulados mapeando al tipo unificado
+  const [randomSeed, setRandomSeed] = useState<number[]>([])
+
+  useEffect(() => {
+    setRandomSeed(Array.from({ length: 100 }, () => Math.random()))
+  }, [])
+
   const incidents: Incident[] = useMemo(() => {
-    const mappedSimulated: Incident[] = simulatedIncidents.map((inc) => ({
+    const mappedSimulated: Incident[] = simulatedIncidents.map((inc, idx) => ({
       id: inc.id,
       type: inc.type,
-      severity: "high", // Por defecto para los simulados
+      severity: "high",
       location: inc.locationName,
       coordinates: { lat: inc.lat, lng: inc.lng },
-      affectedPeople: Math.floor(Math.random() * 50) + 10,
+      affectedPeople: Math.floor(randomSeed[idx % randomSeed.length] * 50) + 10,
       timestamp: inc.timestamp,
       source: "social",
       sourceDetails: { platform: "Simulator" },
     }))
     return [...dbIncidents, ...mappedSimulated]
-  }, [dbIncidents, simulatedIncidents])
+  }, [dbIncidents, simulatedIncidents, randomSeed])
 
   const resourceGroups = useMemo(() => {
     if (!dbRecursos) return []
@@ -88,7 +95,17 @@ export function CrisisMap() {
     return Object.values(groups)
   }, [dbRecursos])
 
-  useEffect(() => { setIsClient(true) }, [])
+  useEffect(() => {
+    setIsClient(true)
+    const link = document.createElement("link")
+    link.rel = "stylesheet"
+    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    document.head.appendChild(link)
+    setLeafletCssLoaded(true)
+    return () => {
+      document.head.removeChild(link)
+    }
+  }, [])
 
   // ── Layer filter ─────────────────────────────────────────────────────────
   const toggleLayer = (layer: IncidentSource) => {
@@ -154,19 +171,19 @@ export function CrisisMap() {
         resolveIncident(incidenteId)
       } else {
         // Es un incidente de Base de Datos
-        await patchIncidente(incidenteId, { estado: "atendido" }).catch(() => {})
+        await patchIncidente(incidenteId, { estado: "atendido" }).catch((err) => console.error("[CrisisMap] Error updating incident:", err))
         mutateIncidents()
 
         // Respawn 2 min después (solo para incidentes de DB)
         setTimeout(async () => {
           const respawn = buildRespawnIncident({ tipo: incidenteTipo, fuente: incidenteFuente })
-          await createIncidente(respawn).catch(() => {})
+          await createIncidente(respawn).catch((err) => console.error("[CrisisMap] Error creating respawn incident:", err))
         }, 2 * 60 * 1000)
       }
 
       // Despachar recursos con ciclo de vida (compartido para ambos)
       await Promise.all(
-        idsToDispatch.map((id) => dispatchResourceWithLifecycle(incidenteId, id).catch(() => {}))
+        idsToDispatch.map((id) => dispatchResourceWithLifecycle(incidenteId, id).catch((err) => console.error("[CrisisMap] Error dispatching resource:", err)))
       )
       await mutateRecursos()
     }
@@ -287,9 +304,9 @@ export function CrisisMap() {
       </div>
 
       {/* ── Leaflet Map ─────────────────────────────────────────────── */}
-      {isClient ? (
+      {isClient && leafletCssLoaded ? (
         <div className="h-[400px] w-full shrink-0 pt-10 md:h-full md:flex-1">
-          <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossOrigin="" />
+          <style>{LEAFLET_DARK_STYLES}</style>
           <style>{LEAFLET_DARK_STYLES}</style>
           <MapContainer center={MAP_CENTER} zoom={13} scrollWheelZoom style={{ height: "100%", width: "100%" }}>
             <TileLayer

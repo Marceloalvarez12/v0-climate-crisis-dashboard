@@ -112,7 +112,7 @@ export function useIncidentSimulator({
 
         // Construimos el objeto
         const newIncident: SimulatorIncident = {
-          id: `inc_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          id: `inc_${crypto.randomUUID()}`,
           type: selectedType,
           locationId: selectedLocation.id,
           locationName: selectedLocation.nombre,
