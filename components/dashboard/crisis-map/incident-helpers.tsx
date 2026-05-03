@@ -1,4 +1,4 @@
-import { Droplets, Flame, Wind, AlertTriangle, Twitter, Thermometer, Camera } from "lucide-react"
+import { Droplets, Flame, Wind, AlertTriangle, Twitter, Thermometer, Camera, Store, Siren, Car } from "lucide-react"
 import type { IncidentType, IncidentSource } from "@/lib/types"
 
 // ---------------------------------------------------------------------------
@@ -10,6 +10,9 @@ export function IncidentIcon({ type }: { type: IncidentType }) {
     case "flood":   return <Droplets      className="h-3 w-3" />
     case "fire":    return <Flame         className="h-3 w-3" />
     case "storm":   return <Wind          className="h-3 w-3" />
+    case "looting": return <Store         className="h-3 w-3" />
+    case "violence":return <Siren         className="h-3 w-3" />
+    case "accident":return <Car           className="h-3 w-3" />
     case "general": return <AlertTriangle className="h-3 w-3" />
   }
 }
@@ -69,6 +72,9 @@ export function incidentTypeLabel(type: IncidentType): string {
     case "flood":   return "Flood"
     case "fire":    return "Fire"
     case "storm":   return "Storm"
+    case "looting": return "Looting"
+    case "violence":return "Violence"
+    case "accident":return "Accident"
     case "general": return "General"
   }
 }

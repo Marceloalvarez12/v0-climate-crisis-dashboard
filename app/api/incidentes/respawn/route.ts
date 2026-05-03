@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { buildRespawnIncident, RESPAWN_ZONES } from "@/lib/mock-data"
 
 const MAX_ACTIVE_INCIDENTS = 6
 
@@ -7,46 +8,62 @@ const MAX_ACTIVE_INCIDENTS = 6
  * POST /api/incidentes/respawn
  *
  * Picks one resolved ("atendido") incident at random and reactivates it by
- * setting estado → "activo" and updated_at → now().
- *
- * Called automatically every 4 minutes by the AIActivityLog component to keep
- * the dashboard populated even when the Gemini API quota is exhausted.
- *
- * Returns:
- *   { respawned: true,  incident: { id, ubicacion, tipo, severidad } }  — success
- *   { respawned: false, reason: "max_active_reached" | "no_resolved" }  — skipped
+ * giving it a completely new random location, type, and source from the mock-data.
+ * It ensures that the chosen location doesn't already have an active incident.
  */
 export async function POST() {
   const supabase = await createClient()
 
-  // 1. Guard: don't respawn if we already have enough active incidents
-  const { count: activeCount } = await supabase
+  // 1. Guard: don't respawn if we already have enough active incidents.
+  // Also get the active locations to avoid spawning there again.
+  const { data: activeIncidents } = await supabase
     .from("incidentes")
-    .select("*", { count: "exact", head: true })
+    .select("ubicacion")
     .eq("estado", "activo")
 
-  if ((activeCount ?? 0) >= MAX_ACTIVE_INCIDENTS) {
+  const activeCount = activeIncidents?.length ?? 0
+  if (activeCount >= MAX_ACTIVE_INCIDENTS) {
     return NextResponse.json({ respawned: false, reason: "max_active_reached" })
   }
 
   // 2. Fetch all resolved incidents (candidates for reactivation)
   const { data: resolved } = await supabase
     .from("incidentes")
-    .select("id, ubicacion, tipo, severidad")
+    .select("id, ubicacion")
     .eq("estado", "atendido")
 
   if (!resolved || resolved.length === 0) {
     return NextResponse.json({ respawned: false, reason: "no_resolved" })
   }
 
-  // 3. Pick one at random
-  const candidate = resolved[Math.floor(Math.random() * resolved.length)]
+  // 3. Find a candidate whose location is NOT currently active
+  const activeLocations = new Set((activeIncidents ?? []).map(inc => inc.ubicacion))
+  const availableCandidates = resolved.filter(inc => !activeLocations.has(inc.ubicacion))
 
-  // 4. Reactivate it — reset updated_at so the 60-min timer starts fresh
-  const now = new Date().toISOString()
+  if (availableCandidates.length === 0) {
+    return NextResponse.json({ respawned: false, reason: "no_locations_available" })
+  }
+
+  // Pick a random available candidate (this keeps its original location)
+  const candidate = availableCandidates[Math.floor(Math.random() * availableCandidates.length)]
+
+  // Generate completely new mock data, but we will IGNORE the location part
+  const newIncidentData = buildRespawnIncident()
+  
+  // Extraemos solo lo que queremos actualizar (tipo, severidad, fuente, detalles)
+  const updatePayload = {
+    estado: "activo",
+    tipo: newIncidentData.tipo,
+    severidad: newIncidentData.severidad,
+    fuente: newIncidentData.fuente,
+    fuente_detalles: newIncidentData.fuente_detalles,
+    updated_at: new Date().toISOString()
+  }
+
+  // 4. Reactivate it — update fields and reset updated_at
   const { data: updated, error } = await supabase
     .from("incidentes")
-    .update({ estado: "activo", updated_at: now })
+    .update(updatePayload)
     .eq("id", candidate.id)
     .select("id, ubicacion, tipo, severidad")
     .single()

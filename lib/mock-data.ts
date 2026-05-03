@@ -17,7 +17,7 @@
 // Tipos base compartidos
 // ---------------------------------------------------------------------------
 
-export type IncidentTipo = "flood" | "fire" | "storm" | "general"
+export type IncidentTipo = "flood" | "fire" | "storm" | "looting" | "violence" | "accident" | "general"
 export type IncidentSeveridad = "critical" | "high" | "medium" | "low"
 export type IncidentFuente = "social" | "sensor" | "camera"
 
@@ -52,103 +52,103 @@ export interface CameraReport {
 
 export const SOCIAL_REPORTS: SocialReport[] = [
   {
-    texto: "URGENTE: Inundacion severa en Plaza Independencia. El agua supera los 50cm. Vecinos atrapados en edificios. #InundacionTucuman",
+    texto: "URGENTE: Inundacion severa en Plaza Independencia. El agua supera los 50cm. Vecinos atrapados. #InundacionTucuman",
     fuente: "@tucuman_alerta",
     tipo: "flood",
-    zona: { lat: -26.8241, lng: -65.2226, nombre: "Centro Historico - Plaza Independencia" },
+    zona: { lat: -26.8305, lng: -65.2038, nombre: "Plaza Independencia - Centro Histórico" },
     imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600",
   },
   {
-    texto: "Canal San Pablo desbordado. Evacuacion de 180 familias en curso. Corte total de Av. Ejercito del Norte. #AlertaTucuman",
+    texto: "Barrio Norte bajo el agua. Evacuación en Plaza Urquiza. #AlertaTucuman",
     fuente: "@rescate_tucuman",
     tipo: "flood",
-    zona: { lat: -26.8400, lng: -65.2500, nombre: "Barrio San Pablo - Canal Norte" },
+    zona: { lat: -26.8214, lng: -65.2028, nombre: "Plaza Urquiza - Barrio Norte" },
     imageUrl: "https://images.unsplash.com/photo-1446824505046-e43605ffb17f?w=600",
   },
   {
-    texto: "EMERGENCIA MAXIMA en Barrio Sur. Hospital solicita evacuacion. Ambulancias no pueden acceder. #SOSTucuman",
+    texto: "EMERGENCIA MAXIMA en Barrio Sur. Hospital solicita evacuacion por humo. Ambulancias bloqueadas. #SOSTucuman",
     fuente: "@emergencias_tuc",
-    tipo: "flood",
-    zona: { lat: -26.8380, lng: -65.2150, nombre: "Barrio Sur - Av. Roca" },
+    tipo: "fire",
+    zona: { lat: -26.8398, lng: -65.2088, nombre: "Plaza San Martín - Barrio Sur" },
     imageUrl: "https://images.unsplash.com/photo-1583245177184-4ab53e5e391a?w=600",
   },
   {
-    texto: "EMERGENCIA en Villa Urquiza: El rio Sali crecio de golpe y esta entrando agua a las casas de la costanera.",
+    texto: "Vientos destructivos en el parque. Arboles inmensos aplastaron autos en Av. Soldati.",
     fuente: "@rescate_tucuman",
-    tipo: "flood",
-    zona: { lat: -26.8550, lng: -65.1720, nombre: "Villa Urquiza - Costanera Rio Sali" },
+    tipo: "storm",
+    zona: { lat: -26.8288, lng: -65.1912, nombre: "Parque 9 de Julio - Av. Soldati" },
   },
   {
-    texto: "URGENTE: El fuego esta bajando por el Cerro San Javier hacia las viviendas de El Corte. Necesitamos bomberos YA! #IncendioTucuman",
-    fuente: "@vecino_sanjavier",
-    tipo: "fire",
-    zona: { lat: -26.7850, lng: -65.3200, nombre: "Cerro San Javier - El Corte" },
+    texto: "Caos vehicular en Plazoleta Mitre por accidente múltiple causado por neblina.",
+    fuente: "@vecino_mitre",
+    tipo: "accident",
+    zona: { lat: -26.8159, lng: -65.2153, nombre: "Plazoleta Mitre - Av. Belgrano y Mitre" },
   },
   {
-    texto: "Se incendia deposito de neumaticos en zona industrial de Banda del Rio Sali. Columna de humo negro visible.",
+    texto: "Tensión en Ejercito del Norte. Grupo de personas intentó saquear un supermercado local.",
     fuente: "@emergencias_tuc",
-    tipo: "fire",
-    zona: { lat: -26.8520, lng: -65.1580, nombre: "Banda del Rio Sali - Zona Industrial" },
+    tipo: "looting",
+    zona: { lat: -26.8188, lng: -65.2346, nombre: "Av. Ejército del Norte y Mendoza" },
   },
   {
-    texto: "Alerta roja por tormenta electrica. Vientos de 85km/h. Arboles caidos en Av. Mitre. #TormentaTucuman",
+    texto: "Alerta roja por tormenta electrica. Vientos de 85km/h. Arboles caidos en Parque Avellaneda. #TormentaTucuman",
     fuente: "@meteo_noa",
     tipo: "storm",
-    zona: { lat: -26.8500, lng: -65.2000, nombre: "Banda del Rio Sali - Zona Industrial" },
+    zona: { lat: -26.8261, lng: -65.2239, nombre: "Parque Avellaneda - Av. Mate de Luna" },
     imageUrl: "https://images.unsplash.com/photo-1527482937786-6f4c6c3fd49c?w=600",
   },
   {
-    texto: "Granizo del tamano de pelotas de golf cayendo en Yerba Buena! Autos destrozados. #TormentaTucuman",
-    fuente: "@yerbabuena_info",
-    tipo: "storm",
-    zona: { lat: -26.8150, lng: -65.2950, nombre: "Yerba Buena - Centro" },
+    texto: "Incendio en las afueras de la Terminal. Humo negro dificulta la respiración.",
+    fuente: "@pasajero_tuc",
+    tipo: "fire",
+    zona: { lat: -26.8366, lng: -65.1954, nombre: "Terminal de Ómnibus - Av. Brígido Terán" },
   },
   {
-    texto: "Tormenta electrica SEVERA en Tafi Viejo. Varios postes de luz caidos, arboles en la calle y corte de energia.",
-    fuente: "@meteo_noa",
-    tipo: "storm",
-    zona: { lat: -26.7280, lng: -65.2650, nombre: "Tafi Viejo - Centro" },
+    texto: "Peleas callejeras y disturbios generalizados en Fco. de Aguirre. Eviten la zona.",
+    fuente: "@seguridad_norte",
+    tipo: "violence",
+    zona: { lat: -26.8001, lng: -65.2014, nombre: "Av. Fco. de Aguirre y Juan B. Justo" },
   },
   {
-    texto: "URGENTE: Canal norte desbordado en altura de Honduras y Ejercito del Norte. El agua arrastra autos estacionados.",
+    texto: "URGENTE: Canal desbordado en Zona Sur. El agua arrastra motos estacionadas.",
     fuente: "@bomberos_tuc",
     tipo: "flood",
-    zona: { lat: -26.8100, lng: -65.2400, nombre: "Canal Norte - Honduras" },
+    zona: { lat: -26.8453, lng: -65.2198, nombre: "Av. Roca y Lincoln - Zona Sur" },
   },
 ]
 
 export const SENSOR_REPORTS: SensorReport[] = [
   {
-    sensorId: "WS-YB-012",
+    sensorId: "WS-PI-012",
     tipo: "storm",
-    zona: { lat: -26.8150, lng: -65.2950, nombre: "Yerba Buena - Country Jockey Club" },
+    zona: { lat: -26.8305, lng: -65.2038, nombre: "Plaza Independencia - Centro Histórico" },
     temperature: 18, humidity: 94, windSpeed: 65, pressure: 1008,
   },
   {
-    sensorId: "WS-EM-003",
+    sensorId: "WS-PU-003",
     tipo: "general",
-    zona: { lat: -26.8600, lng: -65.1900, nombre: "El Manantial - Ruta 301" },
+    zona: { lat: -26.8214, lng: -65.2028, nombre: "Plaza Urquiza - Barrio Norte" },
     temperature: 22, humidity: 78, windSpeed: 25, pressure: 1015,
   },
   {
-    sensorId: "FL-CN-001",
+    sensorId: "FL-RL-001",
     tipo: "flood",
-    zona: { lat: -26.8100, lng: -65.2400, nombre: "Canal Norte - Sensor Hidrometrico" },
+    zona: { lat: -26.8453, lng: -65.2198, nombre: "Av. Roca y Lincoln - Zona Sur" },
     temperature: 20, humidity: 95, windSpeed: 30, pressure: 1010,
   },
 ]
 
 export const CAMERA_REPORTS: CameraReport[] = [
   {
-    cameraId: "CAM-BN-047",
+    cameraId: "CAM-SM-047",
     tipo: "fire",
-    zona: { lat: -26.8050, lng: -65.2100, nombre: "Barrio Norte - Deposito Industrial" },
+    zona: { lat: -26.8398, lng: -65.2088, nombre: "Plaza San Martín - Barrio Sur" },
     imageUrl: "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=600",
   },
   {
-    cameraId: "CAM-V9J-023",
+    cameraId: "CAM-TO-023",
     tipo: "fire",
-    zona: { lat: -26.7950, lng: -65.2350, nombre: "Villa 9 de Julio - Fabrica Textil" },
+    zona: { lat: -26.8366, lng: -65.1954, nombre: "Terminal de Ómnibus - Av. Brígido Terán" },
     imageUrl: "https://images.unsplash.com/photo-1486551937199-baf066858de7?w=600",
   },
 ]
@@ -157,24 +157,35 @@ export const CAMERA_REPORTS: CameraReport[] = [
 // Zonas y helpers para incidentes generados dinamicamente (respawn)
 // ---------------------------------------------------------------------------
 
-export const SMT_BOUNDS = { latMin: -26.84, latMax: -26.80, lngMin: -65.23, lngMax: -65.18 }
-
 export const RESPAWN_ZONES = [
-  "Barrio Sur - Av. Mitre", "Las Talitas - Barrio Mutual", "Tafi Viejo - Zona Residencial",
-  "Banda del Rio Sali - Acceso Norte", "Barrio Norte - Mercado Central",
-  "Yerba Buena - Av. Aconquija", "El Manantial - Ruta Provincial 301",
-  "San Pablo - Sector Industrial", "Alberdi - Barrio Obrero", "Reduccion - Zona Sur",
+  { nombre: "Plaza Independencia - Centro Histórico", lat: -26.8305, lng: -65.2038 },
+  { nombre: "Plaza Urquiza - Barrio Norte", lat: -26.8214, lng: -65.2028 },
+  { nombre: "Plaza San Martín - Barrio Sur", lat: -26.8398, lng: -65.2088 },
+  { nombre: "Parque 9 de Julio - Av. Soldati", lat: -26.8288, lng: -65.1912 },
+  { nombre: "Plazoleta Mitre - Av. Belgrano y Mitre", lat: -26.8159, lng: -65.2153 },
+  { nombre: "Av. Ejército del Norte y Mendoza", lat: -26.8188, lng: -65.2346 },
+  { nombre: "Parque Avellaneda - Av. Mate de Luna", lat: -26.8261, lng: -65.2239 },
+  { nombre: "Terminal de Ómnibus - Av. Brígido Terán", lat: -26.8366, lng: -65.1954 },
+  { nombre: "Av. Fco. de Aguirre y Juan B. Justo", lat: -26.8001, lng: -65.2014 },
+  { nombre: "Av. Roca y Lincoln - Zona Sur", lat: -26.8453, lng: -65.2198 }
 ]
 
-export const TIPOS: IncidentTipo[] = ["flood", "fire", "storm", "general"]
+export const TIPOS: IncidentTipo[] = ["flood", "fire", "storm", "looting", "violence", "accident", "general"]
 export const SEVERIDADES: IncidentSeveridad[] = ["critical", "high", "medium"]
 export const FUENTES: IncidentFuente[] = ["social", "sensor", "camera"]
 
-/** Construye un incidente aleatorio para el ciclo de respawn */
-export function buildRespawnIncident(base?: { tipo?: string; fuente?: string }) {
-  const lat = SMT_BOUNDS.latMin + Math.random() * (SMT_BOUNDS.latMax - SMT_BOUNDS.latMin)
-  const lng = SMT_BOUNDS.lngMin + Math.random() * (SMT_BOUNDS.lngMax - SMT_BOUNDS.lngMin)
-  const zona = RESPAWN_ZONES[Math.floor(Math.random() * RESPAWN_ZONES.length)]
+/** Construye un incidente aleatorio para el ciclo de respawn. 
+ * Opcionalmente se le puede forzar una ubicacion o tipo especifico.
+ */
+export function buildRespawnIncident(base?: { tipo?: string; fuente?: string; zonaIndex?: number }) {
+  const zonaObj = base?.zonaIndex !== undefined && base.zonaIndex >= 0 && base.zonaIndex < RESPAWN_ZONES.length 
+    ? RESPAWN_ZONES[base.zonaIndex] 
+    : RESPAWN_ZONES[Math.floor(Math.random() * RESPAWN_ZONES.length)]
+  
+  const zona = zonaObj.nombre
+  const lat = zonaObj.lat
+  const lng = zonaObj.lng
+
   const tipo = (base?.tipo as IncidentTipo) ?? TIPOS[Math.floor(Math.random() * TIPOS.length)]
   const severidad = SEVERIDADES[Math.floor(Math.random() * SEVERIDADES.length)]
   const fuente = (base?.fuente as IncidentFuente) ?? FUENTES[Math.floor(Math.random() * FUENTES.length)]
@@ -189,8 +200,8 @@ export function buildRespawnIncident(base?: { tipo?: string; fuente?: string }) 
   return {
     tipo, severidad,
     ubicacion: zona,
-    latitud: parseFloat(lat.toFixed(6)),
-    longitud: parseFloat(lng.toFixed(6)),
+    latitud: lat,
+    longitud: lng,
     personas_afectadas: 50 + Math.floor(Math.random() * 800),
     fuente, fuente_detalles,
     estado: "activo",

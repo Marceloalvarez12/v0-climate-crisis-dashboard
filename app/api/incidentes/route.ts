@@ -47,7 +47,11 @@ export async function POST(request: Request) {
 
       const { data, error } = await supabase
         .from("incidentes")
-        .update({ estado: "activo", updated_at: new Date().toISOString() })
+        .update({ 
+          ...body,
+          estado: "activo", 
+          updated_at: new Date().toISOString() 
+        })
         .eq("id", existing.id)
         .select()
         .single()

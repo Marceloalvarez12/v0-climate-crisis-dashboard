@@ -275,7 +275,7 @@ export function AIActivityLog() {
     if (confirmDialog.type === "deploy") {
       try {
         const res       = await fetch("/api/incidentes")
-        const incidentes: Array<{ id: string; ubicacion: string }> = await res.json()
+        const incidentes: Array<{ id: string; ubicacion: string; tipo: string; fuente: string }> = await res.json()
 
         const incidente = incidentes.find((inc) => {
           const incLoc = inc.ubicacion.toLowerCase()
@@ -286,7 +286,7 @@ export function AIActivityLog() {
         if (incidente) {
           await patchIncidente(incidente.id, { estado: "atendido" })
           setTimeout(async () => {
-            const respawn = buildRespawnIncident(incidente as { tipo: string; fuente: string })
+            const respawn = buildRespawnIncident({ tipo: incidente.tipo, fuente: incidente.fuente })
             await createIncidente(respawn)
           }, 2 * 60 * 1000)
         }

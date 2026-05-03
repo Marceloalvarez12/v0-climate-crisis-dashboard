@@ -9,7 +9,7 @@
 // Incidentes
 // ---------------------------------------------------------------------------
 
-export type IncidentType     = "flood" | "fire" | "storm" | "general"
+export type IncidentType     = "flood" | "fire" | "storm" | "looting" | "violence" | "accident" | "general"
 export type IncidentSeverity = "critical" | "high" | "medium" | "low"
 export type IncidentSource   = "social" | "sensor" | "camera"
 
