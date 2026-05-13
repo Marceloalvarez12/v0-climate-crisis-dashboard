@@ -140,15 +140,17 @@ export function useSimulationLoop() {
         // 2. Incidente → atendido
         await patchIncidente(incidentId, { estado: "atendido" })
         mutate("/api/incidentes")
+        mutate("/api/analytics")
         addEvent({ type: "incident_resolved", message: `Incidente en ${incidentLocation} resuelto`, incidentId })
 
         // 3. Recurso → available después de BUSY_TO_AVAILABLE_MS
-        setTimeout(async () => {
+        const availableTimer = setTimeout(async () => {
           await patchRecurso(available.id, { estado: "available", incidente_id: null })
           mutate("/api/recursos")
           setActiveDispatches((prev) => prev.filter((d) => d.resourceId !== available.id))
         }, RESOURCE_BUSY_TO_AVAILABLE_MS)
 
+        dispatchTimersRef.current.set(`${available.id}-available`, availableTimer)
         dispatchTimersRef.current.delete(available.id)
       }, RESOURCE_DISPATCHED_TO_BUSY_MS)
 
@@ -180,6 +182,7 @@ export function useSimulationLoop() {
     return () => {
       if (spawnTimerRef.current) clearInterval(spawnTimerRef.current)
       dispatchTimersRef.current.forEach((t) => clearTimeout(t))
+      dispatchTimersRef.current.clear()
     }
   }, [])
 

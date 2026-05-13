@@ -14,8 +14,10 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
-/** Minutos máximos tolerados en un estado no-disponible antes de forzar el reset */
-const STALE_THRESHOLD_MINUTES = 3
+/** Minutos máximos tolerados en un estado no-disponible antes de forzar el reset.
+ * El ciclo completo dispatch→busy→available dura 35s, así que 45s da margen
+ * suficiente sin dejar recursos atascados visibles por mucho tiempo. */
+const STALE_THRESHOLD_MINUTES = 45 / 60
 
 export async function POST() {
   try {

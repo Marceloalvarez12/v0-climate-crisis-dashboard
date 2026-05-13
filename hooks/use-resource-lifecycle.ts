@@ -1,12 +1,15 @@
-"use client"
-
 import {
   RESOURCE_DISPATCHED_TO_BUSY_MS,
   RESOURCE_BUSY_TO_AVAILABLE_MS,
 } from "@/lib/mock-data"
 import { fetchRecursos, patchRecurso } from "@/lib/api"
 
-const activeTimers = new Map<string, ReturnType<typeof setTimeout>>()
+interface ResourceTimers {
+  busyTimer: ReturnType<typeof setTimeout>
+  availableTimer: ReturnType<typeof setTimeout> | null
+}
+
+const activeTimers = new Map<string, ResourceTimers>()
 
 export async function dispatchResourceWithLifecycle(
   incidenteId?: string,
@@ -28,19 +31,25 @@ export async function dispatchResourceWithLifecycle(
 
   const busyTimer = setTimeout(async () => {
     await patchRecurso(recursoId!, { estado: "busy" })
+
     const availableTimer = setTimeout(async () => {
-      await patchRecurso(recursoId!, { estado: "available" })
+      await patchRecurso(recursoId!, { estado: "available", incidente_id: null })
       activeTimers.delete(recursoId!)
     }, RESOURCE_BUSY_TO_AVAILABLE_MS)
-    activeTimers.set(recursoId!, availableTimer)
+
+    const existing = activeTimers.get(recursoId!)
+    if (existing) {
+      existing.availableTimer = availableTimer
+    }
   }, RESOURCE_DISPATCHED_TO_BUSY_MS)
 
-  activeTimers.set(recursoId!, busyTimer)
+  activeTimers.set(recursoId!, { busyTimer, availableTimer: null })
 
   const cleanup = () => {
-    const timer = activeTimers.get(recursoId!)
-    if (timer) {
-      clearTimeout(timer)
+    const timers = activeTimers.get(recursoId!)
+    if (timers) {
+      clearTimeout(timers.busyTimer)
+      if (timers.availableTimer) clearTimeout(timers.availableTimer)
       activeTimers.delete(recursoId!)
     }
   }
@@ -49,9 +58,10 @@ export async function dispatchResourceWithLifecycle(
 }
 
 export function cleanupResourceLifecycle(recursoId: string) {
-  const timer = activeTimers.get(recursoId)
-  if (timer) {
-    clearTimeout(timer)
+  const timers = activeTimers.get(recursoId)
+  if (timers) {
+    clearTimeout(timers.busyTimer)
+    if (timers.availableTimer) clearTimeout(timers.availableTimer)
     activeTimers.delete(recursoId)
   }
 }

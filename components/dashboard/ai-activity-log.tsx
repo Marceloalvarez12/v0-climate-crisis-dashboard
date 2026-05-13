@@ -291,10 +291,13 @@ export function AIActivityLog() {
           setTimeout(async () => {
             const respawn = buildRespawnIncident({ tipo: incidente.tipo, fuente: incidente.fuente })
             await createIncidente(respawn)
-          }, 2 * 60 * 1000)
+          }, 90_000)
         }
 
         await dispatchResourceWithLifecycle(incidente?.id)
+        mutate("/api/recursos")
+        mutate("/api/incidentes")
+        mutate("/api/analytics")
       } catch (err) {
           console.error("[ai-activity-log] Error in handleDispatch:", err)
         }
