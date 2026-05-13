@@ -10,23 +10,13 @@
 import { NextResponse } from "next/server"
 import { SocialMediaAgent } from "@/lib/agents/social-media-agent"
 
-// Singleton del agente (evita reinstanciar el modelo Gemini en cada request)
-let agentInstance: SocialMediaAgent | null = null
-
-function getAgent(): SocialMediaAgent {
-  if (!agentInstance) {
-    agentInstance = new SocialMediaAgent()
-  }
-  return agentInstance
-}
-
 // ---------------------------------------------------------------------------
 // GET — estado del agente
 // ---------------------------------------------------------------------------
 
 export async function GET() {
   try {
-    const agent  = getAgent()
+    const agent  = new SocialMediaAgent()
     const status = agent.getConnectorStatus()
 
     return NextResponse.json({
@@ -52,7 +42,7 @@ export async function GET() {
 export async function POST() {
   try {
     console.log("[API/agent] Iniciando scan...")
-    const agent  = getAgent()
+    const agent  = new SocialMediaAgent()
     const result = await agent.runScan()
 
     console.log(

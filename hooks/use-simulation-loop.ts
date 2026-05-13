@@ -11,7 +11,7 @@ import {
   RESOURCE_BUSY_TO_AVAILABLE_MS,
   SIMULATION_SPAWN_INTERVAL_MS,
 } from "@/lib/mock-data"
-import { createIncidente, fetchRecursos, patchRecurso } from "@/lib/api"
+import { createIncidente, fetchRecursos, patchRecurso, patchIncidente } from "@/lib/api"
 
 // ---------------------------------------------------------------------------
 // Tipos exportados
@@ -138,11 +138,7 @@ export function useSimulationLoop() {
         addEvent({ type: "resource_arrived", message: `${available.nombre} llegó a ${incidentLocation}`, incidentId, resourceId: available.id })
 
         // 2. Incidente → atendido
-        await fetch("/api/incidentes", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: incidentId, estado: "atendido" }),
-        })
+        await patchIncidente(incidentId, { estado: "atendido" })
         mutate("/api/incidentes")
         addEvent({ type: "incident_resolved", message: `Incidente en ${incidentLocation} resuelto`, incidentId })
 

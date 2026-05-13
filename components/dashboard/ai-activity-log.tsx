@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import { dispatchResourceWithLifecycle } from "@/hooks/use-resource-lifecycle"
 import { useAutoResolve } from "@/hooks/use-auto-resolve"
 import { buildRespawnIncident } from "@/lib/mock-data"
-import { patchIncidente, createIncidente } from "@/lib/api"
+import { patchIncidente, createIncidente, fetcher } from "@/lib/api"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
@@ -71,9 +71,9 @@ function geminiAnalysisToActivity(analysis: GeminiAnalysis): Omit<ActivityItem, 
 // ---------------------------------------------------------------------------
 
 /** Tiempo en ms entre escaneos automáticos de Gemini */
-const GEMINI_SCAN_INTERVAL_MS = 2 * 60 * 1000  // 2 minutos
+const GEMINI_SCAN_INTERVAL_MS = 90_000  // 90 segundos
 /** Delay del primer escaneo después de montar */
-const GEMINI_INITIAL_DELAY_MS = 15_000          // 15 segundos
+const GEMINI_INITIAL_DELAY_MS = 8_000   // 8 segundos
 
 export function AIActivityLog() {
   const [activities,          setActivities]         = useState<ActivityItem[]>(initialActivities)
@@ -96,7 +96,7 @@ export function AIActivityLog() {
   useAutoResolve({
     onResolved: (locations) => {
       locations.forEach((loc) => {
-        addActivity({ type: "complete", message: `Incident at ${loc} automatically closed (60 min without attention)` })
+        addActivity({ type: "complete", message: `Incident at ${loc} automatically closed (5 min without attention)` })
       })
     },
     onResourcesReset: (nombres) => {
@@ -113,11 +113,15 @@ export function AIActivityLog() {
   // Reactivates a random resolved incident (estado atendido → activo, updated_at = now)
   // so the dashboard stays populated even when the Gemini API quota is exhausted.
   useEffect(() => {
-    const RESPAWN_INTERVAL_MS = 4 * 60 * 1000  // 4 minutes
+    const RESPAWN_INTERVAL_MS = 90_000  // 90 segundos
 
     const respawn = async () => {
       try {
-        const res  = await fetch("/api/incidentes/respawn", { method: "POST" })
+        const API_SECRET = process.env.NEXT_PUBLIC_API_SECRET ?? ""
+        const res  = await fetch("/api/incidentes/respawn", {
+          method: "POST",
+          headers: API_SECRET ? { "x-api-secret": API_SECRET } : {},
+        })
         const data = await res.json()
         if (data.respawned && data.incident) {
           mutate("/api/incidentes")
@@ -149,7 +153,7 @@ export function AIActivityLog() {
         addActivity(template)
         messageIndexRef.current += 1
       }
-    }, 5000)
+    }, 8000)
     return () => clearInterval(interval)
   }, [addActivity])
 
@@ -274,8 +278,7 @@ export function AIActivityLog() {
 
     if (confirmDialog.type === "deploy") {
       try {
-        const res       = await fetch("/api/incidentes")
-        const incidentes: Array<{ id: string; ubicacion: string; tipo: string; fuente: string }> = await res.json()
+        const incidentes: Array<{ id: string; ubicacion: string; tipo: string; fuente: string }> = await fetcher("/api/incidentes")
 
         const incidente = incidentes.find((inc) => {
           const incLoc = inc.ubicacion.toLowerCase()

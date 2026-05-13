@@ -1,14 +1,14 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
-// Auto-resolve any active incident older than 60 minutes.
+// Auto-resolve any active incident older than 5 minutes.
 // Called periodically from the client (ai-activity-log useEffect) every 60 seconds.
 export async function POST() {
   const supabase = await createClient()
 
-  const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString()
 
-  // Find active incidents whose updated_at is older than 60 minutes.
+  // Find active incidents whose updated_at is older than 5 minutes.
   // updated_at is always writable and gets reset to NOW() every time an
   // incident is spawned or reactivated, so this timer starts fresh each time.
   const { data: stale, error: fetchError } = await supabase
