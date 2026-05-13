@@ -64,7 +64,10 @@ const getStatusBadge = (status: Resource["status"]) => {
 export function ResourcesPanel() {
   // Fetch resources from Supabase
   const { data: dbResources, error } = useSWR("/api/recursos", fetcher, {
-    refreshInterval: 2000,
+    refreshInterval: 5000,
+    revalidateOnFocus: false,
+    dedupingInterval: 3000,
+    keepPreviousData: true,
   })
 
   // Transform database resources to local format

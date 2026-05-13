@@ -14,7 +14,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner"
 import type { Incident, IncidentSource, DbIncident } from "@/lib/types"
 import { useIncidents, useResources } from "./crisis-map/use-map-data"
-import { useIncidentSimulator } from "@/hooks/use-incident-simulator"
 import { IncidentIcon, SourceIcon, severityColorClass, sourceLabel, incidentTypeLabel } from "./crisis-map/incident-helpers"
 import { createLeafletIcon, LEAFLET_DARK_STYLES } from "./crisis-map/leaflet-icon"
 import { IncidentDetailModal, DeployModal } from "./crisis-map/map-modals"
@@ -55,34 +54,8 @@ export function CrisisMap() {
   const { incidents: dbIncidents, mutate: mutateIncidents } = useIncidents()
   const { data: dbRecursos, mutate: mutateRecursos }        = useResources()
 
-  // ── Simulated Data ────────────────────────────────────────────────────────
-  const { activeIncidents: simulatedIncidents, resolveIncident } = useIncidentSimulator({ 
-    intervalMs: 4 * 60 * 1000, // 4 minutos exactos
-    maxActive: 10,
-    autoResolveMs: 60 * 60 * 1000 // 60 minutos exactos
-  })
-
-  // Mezclamos DB + Simulados mapeando al tipo unificado
-  const [randomSeed, setRandomSeed] = useState<number[]>([])
-
-  useEffect(() => {
-    setRandomSeed(Array.from({ length: 100 }, () => Math.random()))
-  }, [])
-
-  const incidents: Incident[] = useMemo(() => {
-    const mappedSimulated: Incident[] = simulatedIncidents.map((inc, idx) => ({
-      id: inc.id,
-      type: inc.type,
-      severity: "high",
-      location: inc.locationName,
-      coordinates: { lat: inc.lat, lng: inc.lng },
-      affectedPeople: Math.floor(randomSeed[idx % randomSeed.length] * 50) + 10,
-      timestamp: inc.timestamp,
-      source: "social",
-      sourceDetails: { platform: "Simulator" },
-    }))
-    return [...dbIncidents, ...mappedSimulated]
-  }, [dbIncidents, simulatedIncidents, randomSeed])
+  // All incidents come from the database (real + respawned)
+  const incidents: Incident[] = dbIncidents
 
   const resourceGroups = useMemo(() => {
     if (!dbRecursos) return []
@@ -166,22 +139,17 @@ export function CrisisMap() {
     setDeploySuccess(true)
 
     if (incidenteId) {
-      if (incidenteId.startsWith("inc_")) {
-        // Es un incidente simulado: lo resolvemos usando el hook local
-        resolveIncident(incidenteId)
-      } else {
-        // Es un incidente de Base de Datos
-        await patchIncidente(incidenteId, { estado: "atendido" }).catch((err) => console.error("[CrisisMap] Error updating incident:", err))
-        mutateIncidents()
+      // Patch incident to attended state
+      await patchIncidente(incidenteId, { estado: "atendido" }).catch((err) => console.error("[CrisisMap] Error updating incident:", err))
+      mutateIncidents()
 
-        // Respawn 2 min después (solo para incidentes de DB)
-        setTimeout(async () => {
-          const respawn = buildRespawnIncident({ tipo: incidenteTipo, fuente: incidenteFuente })
-          await createIncidente(respawn).catch((err) => console.error("[CrisisMap] Error creating respawn incident:", err))
-        }, 2 * 60 * 1000)
-      }
+      // Respawn 90s después
+      setTimeout(async () => {
+        const respawn = buildRespawnIncident({ tipo: incidenteTipo, fuente: incidenteFuente })
+        await createIncidente(respawn).catch((err) => console.error("[CrisisMap] Error creating respawn incident:", err))
+      }, 90_000)
 
-      // Despachar recursos con ciclo de vida (compartido para ambos)
+      // Despachar recursos con ciclo de vida
       await Promise.all(
         idsToDispatch.map((id) => dispatchResourceWithLifecycle(incidenteId, id).catch((err) => console.error("[CrisisMap] Error dispatching resource:", err)))
       )

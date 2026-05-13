@@ -20,10 +20,13 @@ export function dbToIncident(inc: DbIncident): Incident {
   }
 }
 
-/** Hook de incidentes activos con polling cada 2 s */
+/** Hook de incidentes activos con polling cada 5 s */
 export function useIncidents() {
   const { data, error, mutate } = useSWR<DbIncident[]>("/api/incidentes", fetcher, {
-    refreshInterval: 2000,
+    refreshInterval: 5000,
+    revalidateOnFocus: false,
+    dedupingInterval: 3000,
+    keepPreviousData: true,
   })
 
   const incidents: Incident[] = useMemo(() => {

@@ -37,7 +37,12 @@ interface Metric {
 }
 
 export function AnalyticsPanel() {
-  const { data } = useSWR<AnalyticsData>("/api/analytics", fetcher, { refreshInterval: 2000 })
+  const { data } = useSWR<AnalyticsData>("/api/analytics", fetcher, {
+    refreshInterval: 5000,
+    revalidateOnFocus: false,
+    dedupingInterval: 3000,
+    keepPreviousData: true,
+  })
 
   const d = data
 
