@@ -2,11 +2,10 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { Truck, Users, Plane, Ship, Building2, HeartPulse } from "lucide-react"
-import useSWR from "swr"
 import { cn } from "@/lib/utils"
-import { fetcher } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useResources } from "./crisis-map/use-map-data"
 
 interface Resource {
   id: string
@@ -62,13 +61,8 @@ const getStatusBadge = (status: Resource["status"]) => {
 }
 
 export function ResourcesPanel() {
-  // Fetch resources from Supabase
-  const { data: dbResources, error } = useSWR("/api/recursos", fetcher, {
-    refreshInterval: 5000,
-    revalidateOnFocus: false,
-    dedupingInterval: 3000,
-    keepPreviousData: true,
-  })
+  // Fetch resources from shared hook (unified SWR cache)
+  const { data: dbResources, error } = useResources()
 
   // Transform database resources to local format
   const [dispatchedETAs, setDispatchedETAs] = useState<Record<string, string>>({})

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import dynamic from "next/dynamic"
 import { MapPin, Layers } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { dispatchResourceWithLifecycle } from "@/hooks/use-resource-lifecycle"
+import { dispatchResourceWithLifecycle, restoreResourceTimersOnMount } from "@/hooks/use-resource-lifecycle"
 import { buildRespawnIncident } from "@/lib/mock-data"
 import { patchIncidente, createIncidente } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
@@ -75,6 +75,9 @@ export function CrisisMap() {
     link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     document.head.appendChild(link)
     setLeafletCssLoaded(true)
+
+    restoreResourceTimersOnMount().catch((err) => console.error("[CrisisMap] Error restoring resource timers:", err))
+
     return () => {
       document.head.removeChild(link)
     }
@@ -134,26 +137,30 @@ export function CrisisMap() {
       )
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setDeployingResources(false)
-    setDeploySuccess(true)
-
+    // Dispatch resources immediately
     if (incidenteId) {
       // Patch incident to attended state
       await patchIncidente(incidenteId, { estado: "atendido" }).catch((err) => console.error("[CrisisMap] Error updating incident:", err))
       mutateIncidents()
-
-      // Respawn 90s después
-      setTimeout(async () => {
-        const respawn = buildRespawnIncident({ tipo: incidenteTipo, fuente: incidenteFuente })
-        await createIncidente(respawn).catch((err) => console.error("[CrisisMap] Error creating respawn incident:", err))
-      }, 90_000)
 
       // Despachar recursos con ciclo de vida
       await Promise.all(
         idsToDispatch.map((id) => dispatchResourceWithLifecycle(incidenteId, id).catch((err) => console.error("[CrisisMap] Error dispatching resource:", err)))
       )
       await mutateRecursos()
+    }
+
+    setDeployingResources(false)
+    setDeploySuccess(true)
+
+    // Respawn 90s después
+    if (incidenteId) {
+      const incidenteTipo  = selectedIncident?.type
+      const incidenteFuente = selectedIncident?.source
+      setTimeout(async () => {
+        const respawn = buildRespawnIncident({ tipo: incidenteTipo, fuente: incidenteFuente })
+        await createIncidente(respawn).catch((err) => console.error("[CrisisMap] Error creating respawn incident:", err))
+      }, 90_000)
     }
 
     toast.success(`Resources deployed to ${selectedIncident?.location}`, {

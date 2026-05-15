@@ -5,6 +5,14 @@ import useSWR from "swr"
 import { fetcher } from "@/lib/api"
 import type { Incident, DbIncident } from "@/lib/types"
 
+const SWR_CONFIG = {
+  refreshInterval: 3000,
+  revalidateOnFocus: true,
+  revalidateOnReconnect: true,
+  dedupingInterval: 1000,
+  keepPreviousData: true,
+}
+
 /** Transforma una fila de Supabase al tipo local `Incident` */
 export function dbToIncident(inc: DbIncident): Incident {
   return {
@@ -20,13 +28,11 @@ export function dbToIncident(inc: DbIncident): Incident {
   }
 }
 
-/** Hook de incidentes activos con polling cada 5 s */
+/** Hook de incidentes activos con polling cada 3 s */
 export function useIncidents() {
   const { data, error, mutate } = useSWR<DbIncident[]>("/api/incidentes", fetcher, {
-    refreshInterval: 5000,
-    revalidateOnFocus: false,
-    dedupingInterval: 3000,
-    keepPreviousData: true,
+    ...SWR_CONFIG,
+    refreshInterval: 3000,
   })
 
   const incidents: Incident[] = useMemo(() => {
@@ -37,7 +43,7 @@ export function useIncidents() {
   return { incidents, mutate }
 }
 
-/** Hook de recursos con polling cada 3 s */
+/** Hook de recursos con polling cada 3 s - hook compartido para CrisisMap y ResourcesPanel */
 export function useResources() {
-  return useSWR("/api/recursos", fetcher, { refreshInterval: 3000 })
+  return useSWR("/api/recursos", fetcher, SWR_CONFIG)
 }

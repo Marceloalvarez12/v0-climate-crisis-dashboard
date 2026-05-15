@@ -9,7 +9,46 @@ interface ResourceTimers {
   availableTimer: ReturnType<typeof setTimeout> | null
 }
 
+interface PersistedResourceState {
+  resourceId: string
+  estado: "dispatched" | "busy"
+  timestamp: number
+  incidenteId: string | null
+}
+
+const PERSISTENCE_KEY = "crisis-dashboard-resource-timers"
 const activeTimers = new Map<string, ResourceTimers>()
+
+function loadPersistedStates(): PersistedResourceState[] {
+  try {
+    const raw = localStorage.getItem(PERSISTENCE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as PersistedResourceState[]
+    const now = Date.now()
+    return parsed.filter((s) => now - s.timestamp < RESOURCE_DISPATCHED_TO_BUSY_MS + RESOURCE_BUSY_TO_AVAILABLE_MS + 10000)
+  } catch {
+    return []
+  }
+}
+
+function savePersistedStates(states: PersistedResourceState[]) {
+  try {
+    localStorage.setItem(PERSISTENCE_KEY, JSON.stringify(states))
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function addPersistedState(state: PersistedResourceState) {
+  const existing = loadPersistedStates()
+  const filtered = existing.filter((s) => s.resourceId !== state.resourceId)
+  savePersistedStates([...filtered, state])
+}
+
+function removePersistedState(resourceId: string) {
+  const existing = loadPersistedStates()
+  savePersistedStates(existing.filter((s) => s.resourceId !== resourceId))
+}
 
 export async function dispatchResourceWithLifecycle(
   incidenteId?: string,
@@ -29,12 +68,27 @@ export async function dispatchResourceWithLifecycle(
     incidente_id: incidenteId ?? null,
   })
 
+  addPersistedState({
+    resourceId: recursoId,
+    estado: "dispatched",
+    timestamp: Date.now(),
+    incidenteId: incidenteId ?? null,
+  })
+
   const busyTimer = setTimeout(async () => {
     await patchRecurso(recursoId!, { estado: "busy" })
+
+    addPersistedState({
+      resourceId: recursoId!,
+      estado: "busy",
+      timestamp: Date.now(),
+      incidenteId: incidenteId ?? null,
+    })
 
     const availableTimer = setTimeout(async () => {
       await patchRecurso(recursoId!, { estado: "available", incidente_id: null })
       activeTimers.delete(recursoId!)
+      removePersistedState(recursoId!)
     }, RESOURCE_BUSY_TO_AVAILABLE_MS)
 
     const existing = activeTimers.get(recursoId!)
@@ -52,9 +106,78 @@ export async function dispatchResourceWithLifecycle(
       if (timers.availableTimer) clearTimeout(timers.availableTimer)
       activeTimers.delete(recursoId!)
     }
+    removePersistedState(recursoId!)
   }
 
   return { recursoId, cleanup }
+}
+
+export async function restoreResourceTimersOnMount() {
+  const persisted = loadPersistedStates()
+  const now = Date.now()
+
+  for (const state of persisted) {
+    if (activeTimers.has(state.resourceId)) continue
+
+    const elapsed = now - state.timestamp
+
+    if (state.estado === "dispatched") {
+      const remainingToBusy = RESOURCE_DISPATCHED_TO_BUSY_MS - elapsed
+
+      if (remainingToBusy <= 0) {
+        await patchRecurso(state.resourceId, { estado: "busy" })
+
+        const remainingToAvailable = RESOURCE_BUSY_TO_AVAILABLE_MS - Math.max(0, elapsed - RESOURCE_DISPATCHED_TO_BUSY_MS)
+
+        if (remainingToAvailable <= 0) {
+          await patchRecurso(state.resourceId, { estado: "available", incidente_id: null })
+          removePersistedState(state.resourceId)
+          continue
+        }
+
+        const availableTimer = setTimeout(async () => {
+          await patchRecurso(state.resourceId, { estado: "available", incidente_id: null })
+          activeTimers.delete(state.resourceId)
+          removePersistedState(state.resourceId)
+        }, remainingToAvailable)
+
+        activeTimers.set(state.resourceId, { busyTimer: setTimeout(() => {}, 0), availableTimer })
+      } else {
+        const busyTimer = setTimeout(async () => {
+          await patchRecurso(state.resourceId, { estado: "busy" })
+
+          const availableTimer = setTimeout(async () => {
+            await patchRecurso(state.resourceId, { estado: "available", incidente_id: null })
+            activeTimers.delete(state.resourceId)
+            removePersistedState(state.resourceId)
+          }, RESOURCE_BUSY_TO_AVAILABLE_MS)
+
+          const existing = activeTimers.get(state.resourceId)
+          if (existing) {
+            existing.availableTimer = availableTimer
+          }
+        }, remainingToBusy)
+
+        activeTimers.set(state.resourceId, { busyTimer, availableTimer: null })
+      }
+    } else if (state.estado === "busy") {
+      const remainingToAvailable = RESOURCE_BUSY_TO_AVAILABLE_MS - elapsed
+
+      if (remainingToAvailable <= 0) {
+        await patchRecurso(state.resourceId, { estado: "available", incidente_id: null })
+        removePersistedState(state.resourceId)
+        continue
+      }
+
+      const availableTimer = setTimeout(async () => {
+        await patchRecurso(state.resourceId, { estado: "available", incidente_id: null })
+        activeTimers.delete(state.resourceId)
+        removePersistedState(state.resourceId)
+      }, remainingToAvailable)
+
+      activeTimers.set(state.resourceId, { busyTimer: setTimeout(() => {}, 0), availableTimer })
+    }
+  }
 }
 
 export function cleanupResourceLifecycle(recursoId: string) {
@@ -64,4 +187,5 @@ export function cleanupResourceLifecycle(recursoId: string) {
     if (timers.availableTimer) clearTimeout(timers.availableTimer)
     activeTimers.delete(recursoId)
   }
+  removePersistedState(recursoId)
 }
