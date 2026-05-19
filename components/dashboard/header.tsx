@@ -1,17 +1,19 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Bell, Settings, Radio, Bot, BotOff, LogOut } from "lucide-react"
+import { Bell, Settings, Radio, Bot, BotOff, LogOut, User } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 import { logout } from "@/app/login/actions"
+import { useUserRole } from "@/hooks/use-user-role"
 
 export function DashboardHeader() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
   const [alertCount, setAlertCount] = useState(3)
   const [isAutonomous, setIsAutonomous] = useState(true)
+  const { profile, isAdmin } = useUserRole()
 
   const fetchAgentMode = useCallback(async () => {
     try {
@@ -32,7 +34,6 @@ export function DashboardHeader() {
 
   useEffect(() => {
     fetchAgentMode()
-    // Poll every 10 seconds to detect admin changes
     const interval = setInterval(fetchAgentMode, 10000)
     return () => clearInterval(interval)
   }, [fetchAgentMode])
@@ -68,7 +69,7 @@ export function DashboardHeader() {
           priority
         />
         <p className="hidden sm:block absolute bottom-0 left-0 text-[9px] tracking-widest uppercase text-muted-foreground whitespace-nowrap translate-y-5">
-          Sistema de Monitoreo de Agente IA
+          Consola de Despacho
         </p>
       </div>
 
@@ -78,7 +79,7 @@ export function DashboardHeader() {
           className={`hidden items-center gap-1.5 rounded-md border px-2.5 py-1.5 sm:flex transition-colors ${
             isAutonomous
               ? 'border-emerald-500/20 bg-emerald-500/5'
-              : 'border-red-500/20 bg-red-500/5'
+              : 'border-red-500/20 bg-red-500/5 animate-pulse'
           }`}
         >
           {isAutonomous ? (
@@ -91,7 +92,7 @@ export function DashboardHeader() {
               isAutonomous ? 'text-emerald-400' : 'text-red-400'
             }`}
           >
-            {isAutonomous ? 'IA Activa' : 'Modo Manual'}
+            {isAutonomous ? 'IA Autónoma Activa' : 'Modo Manual Requerido'}
           </span>
         </div>
 
@@ -113,6 +114,21 @@ export function DashboardHeader() {
           </div>
         )}
 
+        {/* Perfil del usuario */}
+        {profile && (
+          <div className="hidden items-center gap-2 rounded-md border border-border bg-secondary/50 px-3 py-1.5 sm:flex">
+            <User className="h-3.5 w-3.5 text-muted-foreground" />
+            <div className="flex flex-col">
+              <span className="text-[11px] font-medium text-foreground leading-tight">
+                {profile.nombre}
+              </span>
+              <span className="text-[9px] text-muted-foreground leading-tight">
+                {isAdmin ? 'Administrador' : 'Operador de Turno'}
+              </span>
+            </div>
+          </div>
+        )}
+
         <Button variant="ghost" size="icon" className="relative h-8 w-8">
           <Bell className="h-4 w-4" />
           {alertCount > 0 && (
@@ -122,9 +138,12 @@ export function DashboardHeader() {
           )}
         </Button>
 
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Settings className="h-4 w-4" />
-        </Button>
+        {/* Settings solo para admin */}
+        {isAdmin && (
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Settings className="h-4 w-4" />
+          </Button>
+        )}
 
         {/* Botón Cerrar Sesión */}
         <form action={logout}>

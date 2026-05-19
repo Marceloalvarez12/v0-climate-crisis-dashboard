@@ -12,6 +12,7 @@ import { Suspense } from "react"
 import { Map, Bot, Shield, BarChart2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { mutate } from "swr"
+import { useUserRole } from "@/hooks/use-user-role"
 
 type MobileTab = "map" | "agent" | "resources" | "analytics"
 
@@ -24,6 +25,7 @@ const MOBILE_TABS: { id: MobileTab; label: string; icon: React.ReactNode }[] = [
 
 export default function CrisisDashboard() {
   const [activeTab, setActiveTab] = useState<MobileTab>("map")
+  const { isAdmin } = useUserRole()
 
   // Revalidate all SWR data when user returns to the page
   useEffect(() => {
@@ -41,9 +43,11 @@ export default function CrisisDashboard() {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background">
-      <Suspense fallback={null}>
-        <DevPanel />
-      </Suspense>
+      {isAdmin && (
+        <Suspense fallback={null}>
+          <DevPanel />
+        </Suspense>
+      )}
 
       <DashboardHeader />
 
