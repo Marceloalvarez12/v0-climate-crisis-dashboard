@@ -1,11 +1,34 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getAgentMode } from './actions'
+import { getAgentMode, getAgentThresholds } from './actions'
 import { AgentKillSwitch } from '@/components/admin/agent-kill-switch'
-import { Shield, ArrowLeft } from 'lucide-react'
+import { AgentThresholdConfig } from '@/components/admin/agent-threshold-config'
+import { Shield, Sliders, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
-export default async function AdminPage() {
+interface AdminPageProps {
+  searchParams: Promise<{ section?: string }>
+}
+
+const SECTIONS = [
+  {
+    id: 'control',
+    label: 'Control del Agente',
+    icon: Shield,
+    description: 'Interruptor de emergencia y modo autónomo',
+  },
+  {
+    id: 'thresholds',
+    label: 'Calibración de Umbrales',
+    icon: Sliders,
+    description: 'Sensibilidad y parámetros de la IA',
+  },
+]
+
+export default async function AdminPage({ searchParams }: AdminPageProps) {
+  const { section } = await searchParams
+  const activeSection = section === 'thresholds' ? 'thresholds' : 'control'
+
   const supabase = await createClient()
 
   const {
@@ -27,6 +50,7 @@ export default async function AdminPage() {
   }
 
   const initialAutonomous = await getAgentMode()
+  const thresholds = await getAgentThresholds()
 
   return (
     <div className="min-h-screen bg-[#0B0F17]">
@@ -57,21 +81,53 @@ export default async function AdminPage() {
         </div>
       </header>
 
-      {/* Contenido Principal */}
-      <main className="mx-auto max-w-3xl px-6 py-10">
-        {/* Título de Sección */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-zinc-100">
-            Panel de Administración
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Gestión y control del sistema ZNTINEL
+      {/* Layout con Sidebar */}
+      <div className="flex">
+        {/* Sidebar */}
+        <aside className="w-64 shrink-0 border-r border-zinc-800 bg-zinc-950/30 min-h-[calc(100vh-57px)] p-4">
+          <p className="text-[10px] font-mono tracking-widest uppercase text-zinc-600 mb-4 px-3">
+            Configuración
           </p>
-        </div>
+          <nav className="space-y-1">
+            {SECTIONS.map((s) => {
+              const isActive = activeSection === s.id
+              const Icon = s.icon
+              return (
+                <Link
+                  key={s.id}
+                  href={`/admin?section=${s.id}`}
+                  className={`flex items-start gap-3 rounded-lg px-3 py-3 text-sm transition-all ${
+                    isActive
+                      ? 'bg-zinc-800/80 text-zinc-100'
+                      : 'text-zinc-500 hover:bg-zinc-800/40 hover:text-zinc-300'
+                  }`}
+                >
+                  <Icon className="h-4 w-4 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium">{s.label}</p>
+                    <p className="text-[10px] text-zinc-600 mt-0.5">
+                      {s.description}
+                    </p>
+                  </div>
+                </Link>
+              )
+            })}
+          </nav>
+        </aside>
 
-        {/* Kill Switch */}
-        <AgentKillSwitch initialAutonomous={initialAutonomous} />
-      </main>
+        {/* Contenido Principal */}
+        <main className="flex-1 px-8 py-10">
+          {activeSection === 'control' && (
+            <AgentKillSwitch initialAutonomous={initialAutonomous} />
+          )}
+          {activeSection === 'thresholds' && (
+            <AgentThresholdConfig
+              initialAutoResolve={thresholds.autoResolve}
+              initialConfidence={thresholds.confidence}
+            />
+          )}
+        </main>
+      </div>
     </div>
   )
 }

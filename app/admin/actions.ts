@@ -53,3 +53,75 @@ export async function updateAgentMode(autonomous: boolean): Promise<{ success: b
 
   return { success: true }
 }
+
+export async function getAgentThresholds(): Promise<{
+  autoResolve: number
+  confidence: number
+}> {
+  const supabase = await createClient()
+
+  const { data } = await supabase
+    .from('config_sistema')
+    .select('clave, valor')
+    .in('clave', ['auto_resolve_minutes', 'confidence_threshold'])
+
+  const autoResolve =
+    data?.find((r) => r.clave === 'auto_resolve_minutes')
+    ? ((data.find((r) => r.clave === 'auto_resolve_minutes')!.valor as { value: number }).value)
+    : 5
+
+  const confidence =
+    data?.find((r) => r.clave === 'confidence_threshold')
+    ? ((data.find((r) => r.clave === 'confidence_threshold')!.valor as { value: number }).value)
+    : 80
+
+  return { autoResolve, confidence }
+}
+
+export async function updateAgentThresholds(
+  autoResolve: number,
+  confidence: number
+): Promise<{ success: boolean }> {
+  const supabase = await createClient()
+
+  const { data: user } = await supabase.auth.getUser()
+  if (!user.user) {
+    throw new Error('No autorizado')
+  }
+
+  const { data: profile } = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('id', user.user.id)
+    .single()
+
+  if (profile?.rol !== 'admin') {
+    throw new Error('Solo administradores pueden cambiar la configuración')
+  }
+
+  const { error: err1 } = await supabase
+    .from('config_sistema')
+    .upsert(
+      {
+        clave: 'auto_resolve_minutes',
+        valor: { value: autoResolve, updated_by: user.user.email },
+      },
+      { onConflict: 'clave' }
+    )
+
+  if (err1) throw new Error(err1.message)
+
+  const { error: err2 } = await supabase
+    .from('config_sistema')
+    .upsert(
+      {
+        clave: 'confidence_threshold',
+        valor: { value: confidence, updated_by: user.user.email },
+      },
+      { onConflict: 'clave' }
+    )
+
+  if (err2) throw new Error(err2.message)
+
+  return { success: true }
+}
