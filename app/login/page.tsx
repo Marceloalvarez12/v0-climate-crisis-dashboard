@@ -1,5 +1,5 @@
 import { login } from './actions'
-import { Logo } from '@/components/logo'
+import Image from 'next/image'
 
 export default async function LoginPage({
   searchParams,
@@ -43,7 +43,14 @@ export default async function LoginPage({
               </span>
             </div>
             <div className="flex justify-center mb-4">
-              <Logo variant="login" />
+              <Image
+                src="/zntinel-logo-optimized.png"
+                alt="Zntinel"
+                width={280}
+                height={80}
+                className="h-20 w-auto object-contain drop-shadow-[0_0_24px_rgba(6,182,212,0.25)]"
+                priority
+              />
             </div>
             <p className="text-[11px] font-mono tracking-widest text-cyan-400/50 uppercase">
               Mission Control Auth
