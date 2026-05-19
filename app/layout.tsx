@@ -7,8 +7,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Centro de Crisis Climaticas - Agente IA',
-  description: 'Dashboard profesional de gestion de crisis climaticas con monitoreo de Agente IA en tiempo real',
+  title: 'Zntinel - Centro de Crisis Climaticas',
+  description: 'Zntinel: Dashboard profesional de gestion de crisis climaticas con monitoreo de Agente IA en tiempo real',
   generator: 'v0.app',
   icons: {
     icon: [

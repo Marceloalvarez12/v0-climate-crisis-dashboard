@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Bell, Settings, Zap, Radio } from "lucide-react"
+import { Bell, Settings, Radio } from "lucide-react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
@@ -30,14 +31,16 @@ export function DashboardHeader() {
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
-      <div className="flex items-center gap-2 min-w-0">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-          <Zap className="h-4 w-4 text-primary" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="truncate text-sm font-bold text-foreground sm:text-base">Centro de Crisis Climaticas</h1>
-          <p className="hidden text-[10px] text-muted-foreground sm:block">Sistema de Monitoreo de Agente IA</p>
-        </div>
+      <div className="flex items-center gap-3 min-w-0">
+        <Image
+          src="/zntinel-logo.png"
+          alt="Zntinel"
+          width={120}
+          height={32}
+          className="h-8 w-auto shrink-0 object-contain"
+          priority
+        />
+        <p className="hidden text-[10px] text-muted-foreground sm:block">Sistema de Monitoreo de Agente IA</p>
       </div>
 
       <div className="flex items-center gap-2">
