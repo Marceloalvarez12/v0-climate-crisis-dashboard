@@ -208,3 +208,143 @@ export async function saveApiCredentials(
 
   return { success: true }
 }
+
+// ============================================
+// USER MANAGEMENT (requires service role key)
+// ============================================
+
+import { createClient as createAdminClient } from '@supabase/supabase-js'
+
+function getAdminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
+
+export interface AdminUser {
+  id: string
+  name: string
+  email: string
+  role: 'admin' | 'operador' | 'agente_ia' | 'visualizador'
+  status: 'activo' | 'suspendido'
+  lastLogin: string | null
+}
+
+export async function getUsers(): Promise<AdminUser[]> {
+  const supabase = await createClient()
+
+  const { data: profiles, error } = await supabase
+    .from('perfiles')
+    .select('*')
+
+  if (error) {
+    console.error('Error fetching profiles:', error.message)
+    return []
+  }
+
+  const adminClient = getAdminClient()
+  const { data: authData } = await adminClient.auth.admin.listUsers()
+
+  const authUsers = authData?.users || []
+
+  return profiles.map((profile) => {
+    const authUser = authUsers.find((u) => u.id === profile.id)
+    return {
+      id: profile.id,
+      name: profile.nombre,
+      email: authUser?.email || '',
+      role: profile.rol as AdminUser['role'],
+      status: (profile.status as AdminUser['status']) || 'activo',
+      lastLogin: authUser?.last_sign_in_at || null,
+    }
+  })
+}
+
+export async function updateUserRole(
+  userId: string,
+  newRole: 'admin' | 'operador' | 'agente_ia' | 'visualizador'
+): Promise<{ success: boolean }> {
+  const supabase = await createClient()
+
+  const { data: user } = await supabase.auth.getUser()
+  if (!user.user) throw new Error('No autorizado')
+
+  const { data: profile } = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('id', user.user.id)
+    .single()
+
+  if (profile?.rol !== 'admin') {
+    throw new Error('Solo administradores pueden cambiar roles')
+  }
+
+  const { error } = await supabase
+    .from('perfiles')
+    .update({ rol: newRole })
+    .eq('id', userId)
+
+  if (error) throw new Error(error.message)
+
+  return { success: true }
+}
+
+export async function suspendUser(
+  userId: string,
+  status: 'activo' | 'suspendido'
+): Promise<{ success: boolean }> {
+  const supabase = await createClient()
+
+  const { data: user } = await supabase.auth.getUser()
+  if (!user.user) throw new Error('No autorizado')
+
+  const { data: profile } = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('id', user.user.id)
+    .single()
+
+  if (profile?.rol !== 'admin') {
+    throw new Error('Solo administradores pueden suspender usuarios')
+  }
+
+  const { error } = await supabase
+    .from('perfiles')
+    .update({ status })
+    .eq('id', userId)
+
+  if (error) throw new Error(error.message)
+
+  return { success: true }
+}
+
+export async function resetUserPassword(
+  userId: string
+): Promise<{ success: boolean }> {
+  const supabase = await createClient()
+
+  const { data: user } = await supabase.auth.getUser()
+  if (!user.user) throw new Error('No autorizado')
+
+  const { data: profile } = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('id', user.user.id)
+    .single()
+
+  if (profile?.rol !== 'admin') {
+    throw new Error('Solo administradores pueden restablecer contraseñas')
+  }
+
+  const adminClient = getAdminClient()
+  const tempPassword = Math.random().toString(36).slice(-10) + 'A1!'
+
+  const { error } = await adminClient.auth.admin.updateUserById(userId, {
+    password: tempPassword,
+  })
+
+  if (error) throw new Error(error.message)
+
+  return { success: true }
+}
