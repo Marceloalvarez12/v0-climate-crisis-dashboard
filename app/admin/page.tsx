@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getAgentMode, getAgentThresholds } from './actions'
+import { getAgentMode, getAgentThresholds, getApiCredentials } from './actions'
 import { AgentKillSwitch } from '@/components/admin/agent-kill-switch'
 import { AgentThresholdConfig } from '@/components/admin/agent-threshold-config'
-import { Shield, Sliders, ArrowLeft } from 'lucide-react'
+import { ApiConnectionManager } from '@/components/admin/api-connection-manager'
+import { Shield, Sliders, Link as LinkIcon, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
 interface AdminPageProps {
@@ -22,6 +23,12 @@ const SECTIONS = [
     label: 'Calibración de Umbrales',
     icon: Sliders,
     description: 'Sensibilidad y parámetros de la IA',
+  },
+  {
+    id: 'connections',
+    label: 'Conexiones API',
+    icon: LinkIcon,
+    description: 'Estado de servicios y credenciales',
   },
 ]
 
@@ -51,6 +58,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   const initialAutonomous = await getAgentMode()
   const thresholds = await getAgentThresholds()
+  const apiKeys = await getApiCredentials()
 
   return (
     <div className="min-h-screen bg-[#0B0F17]">
@@ -125,6 +133,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               initialAutoResolve={thresholds.autoResolve}
               initialConfidence={thresholds.confidence}
             />
+          )}
+          {activeSection === 'connections' && (
+            <ApiConnectionManager initialKeys={apiKeys} />
           )}
         </main>
       </div>
