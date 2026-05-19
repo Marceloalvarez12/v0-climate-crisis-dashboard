@@ -35,9 +35,9 @@ export function DashboardHeader() {
         <Image
           src="/zntinel-logo.png"
           alt="Zntinel"
-          width={120}
-          height={32}
-          className="h-8 w-auto shrink-0 object-contain"
+          width={180}
+          height={48}
+          className="h-12 w-auto shrink-0 object-contain"
           priority
         />
         <p className="hidden text-[10px] text-muted-foreground sm:block">Sistema de Monitoreo de Agente IA</p>
