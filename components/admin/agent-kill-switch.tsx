@@ -9,13 +9,15 @@ interface ImpactItem {
   label: string
   activeText: string
   inactiveText: string
+  alwaysActive?: boolean
 }
 
 const IMPACT_ITEMS: ImpactItem[] = [
   {
     label: 'Escaneo en Tiempo Real',
     activeText: 'X, Facebook, Logs activos',
-    inactiveText: 'Monitoreo detenido',
+    inactiveText: 'X, Facebook, Logs activos',
+    alwaysActive: true,
   },
   {
     label: 'Auto-cierre de Incidentes',
@@ -193,7 +195,9 @@ export function AgentKillSwitch({ initialAutonomous }: AgentKillSwitchProps) {
             Impacto del Cambio
           </p>
           <div className="space-y-3">
-            {IMPACT_ITEMS.map((item) => (
+            {IMPACT_ITEMS.map((item) => {
+              const isActive = isAutonomous || item.alwaysActive
+              return (
               <div
                 key={item.label}
                 className="flex items-center gap-3 rounded-lg bg-zinc-900/50 px-4 py-3"
@@ -201,12 +205,12 @@ export function AgentKillSwitch({ initialAutonomous }: AgentKillSwitchProps) {
                 <div
                   className={cn(
                     'flex h-6 w-6 items-center justify-center rounded-full',
-                    isAutonomous
+                    isActive
                       ? 'bg-emerald-500/20 text-emerald-400'
                       : 'bg-red-500/20 text-red-400'
                   )}
                 >
-                  {isAutonomous ? (
+                  {isActive ? (
                     <svg
                       className="h-3.5 w-3.5"
                       fill="none"
@@ -231,14 +235,15 @@ export function AgentKillSwitch({ initialAutonomous }: AgentKillSwitchProps) {
                   <p
                     className={cn(
                       'text-[11px] transition-colors',
-                      isAutonomous ? 'text-emerald-400/60' : 'text-red-400/60'
+                      isActive ? 'text-emerald-400/60' : 'text-red-400/60'
                     )}
                   >
-                    {isAutonomous ? item.activeText : item.inactiveText}
+                    {isActive ? item.activeText : item.inactiveText}
                   </p>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>
@@ -276,7 +281,6 @@ export function AgentKillSwitch({ initialAutonomous }: AgentKillSwitchProps) {
               </p>
               <ul className="mt-3 space-y-2">
                 {[
-                  'Escaneo automático de redes sociales',
                   'Auto-despacho de recursos',
                   'Cierre automático de incidentes',
                 ].map((item) => (

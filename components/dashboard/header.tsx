@@ -79,7 +79,7 @@ export function DashboardHeader() {
           className={`hidden items-center gap-1.5 rounded-md border px-2.5 py-1.5 sm:flex transition-colors ${
             isAutonomous
               ? 'border-emerald-500/20 bg-emerald-500/5'
-              : 'border-red-500/20 bg-red-500/5 animate-pulse'
+              : 'border-red-500/20 bg-red-500/5'
           }`}
         >
           {isAutonomous ? (
@@ -92,7 +92,7 @@ export function DashboardHeader() {
               isAutonomous ? 'text-emerald-400' : 'text-red-400'
             }`}
           >
-            {isAutonomous ? 'IA Autónoma Activa' : 'Modo Manual Requerido'}
+            {isAutonomous ? 'IA Autónoma Activa' : 'Modo Manual Activo'}
           </span>
         </div>
 
