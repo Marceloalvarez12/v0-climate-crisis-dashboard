@@ -40,7 +40,7 @@ export function DashboardHeader() {
           className="h-[88px] w-auto shrink-0 object-contain -my-3"
           priority
         />
-        <p className="hidden sm:block absolute bottom-0 left-0 text-[9px] tracking-widest uppercase text-muted-foreground whitespace-nowrap translate-y-3">
+        <p className="hidden sm:block absolute bottom-0 left-0 text-[9px] tracking-widest uppercase text-muted-foreground whitespace-nowrap translate-y-5">
           Sistema de Monitoreo de Agente IA
         </p>
       </div>
