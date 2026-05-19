@@ -6,8 +6,9 @@ import { AgentKillSwitch } from '@/components/admin/agent-kill-switch'
 import { AgentThresholdConfig } from '@/components/admin/agent-threshold-config'
 import { ApiConnectionManager } from '@/components/admin/api-connection-manager'
 import { UserRoleManager } from '@/components/admin/user-role-manager'
-import { Shield, Sliders, Link as LinkIcon, Users, LogOut, Monitor } from 'lucide-react'
+import { Shield, Sliders, Link as LinkIcon, Users, LogOut, Monitor, User, Radio } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface AdminPageProps {
   searchParams: Promise<{ section?: string }>
@@ -81,35 +82,63 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   return (
     <div className="min-h-screen bg-[#0B0F17]">
       {/* Header de Admin */}
-      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950/50 px-6 py-4">
-        {/* Izquierda: perfil */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-800">
-            <Shield className="h-4 w-4 text-zinc-400" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-zinc-200">
-              {profile.nombre}
-            </p>
-            <p className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-              Administrador
-            </p>
-          </div>
+      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950/50 px-4 py-1">
+        {/* Izquierda: Logo */}
+        <div className="relative flex items-center min-w-0 ml-14">
+          <Image
+            src="/zntinel-logo.png"
+            alt="Zntinel"
+            width={340}
+            height={88}
+            className="h-[88px] w-auto shrink-0 object-contain -my-3"
+            priority
+          />
+          <p className="hidden sm:block absolute bottom-0 left-0 text-[9px] tracking-widest uppercase text-zinc-500 whitespace-nowrap translate-y-5">
+            Panel de Admin
+          </p>
         </div>
 
-        {/* Derecha: Dashboard + Logout */}
-        <div className="flex items-center gap-3">
+        {/* Derecha: acciones */}
+        <div className="flex items-center gap-2">
+          {/* Dashboard */}
           <Link
             href="/"
-            className="flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/50 px-2.5 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+            className="hidden items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/50 px-2.5 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 sm:flex transition-colors"
           >
             <Monitor className="h-3.5 w-3.5" />
             Dashboard
           </Link>
+
+          {/* Reloj */}
+          <div className="hidden rounded-md border border-zinc-800 bg-zinc-900/50 px-2.5 py-1.5 font-mono text-xs text-zinc-400 md:block">
+            {new Date().toLocaleString("es-AR", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })}
+          </div>
+
+          {/* Perfil */}
+          <div className="hidden items-center gap-2 rounded-md border border-zinc-800 bg-zinc-900/50 px-3 py-1.5 sm:flex">
+            <User className="h-3.5 w-3.5 text-zinc-500" />
+            <div className="flex flex-col">
+              <span className="text-[11px] font-medium text-zinc-200 leading-tight">
+                {profile.nombre}
+              </span>
+              <span className="text-[9px] text-zinc-500 leading-tight">
+                Administrador
+              </span>
+            </div>
+          </div>
+
+          {/* Logout */}
           <form action={logout}>
             <button
               type="submit"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:text-red-400"
               title="Cerrar sesión"
             >
               <LogOut className="h-4 w-4" />
