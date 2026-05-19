@@ -1,11 +1,12 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Bell, Settings, Radio, Bot, BotOff } from "lucide-react"
+import { Bell, Settings, Radio, Bot, BotOff, LogOut } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
+import { logout } from "@/app/login/actions"
 
 export function DashboardHeader() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
@@ -124,6 +125,18 @@ export function DashboardHeader() {
         <Button variant="ghost" size="icon" className="h-8 w-8">
           <Settings className="h-4 w-4" />
         </Button>
+
+        {/* Botón Cerrar Sesión */}
+        <form action={logout}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-red-400"
+            title="Cerrar sesión"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </form>
       </div>
     </header>
   )

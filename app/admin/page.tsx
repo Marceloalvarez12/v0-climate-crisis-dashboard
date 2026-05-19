@@ -1,11 +1,12 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getAgentMode, getAgentThresholds, getApiCredentials, getUsers } from './actions'
+import { logout } from '@/app/login/actions'
 import { AgentKillSwitch } from '@/components/admin/agent-kill-switch'
 import { AgentThresholdConfig } from '@/components/admin/agent-threshold-config'
 import { ApiConnectionManager } from '@/components/admin/api-connection-manager'
 import { UserRoleManager } from '@/components/admin/user-role-manager'
-import { Shield, Sliders, Link as LinkIcon, Users, ArrowLeft } from 'lucide-react'
+import { Shield, Sliders, Link as LinkIcon, Users, ArrowLeft, LogOut } from 'lucide-react'
 import Link from 'next/link'
 
 interface AdminPageProps {
@@ -103,6 +104,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               Administrador
             </p>
           </div>
+          <form action={logout}>
+            <button
+              type="submit"
+              className="ml-2 flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400"
+              title="Cerrar sesión"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </form>
         </div>
       </header>
 
