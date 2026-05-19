@@ -27,7 +27,8 @@ const IMPACT_ITEMS: ImpactItem[] = [
   {
     label: 'Análisis de Severidad',
     activeText: 'Clasificación autónoma activa',
-    inactiveText: 'Clasificación manual requerida',
+    inactiveText: 'Clasificación autónoma activa',
+    alwaysActive: true,
   },
 ]
 
