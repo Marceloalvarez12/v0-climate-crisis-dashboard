@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Bell, Settings, Radio, Bot, BotOff, LogOut, User } from "lucide-react"
+import { Bell, Settings, Radio, Bot, BotOff, LogOut, User, LayoutDashboard } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
@@ -112,6 +113,17 @@ export function DashboardHeader() {
               second: "2-digit",
             })}
           </div>
+        )}
+
+        {/* Botón Volver al Admin (solo admin) */}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className="hidden items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground sm:flex transition-colors"
+          >
+            <LayoutDashboard className="h-3.5 w-3.5" />
+            Panel de Admin
+          </Link>
         )}
 
         {/* Perfil del usuario */}
