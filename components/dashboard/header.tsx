@@ -31,7 +31,7 @@ export function DashboardHeader() {
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
-      <div className="flex flex-col items-start min-w-0">
+      <div className="flex items-center gap-3 min-w-0">
         <Image
           src="/zntinel-logo.png"
           alt="Zntinel"
@@ -40,8 +40,8 @@ export function DashboardHeader() {
           className="h-[88px] w-auto shrink-0 object-contain"
           priority
         />
-        <p className="text-[9px] tracking-widest uppercase text-muted-foreground pl-1 -mt-1">
-          Sistema de Monitoreo de Agente IA
+        <p className="hidden text-[9px] tracking-widest uppercase text-muted-foreground sm:block">
+          Sistema de Monitoreo<br />de Agente IA
         </p>
       </div>
 
