@@ -93,9 +93,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             className="h-[88px] w-auto shrink-0 object-contain -my-3"
             priority
           />
-          <p className="hidden sm:block absolute bottom-0 left-0 text-[9px] tracking-widest uppercase text-zinc-500 whitespace-nowrap translate-y-5">
-            Panel de Admin
-          </p>
         </div>
 
         {/* Derecha: acciones */}

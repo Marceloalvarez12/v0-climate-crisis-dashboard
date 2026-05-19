@@ -69,9 +69,6 @@ export function DashboardHeader() {
           className="h-[88px] w-auto shrink-0 object-contain -my-3"
           priority
         />
-        <p className="hidden sm:block absolute bottom-0 left-0 text-[9px] tracking-widest uppercase text-muted-foreground whitespace-nowrap translate-y-5">
-          Consola de Despacho
-        </p>
       </div>
 
       <div className="flex items-center gap-2">
