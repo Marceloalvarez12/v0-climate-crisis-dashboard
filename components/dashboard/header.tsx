@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Bell, Settings, Zap, Radio } from "lucide-react"
+import { Bell, Settings, Radio } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Logo } from "@/components/logo"
 
 export function DashboardHeader() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
@@ -30,10 +31,8 @@ export function DashboardHeader() {
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
-      <div className="flex items-center gap-2 min-w-0">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-          <Zap className="h-4 w-4 text-primary" />
-        </div>
+      <div className="flex items-center gap-3 min-w-0">
+        <Logo variant="header" />
         <div className="min-w-0">
           <h1 className="truncate text-sm font-bold text-foreground sm:text-base">Climate Crisis Center</h1>
           <p className="hidden text-[10px] text-muted-foreground sm:block">AI Agent Monitoring System</p>
