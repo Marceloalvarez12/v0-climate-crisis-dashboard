@@ -42,7 +42,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Verificar autenticación para todas las demás rutas (dashboard protegido)
+  // Verificar autenticación para todas las demás rutas
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -66,6 +66,25 @@ export async function middleware(request: NextRequest) {
   if (!session) {
     const loginUrl = new URL("/login", request.url)
     return NextResponse.redirect(loginUrl)
+  }
+
+  // Verificar rol para protección de rutas
+  const { data: profile } = await supabase
+    .from("perfiles")
+    .select("rol")
+    .eq("id", session.user.id)
+    .single()
+
+  const userRole = profile?.rol
+
+  // Admin intenta acceder al dashboard → redirigir a /admin
+  if (userRole === "admin" && pathname === "/") {
+    return NextResponse.redirect(new URL("/admin", request.url))
+  }
+
+  // No-admin intenta acceder a /admin → redirigir a /
+  if (userRole !== "admin" && pathname === "/admin") {
+    return NextResponse.redirect(new URL("/", request.url))
   }
 
   return NextResponse.next()

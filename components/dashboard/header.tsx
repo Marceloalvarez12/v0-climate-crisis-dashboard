@@ -31,7 +31,7 @@ export function DashboardHeader() {
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-card px-4 py-1 overflow-hidden">
-      <div className="relative flex items-center min-w-0">
+      <div className="relative flex items-center min-w-0 ml-14">
         <Image
           src="/zntinel-logo.png"
           alt="Zntinel"

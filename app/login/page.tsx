@@ -1,5 +1,4 @@
 import { login } from './actions'
-import Image from 'next/image'
 
 export default async function LoginPage({
   searchParams,
@@ -35,26 +34,20 @@ export default async function LoginPage({
         <div className="backdrop-blur-2xl bg-white/[0.02] border border-white/[0.08] rounded-2xl p-8 shadow-2xl shadow-cyan-950/30">
 
           {/* Cabecera de marca */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 mb-4">
-              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-              <span className="text-[10px] font-mono tracking-[0.3em] text-cyan-400/40 uppercase">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 mb-6">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-[10px] font-mono tracking-[0.3em] text-green-400/60 uppercase">
                 Sistema Activo
               </span>
             </div>
-            <div className="flex justify-center mb-4">
-              <Image
-                src="/zntinel-logo-optimized.png"
-                alt="Zntinel"
-                width={280}
-                height={80}
-                className="h-20 w-auto object-contain drop-shadow-[0_0_24px_rgba(6,182,212,0.25)]"
-                priority
+            <div className="flex justify-center mb-6">
+              <img
+                src="/zntinel-logo.png"
+                alt="ZNTINEL"
+                className="h-32 w-auto object-contain"
               />
             </div>
-            <p className="text-[11px] font-mono tracking-widest text-cyan-400/50 uppercase">
-              Mission Control Auth
-            </p>
           </div>
 
           {/* Mensaje de error parpadeante */}
