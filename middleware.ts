@@ -77,11 +77,6 @@ export async function middleware(request: NextRequest) {
 
   const userRole = profile?.rol
 
-  // Admin intenta acceder al dashboard → redirigir a /admin
-  if (userRole === "admin" && pathname === "/") {
-    return NextResponse.redirect(new URL("/admin", request.url))
-  }
-
   // No-admin intenta acceder a /admin → redirigir a /
   if (userRole !== "admin" && pathname === "/admin") {
     return NextResponse.redirect(new URL("/", request.url))
