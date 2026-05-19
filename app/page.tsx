@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { AIActivityLog } from "@/components/dashboard/ai-activity-log"
+import { AgentStatusPanel } from "@/components/dashboard/agent-status-panel"
 import { ResourcesPanel } from "@/components/dashboard/resources-panel"
 import { CrisisMap } from "@/components/dashboard/crisis-map"
 import { AnalyticsPanel } from "@/components/dashboard/analytics-panel"
@@ -54,8 +55,11 @@ export default function CrisisDashboard() {
       {/* ── DESKTOP layout (lg+) ── */}
       <div className="hidden lg:flex flex-1 overflow-hidden">
         {/* Left sidebar — AI Activity */}
-        <aside className="w-72 shrink-0 border-r border-border p-3 overflow-hidden">
-          <AIActivityLog />
+        <aside className="w-72 shrink-0 border-r border-border p-3 overflow-hidden flex flex-col gap-3">
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <AIActivityLog />
+          </div>
+          <AgentStatusPanel />
         </aside>
 
         {/* Center — Map + Analytics */}
