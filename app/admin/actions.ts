@@ -129,7 +129,7 @@ export async function updateAgentThresholds(
 export async function getApiCredentials(): Promise<Record<string, string>> {
   const supabase = await createClient()
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('config_sistema')
     .select('clave, valor')
     .in('clave', [
@@ -138,6 +138,11 @@ export async function getApiCredentials(): Promise<Record<string, string>> {
       'api_supabase',
       'api_leaflet',
     ])
+
+  if (error) {
+    console.error('Error getting API credentials:', error.message)
+    return { gemini: '', twitter: '', supabase: '', leaflet: '' }
+  }
 
   const keys: Record<string, string> = {}
   const keyMap: Record<string, string> = {

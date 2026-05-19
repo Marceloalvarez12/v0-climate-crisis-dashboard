@@ -34,7 +34,7 @@ const SECTIONS = [
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const { section } = await searchParams
-  const activeSection = section === 'thresholds' ? 'thresholds' : 'control'
+  const activeSection = section === 'thresholds' ? 'thresholds' : section === 'connections' ? 'connections' : 'control'
 
   const supabase = await createClient()
 
@@ -56,9 +56,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     redirect('/')
   }
 
-  const initialAutonomous = await getAgentMode()
-  const thresholds = await getAgentThresholds()
-  const apiKeys = await getApiCredentials()
+  const [initialAutonomous, thresholds, apiKeys] = await Promise.all([
+    activeSection === 'control' ? getAgentMode() : Promise.resolve(false),
+    activeSection === 'thresholds' ? getAgentThresholds() : Promise.resolve({ autoResolve: 5, confidence: 80 }),
+    activeSection === 'connections' ? getApiCredentials() : Promise.resolve({}),
+  ])
 
   return (
     <div className="min-h-screen bg-[#0B0F17]">
