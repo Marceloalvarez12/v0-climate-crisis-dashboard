@@ -6,7 +6,7 @@ import { AgentKillSwitch } from '@/components/admin/agent-kill-switch'
 import { AgentThresholdConfig } from '@/components/admin/agent-threshold-config'
 import { ApiConnectionManager } from '@/components/admin/api-connection-manager'
 import { UserRoleManager } from '@/components/admin/user-role-manager'
-import { Shield, Sliders, Link as LinkIcon, Users, ArrowLeft, LogOut } from 'lucide-react'
+import { Shield, Sliders, Link as LinkIcon, Users, LogOut, Monitor } from 'lucide-react'
 import Link from 'next/link'
 
 interface AdminPageProps {
@@ -81,17 +81,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   return (
     <div className="min-h-screen bg-[#0B0F17]">
       {/* Header de Admin */}
-      <header className="flex items-center gap-4 border-b border-zinc-800 bg-zinc-950/50 px-6 py-4">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-zinc-500 transition-colors hover:text-zinc-300"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span className="text-xs font-mono tracking-wider uppercase">
-            Volver al Dashboard
-          </span>
-        </Link>
-        <div className="flex-1" />
+      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950/50 px-6 py-4">
+        {/* Izquierda: perfil */}
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-800">
             <Shield className="h-4 w-4 text-zinc-400" />
@@ -104,10 +95,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               Administrador
             </p>
           </div>
+        </div>
+
+        {/* Derecha: Dashboard + Logout */}
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 rounded-md border border-zinc-800 bg-zinc-900/50 px-2.5 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            <Monitor className="h-3.5 w-3.5" />
+            Dashboard
+          </Link>
           <form action={logout}>
             <button
               type="submit"
-              className="ml-2 flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400"
               title="Cerrar sesión"
             >
               <LogOut className="h-4 w-4" />
