@@ -1,14 +1,40 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Bell, Settings, Radio } from "lucide-react"
+import { useEffect, useState, useCallback } from "react"
+import { Bell, Settings, Radio, Bot, BotOff } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { createClient } from "@/lib/supabase/client"
 
 export function DashboardHeader() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
   const [alertCount, setAlertCount] = useState(3)
+  const [isAutonomous, setIsAutonomous] = useState(true)
+
+  const fetchAgentMode = useCallback(async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('config_sistema')
+        .select('valor')
+        .eq('clave', 'agent_mode')
+        .single()
+
+      if (!error && data) {
+        setIsAutonomous((data.valor as { autonomous: boolean }).autonomous)
+      }
+    } catch {
+      // Fallback to true if fetch fails
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchAgentMode()
+    // Poll every 10 seconds to detect admin changes
+    const interval = setInterval(fetchAgentMode, 10000)
+    return () => clearInterval(interval)
+  }, [fetchAgentMode])
 
   useEffect(() => {
     setCurrentTime(new Date())
@@ -46,6 +72,28 @@ export function DashboardHeader() {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Indicador de modo IA */}
+        <div
+          className={`hidden items-center gap-1.5 rounded-md border px-2.5 py-1.5 sm:flex transition-colors ${
+            isAutonomous
+              ? 'border-emerald-500/20 bg-emerald-500/5'
+              : 'border-red-500/20 bg-red-500/5'
+          }`}
+        >
+          {isAutonomous ? (
+            <Bot className="h-3 w-3 text-emerald-400" />
+          ) : (
+            <BotOff className="h-3 w-3 text-red-400" />
+          )}
+          <span
+            className={`text-xs font-medium transition-colors ${
+              isAutonomous ? 'text-emerald-400' : 'text-red-400'
+            }`}
+          >
+            {isAutonomous ? 'IA Activa' : 'Modo Manual'}
+          </span>
+        </div>
+
         <div className="hidden items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 sm:flex">
           <Radio className="h-3 w-3 text-success animate-pulse" />
           <span className="text-xs text-muted-foreground">Sistema Activo</span>
