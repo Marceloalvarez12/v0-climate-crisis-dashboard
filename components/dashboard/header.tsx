@@ -60,10 +60,6 @@ export function DashboardHeader() {
           </span>
         </div>
 
-        <div className="hidden items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 sm:flex">
-          <span className="text-xs text-muted-foreground">Sistema Activo</span>
-        </div>
-
         {currentTime && (
           <div className="hidden rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 font-mono text-xs text-foreground md:block">
             {currentTime.toLocaleString("es-AR", {
