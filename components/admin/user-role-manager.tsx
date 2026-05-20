@@ -148,7 +148,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
       .slice(0, 2)
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950/80 backdrop-blur-sm overflow-hidden">
+    <div className="flex flex-col h-full rounded-xl border border-zinc-800 bg-zinc-950/80 backdrop-blur-sm overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-zinc-800 px-6 py-4">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500/10">
@@ -183,10 +183,10 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
       </div>
 
       {/* Tabla */}
-      <div className="overflow-x-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-zinc-800/50">
+            <tr className="sticky top-0 z-10 border-b border-zinc-800/50 bg-zinc-950">
               <th className="text-left px-6 py-3 text-[10px] font-mono tracking-widest uppercase text-zinc-600">
                 Operador
               </th>
@@ -364,7 +364,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
         </table>
 
         {filteredUsers.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-zinc-600">
+          <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-zinc-600">
             <Users className="h-8 w-8 mb-2" />
             <p className="text-sm">No se encontraron usuarios</p>
             <p className="text-xs mt-1">
