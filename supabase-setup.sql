@@ -155,3 +155,62 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================
+-- TABLA ASIGNACIONES DE RECURSOS POR OPERADOR
+-- ============================================
+
+-- 17. Tabla de asignación de recursos a operadores
+CREATE TABLE IF NOT EXISTS public.asignaciones_recursos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  operador_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  recurso_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(operador_id, recurso_id)
+);
+
+-- 18. Índice para búsqueda rápida por operador
+CREATE INDEX IF NOT EXISTS idx_asignaciones_operador ON public.asignaciones_recursos(operador_id);
+
+-- 19. Habilitar RLS en asignaciones_recursos
+ALTER TABLE public.asignaciones_recursos ENABLE ROW LEVEL SECURITY;
+
+-- 20. Política: admins pueden ver todas las asignaciones
+DROP POLICY IF EXISTS "Admins ven asignaciones" ON public.asignaciones_recursos;
+CREATE POLICY "Admins ven asignaciones"
+  ON public.asignaciones_recursos
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.perfiles
+      WHERE perfiles.id = auth.uid() AND perfiles.rol = 'admin'
+    )
+  );
+
+-- 21. Política: operadores pueden ver sus propias asignaciones
+DROP POLICY IF EXISTS "Operadores ven sus asignaciones" ON public.asignaciones_recursos;
+CREATE POLICY "Operadores ven sus asignaciones"
+  ON public.asignaciones_recursos
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = operador_id);
+
+-- 22. Política: solo admins pueden gestionar asignaciones
+DROP POLICY IF EXISTS "Solo admins gestionan asignaciones" ON public.asignaciones_recursos;
+CREATE POLICY "Solo admins gestionan asignaciones"
+  ON public.asignaciones_recursos
+  FOR ALL
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.perfiles
+      WHERE perfiles.id = auth.uid() AND perfiles.rol = 'admin'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.perfiles
+      WHERE perfiles.id = auth.uid() AND perfiles.rol = 'admin'
+    )
+  );

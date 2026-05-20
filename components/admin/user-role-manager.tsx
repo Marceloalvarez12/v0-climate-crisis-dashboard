@@ -11,6 +11,7 @@ import {
   Search,
   Check,
   X,
+  Truck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -18,6 +19,7 @@ import {
   suspendUser,
   resetUserPassword,
 } from '@/app/admin/actions'
+import { ResourceAssignmentModal } from './resource-assignment-modal'
 
 interface User {
   id: string
@@ -53,6 +55,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
   const [roleEditUser, setRoleEditUser] = useState<{ id: string; role: string } | null>(null)
+  const [assignmentUser, setAssignmentUser] = useState<{ id: string; name: string } | null>(null)
   const [actionFeedback, setActionFeedback] = useState<{ id: string; message: string } | null>(null)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -313,6 +316,15 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
                               <Shield className="h-3.5 w-3.5" />
                               Cambiar Nivel de Acceso
                             </button>
+                            {user.role === 'operador' && (
+                              <button
+                                onClick={() => setAssignmentUser({ id: user.id, name: user.name })}
+                                className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
+                              >
+                                <Truck className="h-3.5 w-3.5" />
+                                Asignar Recursos
+                              </button>
+                            )}
                             <button
                               onClick={() => handleResetPassword(user)}
                               className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
@@ -418,6 +430,16 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Asignación de Recursos */}
+      {assignmentUser && (
+        <ResourceAssignmentModal
+          isOpen={!!assignmentUser}
+          onClose={() => setAssignmentUser(null)}
+          operatorId={assignmentUser.id}
+          operatorName={assignmentUser.name}
+        />
       )}
     </div>
   )

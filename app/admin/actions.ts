@@ -382,3 +382,86 @@ export async function resetUserPassword(
 
   return { success: true }
 }
+
+// ============================================
+// RESOURCE ASSIGNMENT
+// ============================================
+
+export async function getOperatorAssignments(
+  operatorId: string
+): Promise<string[]> {
+  const supabase = await createClient()
+
+  const { data: user } = await supabase.auth.getUser()
+  if (!user.user) throw new Error('No autorizado')
+
+  const { data: profile } = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('id', user.user.id)
+    .single()
+
+  if (profile?.rol !== 'admin') {
+    throw new Error('Solo administradores pueden ver asignaciones')
+  }
+
+  const { data, error } = await supabase
+    .from('asignaciones_recursos')
+    .select('recurso_id')
+    .eq('operador_id', operatorId)
+
+  if (error) throw new Error(error.message)
+
+  return data?.map((r) => r.recurso_id) || []
+}
+
+export async function assignResourcesToOperator(
+  operatorId: string,
+  resourceIds: string[]
+): Promise<{ success: boolean }> {
+  const supabase = await createClient()
+
+  const { data: user } = await supabase.auth.getUser()
+  if (!user.user) throw new Error('No autorizado')
+
+  const { data: profile } = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('id', user.user.id)
+    .single()
+
+  if (profile?.rol !== 'admin') {
+    throw new Error('Solo administradores pueden asignar recursos')
+  }
+
+  const { error: deleteError } = await supabase
+    .from('asignaciones_recursos')
+    .delete()
+    .eq('operador_id', operatorId)
+
+  if (deleteError) throw new Error(deleteError.message)
+
+  if (resourceIds.length > 0) {
+    const assignments = resourceIds.map((recurso_id) => ({
+      operador_id: operatorId,
+      recurso_id,
+    }))
+
+    const { error: insertError } = await supabase
+      .from('asignaciones_recursos')
+      .insert(assignments)
+
+    if (insertError) throw new Error(insertError.message)
+  }
+
+  await supabase.rpc('registrar_auditoria', {
+    p_accion: 'asignacion_recursos',
+    p_detalle: JSON.stringify({
+      operador_id: operatorId,
+      recursos_asignados: resourceIds.length,
+      ejecutado_por: user.user.email,
+    }),
+  })
+
+  return { success: true }
+}
