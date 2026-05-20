@@ -17,6 +17,7 @@ import { useIncidents, useResources } from "./crisis-map/use-map-data"
 import { IncidentIcon, SourceIcon, severityColorClass, sourceLabel, incidentTypeLabel } from "./crisis-map/incident-helpers"
 import { createLeafletIcon, LEAFLET_DARK_STYLES } from "./crisis-map/leaflet-icon"
 import { IncidentDetailModal, DeployModal } from "./crisis-map/map-modals"
+import { getCurrentOperatorAssignments } from "@/app/admin/actions"
 
 // ---------------------------------------------------------------------------
 // Lazy-load de componentes Leaflet (sólo cliente)
@@ -49,10 +50,18 @@ export function CrisisMap() {
   const [deployingResources, setDeployingResources] = useState(false)
   const [deploySuccess,      setDeploySuccess]      = useState(false)
   const [selectedCounts,     setSelectedCounts]     = useState<Record<string, number>>({})
+  const [assignedResourceIds, setAssignedResourceIds] = useState<Set<string> | null>(null)
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const { incidents: dbIncidents, mutate: mutateIncidents } = useIncidents()
   const { data: dbRecursos, mutate: mutateRecursos }        = useResources()
+
+  // Fetch operator's assigned resources on mount
+  useEffect(() => {
+    getCurrentOperatorAssignments()
+      .then((ids) => setAssignedResourceIds(new Set(ids)))
+      .catch(() => setAssignedResourceIds(null))
+  }, [])
 
   // All incidents come from the database (real + respawned)
   const incidents: Incident[] = dbIncidents
@@ -61,12 +70,13 @@ export function CrisisMap() {
     if (!dbRecursos) return []
     const groups: Record<string, { tipo: string; ids: string[]; availableIds: string[] }> = {}
     for (const r of dbRecursos) {
+      if (assignedResourceIds !== null && !assignedResourceIds.has(r.id)) continue
       if (!groups[r.tipo]) groups[r.tipo] = { tipo: r.tipo, ids: [], availableIds: [] }
       groups[r.tipo].ids.push(r.id)
       if (r.estado === "available") groups[r.tipo].availableIds.push(r.id)
     }
     return Object.values(groups)
-  }, [dbRecursos])
+  }, [dbRecursos, assignedResourceIds])
 
   useEffect(() => {
     setIsClient(true)

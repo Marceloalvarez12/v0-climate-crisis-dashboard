@@ -247,6 +247,9 @@ export function DeployModal({
           <DialogDescription>
             Select the resources to send to{" "}
             <span className="font-medium text-foreground">{incident?.location}</span>
+            <span className="block mt-1 text-[10px] text-emerald-400/70 font-mono tracking-wider">
+              SOLO RECURSOS ASIGNADOS A TU OPERADOR
+            </span>
           </DialogDescription>
         </DialogHeader>
 

@@ -465,3 +465,19 @@ export async function assignResourcesToOperator(
 
   return { success: true }
 }
+
+export async function getCurrentOperatorAssignments(): Promise<string[]> {
+  const supabase = await createClient()
+
+  const { data: user } = await supabase.auth.getUser()
+  if (!user.user) throw new Error('No autorizado')
+
+  const { data, error } = await supabase
+    .from('asignaciones_recursos')
+    .select('recurso_id')
+    .eq('operador_id', user.user.id)
+
+  if (error) throw new Error(error.message)
+
+  return data?.map((r) => r.recurso_id) || []
+}
