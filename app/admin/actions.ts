@@ -481,3 +481,49 @@ export async function getCurrentOperatorAssignments(): Promise<string[]> {
 
   return data?.map((r) => r.recurso_id) || []
 }
+
+export async function createOperator(
+  nombre: string,
+  email: string,
+  password: string
+): Promise<{ success: boolean }> {
+  const supabase = await createClient()
+
+  const { data: user } = await supabase.auth.getUser()
+  if (!user.user) throw new Error('No autorizado')
+
+  const { data: profile } = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('id', user.user.id)
+    .single()
+
+  if (profile?.rol !== 'admin') {
+    throw new Error('Solo administradores pueden crear operadores')
+  }
+
+  const adminClient = getAdminClient()
+
+  const { error } = await adminClient.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: {
+      nombre,
+      rol: 'operador',
+    },
+  })
+
+  if (error) throw new Error(error.message)
+
+  await supabase.rpc('registrar_auditoria', {
+    p_accion: 'crear_operador',
+    p_detalle: JSON.stringify({
+      nuevo_operador: email,
+      nombre,
+      creado_por: user.user.email,
+    }),
+  })
+
+  return { success: true }
+}

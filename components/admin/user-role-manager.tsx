@@ -20,6 +20,7 @@ import {
   resetUserPassword,
 } from '@/app/admin/actions'
 import { ResourceAssignmentModal } from './resource-assignment-modal'
+import { CreateOperatorModal } from './create-operator-modal'
 
 interface User {
   id: string
@@ -56,6 +57,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
   const [roleEditUser, setRoleEditUser] = useState<{ id: string; role: string } | null>(null)
   const [assignmentUser, setAssignmentUser] = useState<{ id: string; name: string } | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [actionFeedback, setActionFeedback] = useState<{ id: string; message: string } | null>(null)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -176,7 +178,10 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
             className="w-full pl-9 pr-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition-all"
           />
         </div>
-        <button className="flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500 active:scale-95 transition-all">
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500 active:scale-95 transition-all"
+        >
           <UserPlus className="h-4 w-4" />
           Añadir Nuevo Operador
         </button>
@@ -316,13 +321,15 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
                               <Shield className="h-3.5 w-3.5" />
                               Cambiar Nivel de Acceso
                             </button>
-                            <button
-                              onClick={() => setAssignmentUser({ id: user.id, name: user.name })}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
-                            >
-                              <Truck className="h-3.5 w-3.5" />
-                              Asignar Recursos
-                            </button>
+                            {user.role === 'operador' && (
+                              <button
+                                onClick={() => setAssignmentUser({ id: user.id, name: user.name })}
+                                className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
+                              >
+                                <Truck className="h-3.5 w-3.5" />
+                                Asignar Recursos
+                              </button>
+                            )}
                             <button
                               onClick={() => handleResetPassword(user)}
                               className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
@@ -439,6 +446,18 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
           operatorName={assignmentUser.name}
         />
       )}
+
+      {/* Modal Crear Operador */}
+      <CreateOperatorModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          setShowCreateModal(false)
+          // Refresh users list by re-fetching from parent would be ideal,
+          // but for now we reload the page to show the new user
+          window.location.reload()
+        }}
+      />
     </div>
   )
 }
