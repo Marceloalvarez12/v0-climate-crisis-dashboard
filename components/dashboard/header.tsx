@@ -35,7 +35,7 @@ export function DashboardHeader() {
           className="h-[88px] w-auto shrink-0 object-contain -my-3"
           priority
         />
-        <span className="text-xs font-medium text-zinc-400 tracking-wider mb-1">
+        <span className="text-xs font-medium text-zinc-400 tracking-wider mb-0">
           - AI Climate Crisis Management
         </span>
       </div>
