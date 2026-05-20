@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { checkRateLimit } from "@/lib/rate-limit"
 
-const PUBLIC_PATHS = ["/_next", "/favicon.ico", "/api/analytics", "/api/recursos", "/api/incidentes", "/login"]
+const PUBLIC_PATHS = ["/_next", "/favicon.ico", "/login"]
 const API_PATHS = ["/api/"]
 
 export async function middleware(request: NextRequest) {
@@ -15,7 +15,7 @@ export async function middleware(request: NextRequest) {
 
   // Lógica de rate limiting y API_SECRET para rutas /api/*
   if (API_PATHS.some((p) => pathname.startsWith(p))) {
-    const ip = request.headers.get("x-forwarded-for") ?? request.ip ?? "unknown"
+    const ip = request.headers.get("x-forwarded-for") ?? "unknown"
     const rateLimit = checkRateLimit(ip)
 
     if (!rateLimit.allowed) {
@@ -29,9 +29,8 @@ export async function middleware(request: NextRequest) {
 
     if (apiSecret) {
       const authHeader = request.headers.get("x-api-secret")
-      const urlSecret = request.nextUrl.searchParams.get("secret")
 
-      if (authHeader !== apiSecret && urlSecret !== apiSecret) {
+      if (authHeader !== apiSecret) {
         return NextResponse.json(
           { error: "No autorizado" },
           { status: 401 }
@@ -68,12 +67,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Verificar rol para protección de rutas
+  // Verificar rol y estado del usuario
   const { data: profile } = await supabase
     .from("perfiles")
-    .select("rol")
+    .select("rol, status")
     .eq("id", session.user.id)
     .single()
+
+  // Usuario suspendido → cerrar sesión y redirigir al login
+  if (profile?.status === "suspendido") {
+    const loginUrl = new URL("/login?error=suspended", request.url)
+    return NextResponse.redirect(loginUrl)
+  }
 
   const userRole = profile?.rol
 

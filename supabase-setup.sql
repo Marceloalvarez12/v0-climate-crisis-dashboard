@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS public.perfiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   nombre TEXT NOT NULL,
   rol TEXT NOT NULL CHECK (rol IN ('admin', 'operador', 'agente_ia')),
+  status TEXT NOT NULL DEFAULT 'activo' CHECK (status IN ('activo', 'suspendido')),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -91,6 +92,66 @@ BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.perfiles
     WHERE perfiles.id = auth.uid() AND perfiles.rol = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================
+-- TABLA DE AUDITORÍA (Registro de acciones de admin)
+-- ============================================
+
+-- 12. Tabla de auditoría para acciones administrativas
+CREATE TABLE IF NOT EXISTS public.auditoria_admin (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_id UUID NOT NULL REFERENCES auth.users(id),
+  accion TEXT NOT NULL,
+  detalle JSONB NOT NULL,
+  ip_address TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 13. Habilitar RLS en auditoria_admin
+ALTER TABLE public.auditoria_admin ENABLE ROW LEVEL SECURITY;
+
+-- 14. Política: solo admins pueden leer la auditoría
+DROP POLICY IF EXISTS "Solo admins leen auditoria" ON public.auditoria_admin;
+CREATE POLICY "Solo admins leen auditoria"
+  ON public.auditoria_admin
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.perfiles
+      WHERE perfiles.id = auth.uid() AND perfiles.rol = 'admin'
+    )
+  );
+
+-- 15. Política: solo admins pueden insertar en auditoría
+DROP POLICY IF EXISTS "Solo admins insertan auditoria" ON public.auditoria_admin;
+CREATE POLICY "Solo admins insertan auditoria"
+  ON public.auditoria_admin
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.perfiles
+      WHERE perfiles.id = auth.uid() AND perfiles.rol = 'admin'
+    )
+  );
+
+-- 16. Función helper para registrar acciones de admin
+CREATE OR REPLACE FUNCTION public.registrar_auditoria(
+  p_accion TEXT,
+  p_detalle JSONB
+)
+RETURNS VOID AS $$
+BEGIN
+  INSERT INTO public.auditoria_admin (admin_id, accion, detalle, ip_address)
+  VALUES (
+    auth.uid(),
+    p_accion,
+    p_detalle,
+    current_setting('request.headers', true)::json->>'x-forwarded-for'
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

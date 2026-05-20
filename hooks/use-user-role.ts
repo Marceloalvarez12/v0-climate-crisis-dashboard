@@ -6,7 +6,7 @@ interface UserProfile {
   rol: 'admin' | 'operador' | 'agente_ia' | 'visualizador'
 }
 
-const CACHE_KEY = 'zntinel_user_profile'
+const getCacheKey = (userId: string) => `zntinel_user_profile_${userId}`
 const CACHE_DURATION = 30000 // 30 seconds
 
 interface CacheEntry {
@@ -19,27 +19,27 @@ export function useUserRole() {
   const [loading, setLoading] = useState(true)
 
   const fetchProfile = useCallback(async () => {
-    // Check cache first
-    try {
-      const cached = localStorage.getItem(CACHE_KEY)
-      if (cached) {
-        const entry: CacheEntry = JSON.parse(cached)
-        if (Date.now() - entry.timestamp < CACHE_DURATION) {
-          setProfile(entry.profile)
-          setLoading(false)
-          return
-        }
-      }
-    } catch {
-      // Cache invalid, proceed with fetch
-    }
-
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         setLoading(false)
         return
+      }
+
+      const cacheKey = getCacheKey(user.id)
+      try {
+        const cached = localStorage.getItem(cacheKey)
+        if (cached) {
+          const entry: CacheEntry = JSON.parse(cached)
+          if (Date.now() - entry.timestamp < CACHE_DURATION) {
+            setProfile(entry.profile)
+            setLoading(false)
+            return
+          }
+        }
+      } catch {
+        // Cache invalid, proceed with fetch
       }
 
       const { data } = await supabase
@@ -51,7 +51,7 @@ export function useUserRole() {
       if (data) {
         const userProfile = { nombre: data.nombre, rol: data.rol as UserProfile['rol'] }
         setProfile(userProfile)
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ profile: userProfile, timestamp: Date.now() }))
+        localStorage.setItem(cacheKey, JSON.stringify({ profile: userProfile, timestamp: Date.now() }))
       }
     } catch {
       // Silently fail

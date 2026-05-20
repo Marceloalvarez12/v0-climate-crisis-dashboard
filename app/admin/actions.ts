@@ -216,9 +216,13 @@ export async function saveApiCredentials(
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 function getAdminClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY no está configurada. Esta acción requiere acceso de administrador.')
+  }
   return createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    serviceKey,
   )
 }
 
@@ -287,6 +291,16 @@ export async function updateUserRole(
 
   if (error) throw new Error(error.message)
 
+  await supabase.rpc('registrar_auditoria', {
+    p_accion: 'cambio_rol',
+    p_detalle: JSON.stringify({
+      usuario_afectado: userId,
+      rol_anterior: profile.rol,
+      rol_nuevo: newRole,
+      ejecutado_por: user.user.email,
+    }),
+  })
+
   return { success: true }
 }
 
@@ -316,6 +330,15 @@ export async function suspendUser(
 
   if (error) throw new Error(error.message)
 
+  await supabase.rpc('registrar_auditoria', {
+    p_accion: status === 'suspendido' ? 'suspension_usuario' : 'reactivacion_usuario',
+    p_detalle: JSON.stringify({
+      usuario_afectado: userId,
+      nuevo_estado: status,
+      ejecutado_por: user.user.email,
+    }),
+  })
+
   return { success: true }
 }
 
@@ -338,13 +361,24 @@ export async function resetUserPassword(
   }
 
   const adminClient = getAdminClient()
-  const tempPassword = Math.random().toString(36).slice(-10) + 'A1!'
+  const randomBytes = new Uint8Array(16)
+  crypto.getRandomValues(randomBytes)
+  const randomPart = Array.from(randomBytes, (b) => b.toString(36)).join('').slice(0, 12)
+  const tempPassword = `Znt${randomPart}!A1`
 
   const { error } = await adminClient.auth.admin.updateUserById(userId, {
     password: tempPassword,
   })
 
   if (error) throw new Error(error.message)
+
+  await supabase.rpc('registrar_auditoria', {
+    p_accion: 'reset_password',
+    p_detalle: JSON.stringify({
+      usuario_afectado: userId,
+      ejecutado_por: user.user.email,
+    }),
+  })
 
   return { success: true }
 }

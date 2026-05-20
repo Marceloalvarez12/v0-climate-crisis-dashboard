@@ -34,7 +34,10 @@ export function useAutoResolve({
 
   const check = useCallback(async () => {
     const API_SECRET = process.env.NEXT_PUBLIC_API_SECRET ?? ""
-    const authHeaders = API_SECRET ? { "x-api-secret": API_SECRET } : {}
+    const authHeaders: Record<string, string> = {}
+    if (API_SECRET) {
+      authHeaders["x-api-secret"] = API_SECRET
+    }
 
     // ── 1. Auto-resolve incidentes ──────────────────────────────────────────
     try {

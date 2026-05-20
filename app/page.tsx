@@ -9,7 +9,6 @@ import { CrisisMap } from "@/components/dashboard/crisis-map"
 import { AnalyticsPanel } from "@/components/dashboard/analytics-panel"
 import { BroadcastPanel } from "@/components/dashboard/broadcast-panel"
 import { DevPanel } from "@/components/dashboard/dev-panel"
-import { Suspense } from "react"
 import { Map, Bot, Shield, BarChart2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { mutate } from "swr"
@@ -44,11 +43,7 @@ export default function CrisisDashboard() {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background">
-      {isAdmin && (
-        <Suspense fallback={null}>
-          <DevPanel />
-        </Suspense>
-      )}
+      {isAdmin && <DevPanel />}
 
       <DashboardHeader />
 

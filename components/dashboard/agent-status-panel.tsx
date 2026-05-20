@@ -1,35 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
 import { Bot, BotOff, Eye, Ban, CheckCircle2, AlertCircle } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { useAgentMode } from '@/hooks/use-agent-mode'
 
 export function AgentStatusPanel() {
-  const [isAutonomous, setIsAutonomous] = useState(true)
-
-  const fetchMode = useCallback(async () => {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('config_sistema')
-        .select('valor')
-        .eq('clave', 'agent_mode')
-        .single()
-
-      if (!error && data) {
-        setIsAutonomous((data.valor as { autonomous: boolean }).autonomous)
-      }
-    } catch {
-      // Fallback
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchMode()
-    const interval = setInterval(fetchMode, 10000)
-    return () => clearInterval(interval)
-  }, [fetchMode])
+  const isAutonomous = useAgentMode()
 
   const capabilities = [
     {

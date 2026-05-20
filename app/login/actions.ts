@@ -20,9 +20,14 @@ export async function login(formData: FormData) {
 
   const { data: profile } = await supabase
     .from('perfiles')
-    .select('rol')
+    .select('rol, status')
     .eq('id', authData.user.id)
     .single()
+
+  if (profile?.status === 'suspendido') {
+    await supabase.auth.signOut()
+    redirect('/login?error=suspended')
+  }
 
   if (profile?.rol === 'admin') {
     redirect('/admin')

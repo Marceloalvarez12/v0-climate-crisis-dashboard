@@ -156,7 +156,7 @@ export function useSimulationLoop() {
 
       dispatchTimersRef.current.set(available.id, timer)
     },
-    [mutate, addEvent, spawnIncident], // spawnIncident kept in deps to satisfy exhaustive-deps
+    [mutate, addEvent], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   // Inicia el loop: primer incidente inmediato, luego cada SIMULATION_SPAWN_INTERVAL_MS

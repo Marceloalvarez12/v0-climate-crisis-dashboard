@@ -207,7 +207,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
           <tbody className="divide-y divide-zinc-800/30">
             {filteredUsers.map((user) => {
               const isActive = user.status === 'activo'
-              const feedback = actionFeedback?.id === user.id
+              const feedback = actionFeedback?.id === user.id ? actionFeedback : null
 
               return (
                 <tr

@@ -282,7 +282,6 @@ export function CrisisMap() {
       {isClient && leafletCssLoaded ? (
         <div className="h-[400px] w-full shrink-0 pt-10 md:h-full md:flex-1">
           <style>{LEAFLET_DARK_STYLES}</style>
-          <style>{LEAFLET_DARK_STYLES}</style>
           <MapContainer center={MAP_CENTER} zoom={13} scrollWheelZoom style={{ height: "100%", width: "100%" }}>
             <TileLayer
               attribution='&copy; <a href="https://carto.com/">CARTO</a>'

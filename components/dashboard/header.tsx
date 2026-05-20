@@ -1,59 +1,25 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { Bell, Settings, Radio, Bot, BotOff, LogOut, User, LayoutDashboard } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Bell, Bot, BotOff, LogOut, User, LayoutDashboard } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { createClient } from "@/lib/supabase/client"
 import { logout } from "@/app/login/actions"
 import { useUserRole } from "@/hooks/use-user-role"
+import { useAgentMode } from "@/hooks/use-agent-mode"
 
 export function DashboardHeader() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
-  const [alertCount, setAlertCount] = useState(3)
-  const [isAutonomous, setIsAutonomous] = useState(true)
   const { profile, isAdmin } = useUserRole()
-
-  const fetchAgentMode = useCallback(async () => {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('config_sistema')
-        .select('valor')
-        .eq('clave', 'agent_mode')
-        .single()
-
-      if (!error && data) {
-        setIsAutonomous((data.valor as { autonomous: boolean }).autonomous)
-      }
-    } catch {
-      // Fallback to true if fetch fails
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchAgentMode()
-    const interval = setInterval(fetchAgentMode, 10000)
-    return () => clearInterval(interval)
-  }, [fetchAgentMode])
+  const isAutonomous = useAgentMode()
 
   useEffect(() => {
     setCurrentTime(new Date())
     const interval = setInterval(() => {
       setCurrentTime(new Date())
     }, 1000)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (Math.random() > 0.7) {
-        setAlertCount(prev => Math.min(prev + 1, 9))
-      }
-    }, 10000)
 
     return () => clearInterval(interval)
   }, [])
@@ -95,7 +61,6 @@ export function DashboardHeader() {
         </div>
 
         <div className="hidden items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 sm:flex">
-          <Radio className="h-3 w-3 text-success animate-pulse" />
           <span className="text-xs text-muted-foreground">Sistema Activo</span>
         </div>
 
@@ -138,23 +103,6 @@ export function DashboardHeader() {
           </div>
         )}
 
-        <Button variant="ghost" size="icon" className="relative h-8 w-8">
-          <Bell className="h-4 w-4" />
-          {alertCount > 0 && (
-            <Badge className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center bg-primary p-0 text-[10px]">
-              {alertCount}
-            </Badge>
-          )}
-        </Button>
-
-        {/* Settings solo para admin */}
-        {isAdmin && (
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Settings className="h-4 w-4" />
-          </Button>
-        )}
-
-        {/* Botón Cerrar Sesión */}
         <form action={logout}>
           <Button
             variant="ghost"

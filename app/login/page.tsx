@@ -54,7 +54,9 @@ export default async function LoginPage({
           {error && (
             <div className="mb-6 px-4 py-3 rounded-lg border border-red-500/20 bg-red-500/[0.05] animate-pulse">
               <p className="text-[11px] font-mono text-red-400/90 text-center tracking-wider">
-                // ACCESO DENEGADO — Credenciales inválidas
+                {error === 'suspended'
+                  ? '// ACCESO DENEGADO — Cuenta suspendida'
+                  : '// ACCESO DENEGADO — Credenciales inválidas'}
               </p>
             </div>
           )}

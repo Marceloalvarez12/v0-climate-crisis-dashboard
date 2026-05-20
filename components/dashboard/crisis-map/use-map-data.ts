@@ -14,7 +14,9 @@ const SWR_CONFIG = {
 }
 
 /** Transforma una fila de Supabase al tipo local `Incident` */
-export function dbToIncident(inc: DbIncident): Incident {
+export function dbToIncident(inc: DbIncident): Incident | null {
+  if (!inc.latitud || !inc.longitud) return null
+  
   return {
     id:             inc.id,
     type:           inc.tipo as Incident["type"],
@@ -37,8 +39,8 @@ export function useIncidents() {
 
   const incidents: Incident[] = useMemo(() => {
     if (!data || error) return []
-    return data.map(dbToIncident)
-  }, [data, error])
+    return data.map(dbToIncident).filter((inc): inc is Incident => inc !== null)
+  }, [data])
 
   return { incidents, mutate }
 }

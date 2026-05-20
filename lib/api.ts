@@ -9,10 +9,15 @@ import type { DbIncident, DbResource } from "@/lib/types"
 
 const API_SECRET = process.env.NEXT_PUBLIC_API_SECRET ?? ""
 
-const authHeaders = () => ({
-  "Content-Type": "application/json",
-  ...(API_SECRET ? { "x-api-secret": API_SECRET } : {}),
-})
+const authHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  }
+  if (API_SECRET) {
+    headers["x-api-secret"] = API_SECRET
+  }
+  return headers
+}
 
 // SWR fetcher genérico
 export const fetcher = (url: string) =>
