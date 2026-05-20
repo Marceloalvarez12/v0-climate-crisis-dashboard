@@ -316,15 +316,13 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
                               <Shield className="h-3.5 w-3.5" />
                               Cambiar Nivel de Acceso
                             </button>
-                            {user.role === 'operador' && (
-                              <button
-                                onClick={() => setAssignmentUser({ id: user.id, name: user.name })}
-                                className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
-                              >
-                                <Truck className="h-3.5 w-3.5" />
-                                Asignar Recursos
-                              </button>
-                            )}
+                            <button
+                              onClick={() => setAssignmentUser({ id: user.id, name: user.name })}
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
+                            >
+                              <Truck className="h-3.5 w-3.5" />
+                              Asignar Recursos
+                            </button>
                             <button
                               onClick={() => handleResetPassword(user)}
                               className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
