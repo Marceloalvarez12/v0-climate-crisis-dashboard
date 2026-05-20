@@ -26,7 +26,7 @@ export function DashboardHeader() {
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-card px-4 py-1 overflow-hidden">
-      <div className="relative flex items-center min-w-0 ml-14">
+      <div className="relative flex items-end min-w-0 ml-14 gap-2">
         <Image
           src="/zntinel-logo.png"
           alt="Zntinel"
@@ -35,6 +35,9 @@ export function DashboardHeader() {
           className="h-[88px] w-auto shrink-0 object-contain -my-3"
           priority
         />
+        <span className="text-xs font-medium text-zinc-400 tracking-wider mb-1">
+          - AI Climate Crisis Management
+        </span>
       </div>
 
       <div className="flex items-center gap-2">
