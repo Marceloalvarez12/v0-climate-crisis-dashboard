@@ -9,8 +9,10 @@ const SWR_CONFIG = {
   refreshInterval: 3000,
   revalidateOnFocus: true,
   revalidateOnReconnect: true,
-  dedupingInterval: 1000,
+  dedupingInterval: 2000,
   keepPreviousData: true,
+  errorRetryCount: 3,
+  errorRetryInterval: 5000,
 }
 
 /** Transforma una fila de Supabase al tipo local `Incident` */

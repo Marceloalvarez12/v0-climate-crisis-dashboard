@@ -19,7 +19,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://unpkg.com",
               "img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org",
               "font-src 'self'",
-              "connect-src 'self' https://*.supabase.co",
+              "connect-src 'self' https://*.supabase.co https://*.googleapis.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",

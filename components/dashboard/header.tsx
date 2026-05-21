@@ -28,7 +28,7 @@ export function DashboardHeader() {
     <header className="flex items-center justify-between border-b border-border bg-card px-4 py-1 overflow-hidden">
       <div className="relative flex items-center min-w-0 ml-8 gap-2">
         <Image
-          src="/zntinel-logo.png"
+          src="/zntinel-logo-optimized.png"
           alt="Zntinel"
           width={340}
           height={88}

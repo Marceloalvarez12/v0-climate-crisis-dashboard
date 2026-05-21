@@ -25,12 +25,11 @@ export async function middleware(request: NextRequest) {
       )
     }
 
-    const apiSecret = process.env.API_SECRET
-
-    if (apiSecret) {
+    // Solo requerir API_SECRET para métodos que modifican datos
+    const method = request.method
+    if (method !== "GET" && process.env.API_SECRET) {
       const authHeader = request.headers.get("x-api-secret")
-
-      if (authHeader !== apiSecret) {
+      if (authHeader !== process.env.API_SECRET) {
         return NextResponse.json(
           { error: "No autorizado" },
           { status: 401 }
@@ -41,7 +40,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Verificar autenticación para todas las demás rutas
+  // Create response that will carry the cookies
+  const response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -50,8 +55,10 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll() {
-          // No necesitamos setear cookies en el middleware
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            response.cookies.set(name, value)
+          )
         },
       },
     }
@@ -87,11 +94,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url))
   }
 
-  return NextResponse.next()
+  return response
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.*|apple-icon.*).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.*|apple-icon.*|.*\\.png|.*\\.jpg|.*\\.svg|.*\\.ico).*)",
   ],
 }

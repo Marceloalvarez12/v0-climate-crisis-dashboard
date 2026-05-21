@@ -56,11 +56,26 @@ export function CrisisMap() {
   const { incidents: dbIncidents, mutate: mutateIncidents } = useIncidents()
   const { data: dbRecursos, mutate: mutateRecursos }        = useResources()
 
-  // Fetch operator's assigned resources on mount
+  // Fetch operator's assigned resources on mount (with timeout to avoid blocking UI)
   useEffect(() => {
+    let cancelled = false
+    const timeout = setTimeout(() => {
+      if (!cancelled) setAssignedResourceIds(null)
+    }, 5000)
+
     getCurrentOperatorAssignments()
-      .then((ids) => setAssignedResourceIds(new Set(ids)))
-      .catch(() => setAssignedResourceIds(null))
+      .then((ids) => {
+        if (!cancelled) setAssignedResourceIds(new Set(ids))
+      })
+      .catch(() => {
+        if (!cancelled) setAssignedResourceIds(null)
+      })
+      .finally(() => clearTimeout(timeout))
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeout)
+    }
   }, [])
 
   // All incidents come from the database (real + respawned)

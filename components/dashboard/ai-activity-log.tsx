@@ -109,11 +109,12 @@ export function AIActivityLog() {
 
   const { mutate } = useSWRConfig()
 
-  // ── Respawn automático cada 4 minutos ────────────────────────────────────
+  // ── Respawn automático cada 90 segundos ────────────────────────────────────
   // Reactivates a random resolved incident (estado atendido → activo, updated_at = now)
   // so the dashboard stays populated even when the Gemini API quota is exhausted.
   useEffect(() => {
     const RESPAWN_INTERVAL_MS = 90_000  // 90 segundos
+    let mutateTimer: NodeJS.Timeout | null = null
 
     const respawn = async () => {
       try {
@@ -124,8 +125,6 @@ export function AIActivityLog() {
         })
         const data = await res.json()
         if (data.respawned && data.incident) {
-          mutate("/api/incidentes")
-          mutate("/api/analytics")
           addActivity({
             type:    "alert",
             message: `New incident detected: ${data.incident.tipo} at ${data.incident.ubicacion}`,
@@ -133,15 +132,24 @@ export function AIActivityLog() {
             actionable: true,
             location: data.incident.ubicacion,
           })
+          // Debounce mutate para evitar cascada de revalidaciones
+          if (mutateTimer) clearTimeout(mutateTimer)
+          mutateTimer = setTimeout(() => {
+            mutate("/api/incidentes")
+            mutate("/api/analytics")
+          }, 1000)
         }
       } catch {
         // Non-blocking
       }
     }
 
-    // First respawn after 4 minutes, then every 4 minutes
+    // First respawn after 90 seconds, then every 90 seconds
     const id = setInterval(respawn, RESPAWN_INTERVAL_MS)
-    return () => clearInterval(id)
+    return () => {
+      clearInterval(id)
+      if (mutateTimer) clearTimeout(mutateTimer)
+    }
   }, [addActivity, mutate])
 
   // ── Loop de mensajes de fondo (monitoring, extraction, etc.) ─────────────

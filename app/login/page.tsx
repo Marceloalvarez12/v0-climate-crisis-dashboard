@@ -43,9 +43,9 @@ export default async function LoginPage({
             </div>
             <div className="flex justify-center mb-6">
               <img
-                src="/zntinel-logo.png"
+                src="/zntinel-logo-optimized.png"
                 alt="ZNTINEL"
-                className="h-32 w-auto object-contain"
+                className="h-44 w-auto object-contain"
               />
             </div>
           </div>

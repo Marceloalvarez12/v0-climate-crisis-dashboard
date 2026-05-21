@@ -6,7 +6,8 @@ import { AgentKillSwitch } from '@/components/admin/agent-kill-switch'
 import { AgentThresholdConfig } from '@/components/admin/agent-threshold-config'
 import { ApiConnectionManager } from '@/components/admin/api-connection-manager'
 import { UserRoleManager } from '@/components/admin/user-role-manager'
-import { Shield, Sliders, Link as LinkIcon, Users, LogOut, Monitor, User, Radio } from 'lucide-react'
+import { ResourceManager } from '@/components/admin/resource-manager'
+import { Shield, Sliders, Link as LinkIcon, Users, LogOut, Monitor, User, Radio, Truck } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -39,6 +40,12 @@ const SECTIONS = [
     icon: Users,
     description: 'Gestión de personal y accesos',
   },
+  {
+    id: 'resources',
+    label: 'Gestión de Recursos',
+    icon: Truck,
+    description: 'Unidades, vehículos y equipos',
+  },
 ]
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
@@ -50,7 +57,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         ? 'connections'
         : section === 'users'
           ? 'users'
-          : 'control'
+          : section === 'resources'
+            ? 'resources'
+            : 'control'
 
   const supabase = await createClient()
 
@@ -86,7 +95,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         {/* Izquierda: Logo */}
         <div className="relative flex items-center min-w-0 ml-8 gap-2">
           <Image
-            src="/zntinel-logo.png"
+            src="/zntinel-logo-optimized.png"
             alt="Zntinel"
             width={340}
             height={88}
@@ -197,6 +206,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           )}
           {activeSection === 'users' && (
             <UserRoleManager initialUsers={adminUsers} />
+          )}
+          {activeSection === 'resources' && (
+            <ResourceManager />
           )}
         </main>
       </div>

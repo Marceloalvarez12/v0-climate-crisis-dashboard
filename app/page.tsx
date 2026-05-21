@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { AIActivityLog } from "@/components/dashboard/ai-activity-log"
 import { AgentStatusPanel } from "@/components/dashboard/agent-status-panel"
@@ -11,7 +11,6 @@ import { BroadcastPanel } from "@/components/dashboard/broadcast-panel"
 import { DevPanel } from "@/components/dashboard/dev-panel"
 import { Map, Bot, Shield, BarChart2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { mutate } from "swr"
 import { useUserRole } from "@/hooks/use-user-role"
 
 type MobileTab = "map" | "agent" | "resources" | "analytics"
@@ -26,20 +25,6 @@ const MOBILE_TABS: { id: MobileTab; label: string; icon: React.ReactNode }[] = [
 export default function CrisisDashboard() {
   const [activeTab, setActiveTab] = useState<MobileTab>("map")
   const { isAdmin } = useUserRole()
-
-  // Revalidate all SWR data when user returns to the page
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        mutate("/api/incidentes")
-        mutate("/api/recursos")
-        mutate("/api/analytics")
-      }
-    }
-
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
-  }, [])
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background">
