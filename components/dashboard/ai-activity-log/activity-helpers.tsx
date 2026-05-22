@@ -1,5 +1,5 @@
 import {
-  Bot, Search, AlertTriangle, Database, Radio, CheckCircle2, Brain,
+  Bot, Search, AlertTriangle, Database, Radio, CheckCircle2, Brain, Send,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import type { ActivityItem } from "./types"
@@ -17,6 +17,7 @@ export function ActivityIcon({ type }: { type: ActivityItem["type"] }) {
     case "monitoring": return <Radio       className="h-3.5 w-3.5" />
     case "complete":   return <CheckCircle2 className="h-3.5 w-3.5" />
     case "reasoning":  return <Brain       className="h-3.5 w-3.5" />
+    case "dispatch":   return <Send        className="h-3.5 w-3.5" />
   }
 }
 
@@ -33,6 +34,7 @@ export function activityIconColor(type: ActivityItem["type"]): string {
     case "monitoring": return "text-accent"
     case "complete":   return "text-success"
     case "reasoning":  return "text-purple-400"
+    case "dispatch":   return "text-emerald-400"
   }
 }
 

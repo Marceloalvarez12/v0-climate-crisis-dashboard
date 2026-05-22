@@ -12,7 +12,8 @@ export async function GET() {
     .order("created_at", { ascending: false })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("[api/incidentes/GET] Error:", error.message)
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 
   return NextResponse.json(data)
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
   const parsed = IncidentCreateSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Datos inválidos", details: parsed.error.flatten() },
+      { error: "Datos inválidos" },
       { status: 400 }
     )
   }
@@ -62,7 +63,10 @@ export async function POST(request: Request) {
         .eq("id", existing.id)
         .select("id, tipo, severidad, ubicacion, latitud, longitud, personas_afectadas, fuente, fuente_detalles, estado, created_at, updated_at")
         .single()
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      if (error) {
+        console.error("[api/incidentes/POST] Error updating:", error.message)
+        return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
+      }
       return NextResponse.json(data)
     }
     return NextResponse.json(existing)
@@ -84,7 +88,8 @@ export async function POST(request: Request) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("[api/incidentes/POST] Error inserting:", error.message)
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 
   return NextResponse.json(data)
@@ -97,7 +102,7 @@ export async function PATCH(request: Request) {
   const parsed = IncidentPatchSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Datos inválidos", details: parsed.error.flatten() },
+      { error: "Datos inválidos" },
       { status: 400 }
     )
   }
@@ -112,7 +117,8 @@ export async function PATCH(request: Request) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("[api/incidentes/PATCH] Error:", error.message)
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 
   return NextResponse.json(data)

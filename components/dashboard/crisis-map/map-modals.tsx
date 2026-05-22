@@ -269,7 +269,12 @@ export function DeployModal({
               {!dbRecursos ? (
                 <p className="text-sm text-muted-foreground text-center py-4">Loading resources...</p>
               ) : resourceGroups.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No resources registered</p>
+                <div className="text-center py-4 space-y-2">
+                  <p className="text-sm text-muted-foreground">No resources available for deployment</p>
+                  <p className="text-xs text-zinc-600">
+                    All resources are currently busy or none are assigned to your operator.
+                  </p>
+                </div>
               ) : (
                 resourceGroups.map((group) => {
                   const available = group.availableIds.length

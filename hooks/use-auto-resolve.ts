@@ -3,20 +3,31 @@
 import { useEffect, useCallback } from "react"
 import { useSWRConfig } from "swr"
 
+interface AutoDispatchedResource {
+  recursoId: string
+  recursoNombre: string
+  recursoTipo: string
+  incidenteUbicacion: string
+  incidenteTipo: string
+}
+
 interface AutoResolveOptions {
   /** Callback para notificar incidentes cerrados automáticamente */
   onResolved?: (locations: string[]) => void
   /** Callback para notificar recursos liberados automáticamente */
   onResourcesReset?: (nombres: string[]) => void
+  /** Callback para notificar recursos auto-asignados */
+  onAutoDispatched?: (resources: AutoDispatchedResource[]) => void
   /** Intervalo de chequeo en ms. Default: 60 segundos */
   intervalMs?: number
 }
 
 /**
- * Ejecuta dos tareas de mantenimiento automático en un único intervalo:
+ * Ejecuta tres tareas de mantenimiento automático en un único intervalo:
  *
  * 1. Auto-resolve de incidentes: marca como "atendido" los incidentes activos
  *    con más de 5 minutos sin atención vía POST /api/incidentes/auto-resolve.
+ *    También auto-dispatcha el recurso más apropiado para cada incidente resuelto.
  *
  * 2. Auto-reset de recursos: detecta recursos en estado "dispatched" o "busy"
  *    con más de 3 minutos sin actualización (atascados por reinicio del servidor
@@ -24,22 +35,23 @@ interface AutoResolveOptions {
  *    POST /api/recursos/auto-reset.
  *
  * Ambas tareas corren en mount y luego cada `intervalMs` milisegundos.
+ *
+ * Security: Authentication is handled by Supabase session cookies via middleware.
  */
 export function useAutoResolve({
   onResolved,
   onResourcesReset,
+  onAutoDispatched,
   intervalMs = 60_000,
 }: AutoResolveOptions = {}) {
   const { mutate } = useSWRConfig()
 
   const check = useCallback(async () => {
-    const API_SECRET = process.env.NEXT_PUBLIC_API_SECRET ?? ""
-    const authHeaders: Record<string, string> = {}
-    if (API_SECRET) {
-      authHeaders["x-api-secret"] = API_SECRET
+    const authHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
     }
 
-    // ── 1. Auto-resolve incidentes ──────────────────────────────────────────
+    // ── 1. Auto-resolve incidentes + auto-dispatch ──────────────────────────
     try {
       const res = await fetch("/api/incidentes/auto-resolve", {
         method: "POST",
@@ -51,6 +63,10 @@ export function useAutoResolve({
           mutate("/api/incidentes")
           mutate("/api/analytics")
           onResolved?.(data.locations ?? [])
+        }
+        if (data.autoDispatched && data.autoDispatched.length > 0) {
+          mutate("/api/recursos")
+          onAutoDispatched?.(data.autoDispatched)
         }
       }
     } catch {
@@ -75,7 +91,7 @@ export function useAutoResolve({
     } catch {
       // Non-blocking
     }
-  }, [mutate, onResolved, onResourcesReset])
+  }, [mutate, onResolved, onResourcesReset, onAutoDispatched])
 
   useEffect(() => {
     // Ejecutar inmediatamente al montar (limpia recursos atascados desde el arranque)

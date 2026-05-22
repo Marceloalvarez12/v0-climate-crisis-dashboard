@@ -51,10 +51,18 @@ export function CrisisMap() {
   const [deploySuccess,      setDeploySuccess]      = useState(false)
   const [selectedCounts,     setSelectedCounts]     = useState<Record<string, number>>({})
   const [assignedResourceIds, setAssignedResourceIds] = useState<Set<string> | null>(null)
+  const [stableIncidents, setStableIncidents] = useState<Incident[]>([])
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const { incidents: dbIncidents, mutate: mutateIncidents } = useIncidents()
   const { data: dbRecursos, mutate: mutateRecursos }        = useResources()
+
+  // Keep incidents stable during revalidation to prevent markers from disappearing
+  useEffect(() => {
+    if (dbIncidents !== undefined && dbIncidents.length > 0) {
+      setStableIncidents(dbIncidents)
+    }
+  }, [dbIncidents])
 
   // Fetch operator's assigned resources on mount (with timeout to avoid blocking UI)
   useEffect(() => {
@@ -78,14 +86,17 @@ export function CrisisMap() {
     }
   }, [])
 
-  // All incidents come from the database (real + respawned)
-  const incidents: Incident[] = dbIncidents
+  // Use stable incidents that persist during revalidation
+  const incidents: Incident[] = stableIncidents
 
   const resourceGroups = useMemo(() => {
     if (!dbRecursos) return []
     const groups: Record<string, { tipo: string; ids: string[]; availableIds: string[] }> = {}
     for (const r of dbRecursos) {
-      if (assignedResourceIds !== null && !assignedResourceIds.has(r.id)) continue
+      // Si assignedResourceIds es un Set vacío (sin asignaciones), mostrar TODOS los recursos
+      // Si tiene IDs, filtrar solo los asignados al operador
+      const hasExplicitAssignments = assignedResourceIds !== null && assignedResourceIds.size > 0
+      if (hasExplicitAssignments && !assignedResourceIds.has(r.id)) continue
       if (!groups[r.tipo]) groups[r.tipo] = { tipo: r.tipo, ids: [], availableIds: [] }
       groups[r.tipo].ids.push(r.id)
       if (r.estado === "available") groups[r.tipo].availableIds.push(r.id)

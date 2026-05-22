@@ -13,7 +13,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Lógica de rate limiting y API_SECRET para rutas /api/*
+  // Rate limiting para TODOS los métodos (incluyendo GET)
   if (API_PATHS.some((p) => pathname.startsWith(p))) {
     const ip = request.headers.get("x-forwarded-for") ?? "unknown"
     const rateLimit = checkRateLimit(ip)
@@ -25,16 +25,55 @@ export async function middleware(request: NextRequest) {
       )
     }
 
-    // Solo requerir API_SECRET para métodos que modifican datos
+    // Auth check: session OR API_SECRET
     const method = request.method
-    if (method !== "GET" && process.env.API_SECRET) {
-      const authHeader = request.headers.get("x-api-secret")
-      if (authHeader !== process.env.API_SECRET) {
-        return NextResponse.json(
-          { error: "No autorizado" },
-          { status: 401 }
-        )
+    const requiresAuth = method !== "GET"
+
+    if (requiresAuth) {
+      // Primero intentar autenticar por sesión de Supabase
+      const response = NextResponse.next({
+        request: { headers: request.headers },
+      })
+
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            getAll() {
+              return request.cookies.getAll()
+            },
+            setAll(cookiesToSet) {
+              cookiesToSet.forEach(({ name, value }) =>
+                response.cookies.set(name, value)
+              )
+            },
+          },
+        }
+      )
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (session) {
+        // Usuario autenticado por sesión - permitir request
+        return response
       }
+
+      // Fallback: verificar API_SECRET para requests server-to-server
+      if (process.env.API_SECRET) {
+        const authHeader = request.headers.get("x-api-secret")
+        if (authHeader === process.env.API_SECRET) {
+          return NextResponse.next()
+        }
+      }
+
+      // Sin autenticación válida
+      return NextResponse.json(
+        { error: "No autorizado" },
+        { status: 401 }
+      )
     }
 
     return NextResponse.next()

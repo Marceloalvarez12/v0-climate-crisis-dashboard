@@ -7,7 +7,7 @@ export interface ReasoningStep {
 
 export interface ActivityItem {
   id:          string
-  type:        "extraction" | "analysis" | "alert" | "database" | "monitoring" | "complete" | "reasoning"
+  type:        "extraction" | "analysis" | "alert" | "database" | "monitoring" | "complete" | "reasoning" | "dispatch"
   message:     string
   timestamp:   Date
   isNew?:      boolean

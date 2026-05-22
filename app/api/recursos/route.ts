@@ -12,7 +12,8 @@ export async function GET() {
     .order("tipo", { ascending: true })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("[api/recursos/GET] Error:", error.message)
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 
   return NextResponse.json(data)
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
   const parsed = ResourceCreateSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Datos inválidos", details: parsed.error.flatten() },
+      { error: "Datos inválidos" },
       { status: 400 }
     )
   }
@@ -39,7 +40,8 @@ export async function POST(request: Request) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("[api/recursos/POST] Error:", error.message)
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 
   return NextResponse.json(data)
@@ -52,7 +54,7 @@ export async function PATCH(request: Request) {
   const parsed = ResourcePatchSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Datos inválidos", details: parsed.error.flatten() },
+      { error: "Datos inválidos" },
       { status: 400 }
     )
   }
@@ -73,7 +75,8 @@ export async function PATCH(request: Request) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("[api/recursos/PATCH] Error:", error.message)
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 
   return NextResponse.json(data)
@@ -97,7 +100,8 @@ export async function DELETE(request: Request) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("[api/recursos/DELETE] Error:", error.message)
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 
   return NextResponse.json(data)

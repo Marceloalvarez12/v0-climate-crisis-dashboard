@@ -19,6 +19,7 @@ import { ActivityIcon, activityIconColor, SeverityBadge } from "./ai-activity-lo
 import { ReasoningPanel, ConfidenceBadge } from "./ai-activity-log/reasoning-panel"
 import { SatelliteModal } from "./ai-activity-log/satellite-modal"
 import { AlertActions, ConfirmActionDialog } from "./ai-activity-log/alert-actions"
+import { getResourceLabel } from "@/lib/resource-matching"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -92,7 +93,7 @@ export function AIActivityLog() {
     setActivities((prev) => [...prev.slice(-20), makeActivity(template)])
   }, [])
 
-  // ── Auto-resolve incidentes viejos + auto-reset recursos atascados ───────
+  // ── Auto-resolve incidentes viejos + auto-reset recursos atascados + auto-dispatch ──
   useAutoResolve({
     onResolved: (locations) => {
       locations.forEach((loc) => {
@@ -103,6 +104,14 @@ export function AIActivityLog() {
       addActivity({
         type:    "complete",
         message: `Resources automatically released: ${nombres.join(", ")}`,
+      })
+    },
+    onAutoDispatched: (resources) => {
+      resources.forEach((r) => {
+        addActivity({
+          type:    "dispatch",
+          message: `Auto-dispatched ${getResourceLabel(r.recursoTipo)} ${r.recursoNombre} to ${r.incidenteUbicacion}`,
+        })
       })
     },
   })
@@ -118,10 +127,9 @@ export function AIActivityLog() {
 
     const respawn = async () => {
       try {
-        const API_SECRET = process.env.NEXT_PUBLIC_API_SECRET ?? ""
         const res  = await fetch("/api/incidentes/respawn", {
           method: "POST",
-          headers: API_SECRET ? { "x-api-secret": API_SECRET } : {},
+          headers: { "Content-Type": "application/json" },
         })
         const data = await res.json()
         if (data.respawned && data.incident) {
@@ -330,14 +338,16 @@ export function AIActivityLog() {
   return (
     <div className="flex h-full flex-col rounded-lg border border-border bg-card overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3 shrink-0">
-        <div className="relative">
-          <div className="h-2 w-2 rounded-full bg-success" />
-          <div className="absolute inset-0 h-2 w-2 rounded-full bg-success animate-pulse-ring" />
+      <div className="flex items-center justify-between border-b border-border px-4 py-3 shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <div className="h-2 w-2 rounded-full bg-success" />
+            <div className="absolute inset-0 h-2 w-2 rounded-full bg-success animate-pulse-ring" />
+          </div>
+          <h2 className="text-sm font-semibold text-foreground whitespace-nowrap">Live Agent</h2>
         </div>
-        <h2 className="text-sm font-semibold text-foreground">Live AI Agent</h2>
 
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
           {isAgentScanning && (
             <Badge variant="outline" className="text-[9px] h-5 px-1.5 border-purple-500/50 text-purple-400 bg-purple-500/10 gap-1">
               <Loader2 className="h-2.5 w-2.5 animate-spin" />

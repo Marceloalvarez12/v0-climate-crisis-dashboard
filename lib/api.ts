@@ -3,26 +3,21 @@
  *
  * Helpers para llamadas a la API interna.
  * Centralizar aquí evita repetir `fetch + headers + JSON.stringify` en cada componente.
+ *
+ * Security: Authentication is handled by Supabase session cookies via middleware.
+ * No API secrets are exposed to the client.
  */
 
 import type { DbIncident, DbResource } from "@/lib/types"
 
-const API_SECRET = process.env.NEXT_PUBLIC_API_SECRET ?? ""
-
-const authHeaders = (): Record<string, string> => {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  }
-  if (API_SECRET) {
-    headers["x-api-secret"] = API_SECRET
-  }
-  return headers
-}
+const authHeaders = (): Record<string, string> => ({
+  "Content-Type": "application/json",
+})
 
 // SWR fetcher genérico
 export const fetcher = (url: string) =>
   fetch(url, {
-    headers: API_SECRET ? { "x-api-secret": API_SECRET } : {},
+    headers: { "Content-Type": "application/json" },
   }).then((res) => {
     if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
     return res.json()
@@ -58,7 +53,7 @@ export async function createIncidente(body: Record<string, unknown>) {
 
 export async function fetchRecursos(): Promise<DbResource[]> {
   const res = await fetch("/api/recursos", {
-    headers: API_SECRET ? { "x-api-secret": API_SECRET } : {},
+    headers: { "Content-Type": "application/json" },
   })
   if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
   return res.json()

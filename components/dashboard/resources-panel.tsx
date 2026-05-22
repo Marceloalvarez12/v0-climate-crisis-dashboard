@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useResources } from "./crisis-map/use-map-data"
+import { getCurrentOperatorAssignments } from "@/app/admin/actions"
 
 interface Resource {
   id: string
@@ -61,11 +62,53 @@ const getStatusBadge = (status: Resource["status"]) => {
 }
 
 export function ResourcesPanel() {
-  // Fetch resources from shared hook (unified SWR cache)
   const { data: dbResources, error } = useResources()
-
-  // Transform database resources to local format
+  const [assignedResourceIds, setAssignedResourceIds] = useState<Set<string> | null>(null)
   const [dispatchedETAs, setDispatchedETAs] = useState<Record<string, string>>({})
+  const [showingError, setShowingError] = useState(false)
+
+  // Grace period: only show error after 8 seconds (covers SWR retries)
+  // SWR has errorRetryCount: 3 and errorRetryInterval: 5000, so 8s covers all retries
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setShowingError(true), 8000)
+      return () => clearTimeout(timer)
+    }
+    // Reset error state when data arrives
+    if (dbResources !== undefined) {
+      setShowingError(false)
+    }
+  }, [error, dbResources])
+
+  // Fetch operator's assigned resources on mount
+  useEffect(() => {
+    let cancelled = false
+    const timeout = setTimeout(() => {
+      if (!cancelled) setAssignedResourceIds(null)
+    }, 5000)
+
+    getCurrentOperatorAssignments()
+      .then((ids) => {
+        if (!cancelled) setAssignedResourceIds(new Set(ids))
+      })
+      .catch(() => {
+        if (!cancelled) setAssignedResourceIds(null)
+      })
+      .finally(() => clearTimeout(timeout))
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeout)
+    }
+  }, [])
+
+  // Filter resources by operator assignments (same logic as CrisisMap)
+  const filteredDbResources = useMemo(() => {
+    if (!dbResources) return []
+    const hasExplicitAssignments = assignedResourceIds !== null && assignedResourceIds.size > 0
+    if (!hasExplicitAssignments) return dbResources
+    return dbResources.filter((r: { id: string }) => assignedResourceIds.has(r.id))
+  }, [dbResources, assignedResourceIds])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -91,7 +134,7 @@ export function ResourcesPanel() {
     return () => clearInterval(interval)
   }, [])
 
-  const resources: Resource[] = dbResources ? dbResources.map((r: { id: string; tipo: string; nombre: string; estado: string; ubicacion: string }) => ({
+  const resources: Resource[] = filteredDbResources ? filteredDbResources.map((r: { id: string; tipo: string; nombre: string; estado: string; ubicacion: string }) => ({
     id: r.id,
     name: r.nombre,
     type: r.tipo as Resource["type"],
@@ -104,7 +147,20 @@ export function ResourcesPanel() {
   const enRouteCount = resources.filter(r => r.status === "dispatched").length
   const busyCount = resources.filter(r => r.status === "busy").length
 
-  if (error) {
+  // Show loading state during initial fetch and SWR retries (prevents flash of error)
+  if (!dbResources && !showingError) {
+    return (
+      <div className="flex h-full flex-col rounded-lg border border-border bg-card p-4">
+        <div className="flex items-center gap-2">
+          <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-xs text-muted-foreground">Loading resources...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Only show error after grace period expires (8 seconds)
+  if (showingError && !dbResources) {
     return (
       <div className="flex h-full flex-col rounded-lg border border-border bg-card p-4">
         <p className="text-sm text-muted-foreground">Error loading resources</p>
@@ -134,7 +190,11 @@ export function ResourcesPanel() {
       <ScrollArea className="flex-1 px-3 py-2">
         <div className="space-y-2">
           {resources.length === 0 ? (
-            <p className="text-xs text-muted-foreground p-2">Loading resources...</p>
+            <p className="text-xs text-muted-foreground p-2">
+              {assignedResourceIds !== null && assignedResourceIds.size === 0
+                ? "No resources assigned to you. Contact admin."
+                : "Loading resources..."}
+            </p>
           ) : (
             resources.map((resource) => (
               <div
