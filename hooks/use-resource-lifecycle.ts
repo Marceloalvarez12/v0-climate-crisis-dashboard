@@ -25,7 +25,7 @@ function loadPersistedStates(): PersistedResourceState[] {
     if (!raw) return []
     const parsed = JSON.parse(raw) as PersistedResourceState[]
     const now = Date.now()
-    return parsed.filter((s) => now - s.timestamp < RESOURCE_DISPATCHED_TO_BUSY_MS + RESOURCE_BUSY_TO_AVAILABLE_MS + 10000)
+    return parsed.filter((s) => now - s.timestamp < RESOURCE_DISPATCHED_TO_BUSY_MS + RESOURCE_BUSY_TO_AVAILABLE_MS + 20000)
   } catch {
     return []
   }
@@ -53,6 +53,7 @@ function removePersistedState(resourceId: string) {
 export async function dispatchResourceWithLifecycle(
   incidenteId?: string,
   resourceId?: string,
+  onStateChange?: () => void,
 ): Promise<{ recursoId: string | null; cleanup: () => void }> {
   let recursoId = resourceId
 
@@ -67,6 +68,7 @@ export async function dispatchResourceWithLifecycle(
     estado: "dispatched",
     incidente_id: incidenteId ?? null,
   })
+  onStateChange?.()
 
   addPersistedState({
     resourceId: recursoId,
@@ -77,6 +79,7 @@ export async function dispatchResourceWithLifecycle(
 
   const busyTimer = setTimeout(async () => {
     await patchRecurso(recursoId!, { estado: "busy" })
+    onStateChange?.()
 
     addPersistedState({
       resourceId: recursoId!,
@@ -87,6 +90,7 @@ export async function dispatchResourceWithLifecycle(
 
     const availableTimer = setTimeout(async () => {
       await patchRecurso(recursoId!, { estado: "available", incidente_id: null })
+      onStateChange?.()
       activeTimers.delete(recursoId!)
       removePersistedState(recursoId!)
     }, RESOURCE_BUSY_TO_AVAILABLE_MS)
@@ -119,18 +123,72 @@ export async function restoreResourceTimersOnMount() {
   for (const state of persisted) {
     if (activeTimers.has(state.resourceId)) continue
 
-    const elapsed = now - state.timestamp
+    try {
+      const recursos = await fetchRecursos()
+      const currentResource = recursos.find((r) => r.id === state.resourceId)
 
-    if (state.estado === "dispatched") {
-      const remainingToBusy = RESOURCE_DISPATCHED_TO_BUSY_MS - elapsed
+      if (!currentResource) {
+        removePersistedState(state.resourceId)
+        continue
+      }
 
-      if (remainingToBusy <= 0) {
-        await patchRecurso(state.resourceId, { estado: "busy" })
+      if (currentResource.estado === "available") {
+        removePersistedState(state.resourceId)
+        continue
+      }
 
-        const remainingToAvailable = RESOURCE_BUSY_TO_AVAILABLE_MS - Math.max(0, elapsed - RESOURCE_DISPATCHED_TO_BUSY_MS)
+      const elapsed = now - state.timestamp
+
+      if (state.estado === "dispatched") {
+        const remainingToBusy = RESOURCE_DISPATCHED_TO_BUSY_MS - elapsed
+
+        if (remainingToBusy <= 0) {
+          if (currentResource.estado !== "busy" && currentResource.estado !== "available") {
+            await patchRecurso(state.resourceId, { estado: "busy" })
+          }
+
+          const remainingToAvailable = RESOURCE_BUSY_TO_AVAILABLE_MS - Math.max(0, elapsed - RESOURCE_DISPATCHED_TO_BUSY_MS)
+
+          if (remainingToAvailable <= 0) {
+            if (currentResource.estado !== "available") {
+              await patchRecurso(state.resourceId, { estado: "available", incidente_id: null })
+            }
+            removePersistedState(state.resourceId)
+            continue
+          }
+
+          const availableTimer = setTimeout(async () => {
+            await patchRecurso(state.resourceId, { estado: "available", incidente_id: null })
+            activeTimers.delete(state.resourceId)
+            removePersistedState(state.resourceId)
+          }, remainingToAvailable)
+
+          activeTimers.set(state.resourceId, { busyTimer: setTimeout(() => {}, 0), availableTimer })
+        } else {
+          const busyTimer = setTimeout(async () => {
+            await patchRecurso(state.resourceId, { estado: "busy" })
+
+            const availableTimer = setTimeout(async () => {
+              await patchRecurso(state.resourceId, { estado: "available", incidente_id: null })
+              activeTimers.delete(state.resourceId)
+              removePersistedState(state.resourceId)
+            }, RESOURCE_BUSY_TO_AVAILABLE_MS)
+
+            const existing = activeTimers.get(state.resourceId)
+            if (existing) {
+              existing.availableTimer = availableTimer
+            }
+          }, remainingToBusy)
+
+          activeTimers.set(state.resourceId, { busyTimer, availableTimer: null })
+        }
+      } else if (state.estado === "busy") {
+        const remainingToAvailable = RESOURCE_BUSY_TO_AVAILABLE_MS - elapsed
 
         if (remainingToAvailable <= 0) {
-          await patchRecurso(state.resourceId, { estado: "available", incidente_id: null })
+          if (currentResource.estado !== "available") {
+            await patchRecurso(state.resourceId, { estado: "available", incidente_id: null })
+          }
           removePersistedState(state.resourceId)
           continue
         }
@@ -142,40 +200,10 @@ export async function restoreResourceTimersOnMount() {
         }, remainingToAvailable)
 
         activeTimers.set(state.resourceId, { busyTimer: setTimeout(() => {}, 0), availableTimer })
-      } else {
-        const busyTimer = setTimeout(async () => {
-          await patchRecurso(state.resourceId, { estado: "busy" })
-
-          const availableTimer = setTimeout(async () => {
-            await patchRecurso(state.resourceId, { estado: "available", incidente_id: null })
-            activeTimers.delete(state.resourceId)
-            removePersistedState(state.resourceId)
-          }, RESOURCE_BUSY_TO_AVAILABLE_MS)
-
-          const existing = activeTimers.get(state.resourceId)
-          if (existing) {
-            existing.availableTimer = availableTimer
-          }
-        }, remainingToBusy)
-
-        activeTimers.set(state.resourceId, { busyTimer, availableTimer: null })
       }
-    } else if (state.estado === "busy") {
-      const remainingToAvailable = RESOURCE_BUSY_TO_AVAILABLE_MS - elapsed
-
-      if (remainingToAvailable <= 0) {
-        await patchRecurso(state.resourceId, { estado: "available", incidente_id: null })
-        removePersistedState(state.resourceId)
-        continue
-      }
-
-      const availableTimer = setTimeout(async () => {
-        await patchRecurso(state.resourceId, { estado: "available", incidente_id: null })
-        activeTimers.delete(state.resourceId)
-        removePersistedState(state.resourceId)
-      }, remainingToAvailable)
-
-      activeTimers.set(state.resourceId, { busyTimer: setTimeout(() => {}, 0), availableTimer })
+    } catch (err) {
+      console.error(`[restoreResourceTimersOnMount] Error restoring timers for ${state.resourceId}:`, err)
+      removePersistedState(state.resourceId)
     }
   }
 }

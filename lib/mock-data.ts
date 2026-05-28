@@ -340,7 +340,7 @@ export const STATIC_RESPONSE_TIME_MIN = 18
  * Compartidos por use-resource-lifecycle.ts y use-simulation-loop.ts
  * para garantizar consistencia entre despacho manual y simulacion.
  *
- * Flujo: available → dispatched (15s) → busy (20s) → available
+ * Flujo: available → dispatched (20s) → busy (20s) → available
  * Calibrados para un simulador tipo "demo en vivo": lo suficiente para
  * ver la animación sin aburrir al usuario.
  */

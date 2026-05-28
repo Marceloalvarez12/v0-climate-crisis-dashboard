@@ -15,9 +15,9 @@ import { NextResponse } from "next/server"
 import { getResources, updateResource } from "@/lib/mock-db"
 
 /** Maximum minutes tolerated in a non-available state before forcing reset.
- * The complete dispatch→busy→available cycle takes 35s, so 45s gives enough
- * margin without leaving stuck resources visible for too long. */
-const STALE_THRESHOLD_MINUTES = 45 / 60
+ * The complete dispatch→busy→available cycle takes 40s (20s+20s), so 60s gives
+ * enough margin without leaving stuck resources visible for too long. */
+const STALE_THRESHOLD_MINUTES = 60 / 60
 
 export async function POST() {
   try {

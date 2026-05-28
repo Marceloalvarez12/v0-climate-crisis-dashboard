@@ -145,7 +145,7 @@ export function CrisisMap() {
 
       // Despachar recursos con ciclo de vida
       await Promise.all(
-        idsToDispatch.map((id) => dispatchResourceWithLifecycle(incidenteId, id).catch((err) => console.error("[CrisisMap] Error dispatching resource:", err)))
+        idsToDispatch.map((id) => dispatchResourceWithLifecycle(incidenteId, id, () => mutateRecursos()).catch((err) => console.error("[CrisisMap] Error dispatching resource:", err)))
       )
       await mutateRecursos()
     }

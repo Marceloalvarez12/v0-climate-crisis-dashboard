@@ -294,8 +294,9 @@ export function AIActivityLog() {
           }, 90_000)
         }
 
-        await dispatchResourceWithLifecycle(incidente?.id)
-        mutate("/api/recursos")
+        await dispatchResourceWithLifecycle(incidente?.id, undefined, () => {
+          mutate("/api/recursos")
+        })
         mutate("/api/incidentes")
         mutate("/api/analytics")
       } catch (err) {

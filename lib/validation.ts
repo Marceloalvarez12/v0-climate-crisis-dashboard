@@ -13,16 +13,16 @@ export const IncidentCreateSchema = z.object({
 })
 
 export const IncidentPatchSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   estado: z.enum(["activo", "atendido"]).optional(),
   severidad: z.enum(["critical", "high", "medium", "low"]).optional(),
   personas_afectadas: z.number().int().min(0).optional(),
 })
 
 export const ResourcePatchSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1),
   estado: z.enum(["available", "dispatched", "busy"]).optional(),
-  incidente_id: z.string().uuid().nullable().optional(),
+  incidente_id: z.string().nullable().optional(),
 })
 
 export const AgentLogSchema = z.object({
