@@ -18,33 +18,33 @@ interface AdminPageProps {
 const SECTIONS = [
   {
     id: 'control',
-    label: 'Control del Agente',
+    label: 'Agent Control',
     icon: Shield,
-    description: 'Interruptor de emergencia y modo autónomo',
+    description: 'Emergency switch and autonomous mode',
   },
   {
     id: 'thresholds',
-    label: 'Calibración de Umbrales',
+    label: 'Threshold Calibration',
     icon: Sliders,
-    description: 'Sensibilidad y parámetros de la IA',
+    description: 'AI sensitivity and parameters',
   },
   {
     id: 'connections',
-    label: 'Conexiones API',
+    label: 'API Connections',
     icon: LinkIcon,
-    description: 'Estado de servicios y credenciales',
+    description: 'Service status and credentials',
   },
   {
     id: 'users',
-    label: 'Usuarios y Roles',
+    label: 'Users & Roles',
     icon: Users,
-    description: 'Gestión de personal y accesos',
+    description: 'Staff and access management',
   },
   {
     id: 'resources',
-    label: 'Gestión de Recursos',
+    label: 'Resource Management',
     icon: Truck,
-    description: 'Unidades, vehículos y equipos',
+    description: 'Units, vehicles and equipment',
   },
 ]
 
@@ -120,7 +120,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
           {/* Reloj */}
           <div className="hidden rounded-md border border-zinc-800 bg-zinc-900/50 px-2.5 py-1.5 font-mono text-xs text-zinc-400 md:block">
-            {new Date().toLocaleString("es-AR", {
+            {new Date().toLocaleString("en-US", {
               day: "2-digit",
               month: "2-digit",
               year: "numeric",
@@ -138,7 +138,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 {profile.nombre}
               </span>
               <span className="text-[9px] text-zinc-500 leading-tight">
-                Administrador
+                Administrator
               </span>
             </div>
           </div>
@@ -148,7 +148,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <button
               type="submit"
               className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:text-red-400"
-              title="Cerrar sesión"
+              title="Log out"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -161,7 +161,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         {/* Sidebar */}
         <aside className="w-64 shrink-0 border-r border-zinc-800 bg-zinc-950/30 min-h-[calc(100vh-57px)] p-4">
           <p className="text-[10px] font-mono tracking-widest uppercase text-zinc-600 mb-4 px-3">
-            Configuración
+            Settings
           </p>
           <nav className="space-y-1">
             {SECTIONS.map((s) => {

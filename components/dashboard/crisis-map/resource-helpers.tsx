@@ -1,9 +1,5 @@
 import { Ambulance, Shield, Truck, Wind, AlertTriangle } from "lucide-react"
 
-// ---------------------------------------------------------------------------
-// Icono de recurso según tipo
-// ---------------------------------------------------------------------------
-
 export function RecursoIcon({ tipo }: { tipo: string }) {
   switch (tipo) {
     case "ambulance":   return <Ambulance     className="h-5 w-5" />
@@ -15,17 +11,15 @@ export function RecursoIcon({ tipo }: { tipo: string }) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Etiqueta en español según tipo de recurso
-// ---------------------------------------------------------------------------
-
 export function tipoRecursoLabel(tipo: string): string {
   switch (tipo) {
-    case "ambulance":   return "SAME Ambulances"
-    case "firefighter": return "Volunteer Firefighters"
-    case "police":      return "Provincial Police"
-    case "boat":        return "Rescue Boats"
-    case "helicopter":  return "Helicopters"
+    case "ambulance":   return "Ambulancias SAME"
+    case "firefighter": return "Bomberos"
+    case "police":      return "Policía Provincial"
+    case "boat":        return "Lanchas de Rescate"
+    case "helicopter":  return "Helicópteros"
+    case "medical":     return "Equipos Médicos"
+    case "shelter":     return "Albergues"
     default:            return tipo
   }
 }

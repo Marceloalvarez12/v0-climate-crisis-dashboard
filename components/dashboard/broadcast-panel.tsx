@@ -85,7 +85,7 @@ export function BroadcastPanel() {
     setGeneratingPdf(true)
     setShowPdfDialog(true)
 
-    // Simular generacion de PDF
+    // Simulate PDF generation
     await new Promise(resolve => setTimeout(resolve, 2500))
     
     setGeneratingPdf(false)
@@ -161,7 +161,7 @@ export function BroadcastPanel() {
                 ) : (
                   <>
                     <Send className="h-3 w-3 mr-1" />
-                    Enviar
+                    Send
                   </>
                 )}
               </Button>

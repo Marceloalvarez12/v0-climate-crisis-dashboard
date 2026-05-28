@@ -1,13 +1,14 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { ResourcePatchSchema, ResourceCreateSchema } from "@/lib/validation"
+import { calculateEstado } from "@/lib/resource-helpers"
 
 export async function GET() {
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from("recursos")
-    .select("id, tipo, nombre, numero, estado, ubicacion")
+    .select("id, tipo, nombre, cantidad, cantidad_disponible, estado, ubicacion")
     .neq("estado", "retired")
     .order("tipo", { ascending: true })
 
@@ -16,7 +17,13 @@ export async function GET() {
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 
-  return NextResponse.json(data)
+  const resources = (data || []).map((r) => ({
+    ...r,
+    cantidad: r.cantidad || 1,
+    cantidad_disponible: r.cantidad_disponible ?? (r.cantidad || 1),
+  }))
+
+  return NextResponse.json(resources)
 }
 
 export async function POST(request: Request) {
@@ -31,12 +38,21 @@ export async function POST(request: Request) {
     )
   }
 
-  const { nombre, tipo, numero, ubicacion } = parsed.data
+  const { nombre, tipo, cantidad, ubicacion } = parsed.data
+
+  const cantidadDisp = cantidad
 
   const { data, error } = await supabase
     .from("recursos")
-    .insert({ nombre, tipo, numero, ubicacion, estado: "available" })
-    .select("id, tipo, nombre, numero, estado, ubicacion")
+    .insert({
+      nombre,
+      tipo,
+      cantidad,
+      cantidad_disponible: cantidadDisp,
+      ubicacion,
+      estado: "available",
+    })
+    .select("id, tipo, nombre, cantidad, cantidad_disponible, estado, ubicacion")
     .single()
 
   if (error) {
@@ -44,7 +60,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 
-  return NextResponse.json(data)
+  return NextResponse.json({
+    ...data,
+    cantidad: data.cantidad || 1,
+    cantidad_disponible: data.cantidad_disponible ?? (data.cantidad || 1),
+  })
 }
 
 export async function PATCH(request: Request) {
@@ -59,19 +79,34 @@ export async function PATCH(request: Request) {
     )
   }
 
-  const { id, estado, incidente_id } = parsed.data
+  const { id, estado, incidente_id, cantidad_disponible } = parsed.data
 
   const updatePayload: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   }
-  if (estado !== undefined) updatePayload.estado = estado
+
+  if (cantidad_disponible !== undefined) {
+    const { data: current } = await supabase
+      .from("recursos")
+      .select("cantidad")
+      .eq("id", id)
+      .single()
+
+    const cantidad = current?.cantidad || 1
+    const newDisp = Math.max(0, Math.min(cantidad, cantidad_disponible))
+    updatePayload.cantidad_disponible = newDisp
+    updatePayload.estado = calculateEstado(cantidad, newDisp)
+  } else if (estado !== undefined) {
+    updatePayload.estado = estado
+  }
+
   if (incidente_id !== undefined) updatePayload.incidente_id = incidente_id
 
   const { data, error } = await supabase
     .from("recursos")
     .update(updatePayload)
     .eq("id", id)
-    .select("id, tipo, nombre, numero, estado, ubicacion, updated_at, incidente_id")
+    .select("id, tipo, nombre, cantidad, cantidad_disponible, estado, ubicacion, updated_at, incidente_id")
     .single()
 
   if (error) {
@@ -79,7 +114,11 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 
-  return NextResponse.json(data)
+  return NextResponse.json({
+    ...data,
+    cantidad: data.cantidad || 1,
+    cantidad_disponible: data.cantidad_disponible ?? (data.cantidad || 1),
+  })
 }
 
 export async function DELETE(request: Request) {
@@ -91,12 +130,11 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "ID de recurso requerido" }, { status: 400 })
   }
 
-  // Soft delete: cambiar estado a retired
   const { data, error } = await supabase
     .from("recursos")
     .update({ estado: "retired", updated_at: new Date().toISOString() })
     .eq("id", id)
-    .select("id, tipo, nombre, numero, estado, ubicacion")
+    .select("id, tipo, nombre, cantidad, cantidad_disponible, estado, ubicacion")
     .single()
 
   if (error) {
@@ -104,5 +142,9 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
   }
 
-  return NextResponse.json(data)
+  return NextResponse.json({
+    ...data,
+    cantidad: data.cantidad || 1,
+    cantidad_disponible: data.cantidad_disponible ?? (data.cantidad || 1),
+  })
 }

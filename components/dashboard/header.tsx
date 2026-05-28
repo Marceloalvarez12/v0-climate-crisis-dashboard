@@ -59,13 +59,13 @@ export function DashboardHeader() {
               isAutonomous ? 'text-emerald-400' : 'text-red-400'
             }`}
           >
-            {isAutonomous ? 'IA Autónoma Activa' : 'Modo Manual Activo'}
+            {isAutonomous ? 'Active Autonomous AI' : 'Manual Mode Active'}
           </span>
         </div>
 
         {currentTime && (
           <div className="hidden rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 font-mono text-xs text-foreground md:block">
-            {currentTime.toLocaleString("es-AR", {
+            {currentTime.toLocaleString("en-US", {
               day: "2-digit",
               month: "2-digit",
               year: "numeric",
@@ -83,7 +83,7 @@ export function DashboardHeader() {
             className="hidden items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground sm:flex transition-colors"
           >
             <LayoutDashboard className="h-3.5 w-3.5" />
-            Panel de Admin
+            Admin Panel
           </Link>
         )}
 
@@ -96,7 +96,7 @@ export function DashboardHeader() {
                 {profile.nombre}
               </span>
               <span className="text-[9px] text-muted-foreground leading-tight">
-                {isAdmin ? 'Administrador' : 'Operador de Turno'}
+                {isAdmin ? 'Administrator' : 'Operator on Duty'}
               </span>
             </div>
           </div>
@@ -107,7 +107,7 @@ export function DashboardHeader() {
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-muted-foreground hover:text-red-400"
-            title="Cerrar sesión"
+            title="Log out"
           >
             <LogOut className="h-4 w-4" />
           </Button>

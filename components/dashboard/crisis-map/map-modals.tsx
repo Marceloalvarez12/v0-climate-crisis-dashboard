@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { Users, Clock, MapPinned, Twitter, Send, Phone, CheckCircle2 } from "lucide-react"
+import { Users, Clock, MapPinned, Twitter, Send, Phone, CheckCircle2, ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -22,11 +22,8 @@ import {
   incidentSeverityLabel,
 } from "./incident-helpers"
 import { RecursoIcon, tipoRecursoLabel } from "./resource-helpers"
+import { getTipoLabel, groupResourcesByTypeAndBase } from "@/lib/resource-helpers"
 import type { Incident, DbResource } from "@/lib/types"
-
-// ---------------------------------------------------------------------------
-// Modal de detalle del incidente
-// ---------------------------------------------------------------------------
 
 interface IncidentDetailModalProps {
   incident:        Incident | null
@@ -61,7 +58,6 @@ export function IncidentDetailModal({
             </DialogHeader>
 
             <div className="space-y-4">
-              {/* Stats */}
               <div className="grid grid-cols-3 gap-3">
                 <StatCard icon={<Users className="h-4 w-4 mx-auto mb-1 text-primary" />} label="Affected">
                   {incident.affectedPeople.toLocaleString()}
@@ -74,7 +70,6 @@ export function IncidentDetailModal({
                 </StatCard>
               </div>
 
-              {/* Source details */}
               <div className="rounded-lg border border-border bg-secondary/30 p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <SourceIcon source={incident.source} />
@@ -90,7 +85,6 @@ export function IncidentDetailModal({
                 <SourceDetail incident={incident} />
               </div>
 
-              {/* Actions */}
               <div className="flex gap-2">
                 <Button className="flex-1" variant="default" onClick={onOpenDeploy}>
                   <Send className="h-4 w-4 mr-2" />
@@ -109,7 +103,6 @@ export function IncidentDetailModal({
   )
 }
 
-// Small reusable stat card
 function StatCard({ icon, label, children, small }: { icon: React.ReactNode; label: string; children: React.ReactNode; small?: boolean }) {
   return (
     <div className="rounded-lg bg-secondary/50 p-3 text-center">
@@ -120,7 +113,6 @@ function StatCard({ icon, label, children, small }: { icon: React.ReactNode; lab
   )
 }
 
-// Detalle según la fuente del incidente
 function SourceDetail({ incident }: { incident: Incident }) {
   const { source, sourceDetails: sd } = incident
 
@@ -172,7 +164,6 @@ function SourceDetail({ incident }: { incident: Incident }) {
     )
   }
 
-  // camera
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">Location: {sd.cameraLocation}</p>
@@ -196,14 +187,12 @@ function SourceDetail({ incident }: { incident: Incident }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Modal de despliegue de recursos
-// ---------------------------------------------------------------------------
-
 interface ResourceGroup {
   tipo:         string
-  ids:          string[]
-  availableIds: string[]
+  ubicacion:    string
+  resources:    DbResource[]
+  totalCantidad: number
+  totalDisponible: number
 }
 
 interface DeployModalProps {
@@ -216,7 +205,7 @@ interface DeployModalProps {
   deploySuccess:   boolean
   onClose:         () => void
   onDeploy:        () => void
-  onAdjustCount:   (tipo: string, delta: number, max: number) => void
+  onAdjustCount:   (key: string, delta: number, max: number) => void
 }
 
 export function DeployModal({
@@ -236,6 +225,15 @@ export function DeployModal({
     [selectedCounts],
   )
 
+  const groupedByTipo = useMemo(() => {
+    const groups: Record<string, ResourceGroup[]> = {}
+    for (const group of resourceGroups) {
+      if (!groups[group.tipo]) groups[group.tipo] = []
+      groups[group.tipo].push(group)
+    }
+    return groups
+  }, [resourceGroups])
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md z-[9999]">
@@ -248,7 +246,7 @@ export function DeployModal({
             Select the resources to send to{" "}
             <span className="font-medium text-foreground">{incident?.location}</span>
             <span className="block mt-1 text-[10px] text-emerald-400/70 font-mono tracking-wider">
-              SOLO RECURSOS ASIGNADOS A TU OPERADOR
+              ONLY RESOURCES ASSIGNED TO YOUR OPERATOR
             </span>
           </DialogDescription>
         </DialogHeader>
@@ -265,7 +263,7 @@ export function DeployModal({
           </div>
         ) : (
           <>
-            <div className="space-y-2 py-2">
+            <div className="space-y-3 py-2 max-h-[50vh] overflow-y-auto">
               {!dbRecursos ? (
                 <p className="text-sm text-muted-foreground text-center py-4">Loading resources...</p>
               ) : resourceGroups.length === 0 ? (
@@ -276,64 +274,74 @@ export function DeployModal({
                   </p>
                 </div>
               ) : (
-                resourceGroups.map((group) => {
-                  const available = group.availableIds.length
-                  const busy      = group.ids.length - available
-                  const count     = selectedCounts[group.tipo] ?? 0
-                  const noStock   = available === 0
+                Object.entries(groupedByTipo).map(([tipo, groups]) => {
+                  const totalAvailable = groups.reduce((sum, g) => sum + g.totalDisponible, 0)
+                  const totalAll = groups.reduce((sum, g) => sum + g.totalCantidad, 0)
 
                   return (
-                    <div
-                      key={group.tipo}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg border p-3 transition-all",
-                        noStock  ? "border-border bg-secondary/20 opacity-60"
-                        : count > 0 ? "border-primary bg-primary/10"
-                        :            "border-border hover:bg-secondary/30",
-                      )}
-                    >
-                      {/* Icon */}
-                      <div className={cn(
-                        "h-10 w-10 shrink-0 rounded-full flex items-center justify-center",
-                        noStock  ? "bg-secondary/50 text-muted-foreground"
-                        : count > 0 ? "bg-primary text-primary-foreground"
-                        :            "bg-secondary text-foreground",
-                      )}>
-                        <RecursoIcon tipo={group.tipo} />
-                      </div>
-
-                      {/* Label */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground">{tipoRecursoLabel(group.tipo)}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className={cn("text-xs font-semibold", available > 0 ? "text-success" : "text-muted-foreground")}>
-                            {available} available{available !== 1 ? "s" : ""}
-                          </span>
-                          {busy > 0 && (
-                            <span className="text-[10px] text-muted-foreground">
-                              · {busy} busy{busy !== 1 ? "" : ""}
-                            </span>
-                          )}
+                    <div key={tipo} className="rounded-lg border border-border">
+                      <div className="flex items-center gap-3 px-3 py-2.5 bg-secondary/20">
+                        <div className="h-8 w-8 shrink-0 rounded-full bg-secondary flex items-center justify-center">
+                          <RecursoIcon tipo={tipo} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground">{getTipoLabel(tipo)}</p>
+                          <p className={cn("text-[10px] font-semibold", totalAvailable > 0 ? "text-success" : "text-muted-foreground")}>
+                            {totalAvailable} available{totalAvailable !== 1 ? "s" : ""}
+                          </p>
                         </div>
                       </div>
 
-                      {/* Counter */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => onAdjustCount(group.tipo, -1, available)}
-                          disabled={count === 0}
-                          className="h-7 w-7 rounded-md border border-border flex items-center justify-center text-sm hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        >
-                          −
-                        </button>
-                        <span className="w-5 text-center text-sm font-bold tabular-nums text-foreground">{count}</span>
-                        <button
-                          onClick={() => onAdjustCount(group.tipo, +1, available)}
-                          disabled={count >= available}
-                          className="h-7 w-7 rounded-md border border-border flex items-center justify-center text-sm hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        >
-                          +
-                        </button>
+                      <div className="divide-y divide-border">
+                        {groups.map((group) => {
+                          const groupKey = `${group.tipo}|${group.ubicacion}`
+                          const available = group.totalDisponible
+                          const busy = group.totalCantidad - available
+                          const count = selectedCounts[groupKey] ?? 0
+                          const noStock = available === 0
+
+                          return (
+                            <div
+                              key={groupKey}
+                              className={cn(
+                                "flex items-center gap-3 px-3 py-2 transition-all",
+                                noStock ? "opacity-50" : "",
+                              )}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-foreground">{group.ubicacion}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className={cn("text-[10px] font-semibold", available > 0 ? "text-success" : "text-muted-foreground")}>
+                                    {available}/{group.totalCantidad}
+                                  </span>
+                                  {busy > 0 && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      · {busy} busy
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  onClick={() => onAdjustCount(groupKey, -1, available)}
+                                  disabled={count === 0}
+                                  className="h-6 w-6 rounded-md border border-border flex items-center justify-center text-xs hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                >
+                                  −
+                                </button>
+                                <span className="w-5 text-center text-xs font-bold tabular-nums text-foreground">{count}</span>
+                                <button
+                                  onClick={() => onAdjustCount(groupKey, +1, available)}
+                                  disabled={count >= available}
+                                  className="h-6 w-6 rounded-md border border-border flex items-center justify-center text-xs hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
                   )
@@ -341,14 +349,16 @@ export function DeployModal({
               )}
             </div>
 
-            {/* Summary */}
             <div className="rounded-lg bg-secondary/50 p-3">
               <p className="text-xs text-muted-foreground mb-1">Deployment summary</p>
               <p className="text-sm font-medium text-foreground">
                 {totalSelected > 0
                   ? Object.entries(selectedCounts)
                       .filter(([, v]) => v > 0)
-                      .map(([tipo, v]) => `${v} ${tipoRecursoLabel(tipo)}`)
+                      .map(([key, v]) => {
+                        const [tipo] = key.split("|")
+                        return `${v} ${getTipoLabel(tipo)}`
+                      })
                       .join(", ")
                   : "No resources selected"}
               </p>

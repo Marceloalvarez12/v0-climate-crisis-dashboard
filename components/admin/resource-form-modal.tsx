@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { X, Check, Loader2, Truck, Ambulance, Shield, Ship, Plane } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { generateResourceName, getTipoLabel } from "@/lib/resource-helpers"
 
 const RESOURCE_TYPES = [
   { id: "ambulance", label: "Ambulancia", icon: <Ambulance className="h-4 w-4" /> },
@@ -18,13 +19,13 @@ interface ResourceFormModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
-  editResource?: { id: string; nombre: string; tipo: string; numero: string; estado: string; ubicacion: string } | null
+  editResource?: { id: string; nombre: string; tipo: string; cantidad: number; estado: string; ubicacion: string } | null
 }
 
 export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: ResourceFormModalProps) {
   const [nombre, setNombre] = useState("")
   const [tipo, setTipo] = useState("ambulance")
-  const [numero, setNumero] = useState("")
+  const [cantidad, setCantidad] = useState(1)
   const [ubicacion, setUbicacion] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -33,16 +34,23 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
     if (editResource) {
       setNombre(editResource.nombre)
       setTipo(editResource.tipo)
-      setNumero(editResource.numero || "")
+      setCantidad(editResource.cantidad || 1)
       setUbicacion(editResource.ubicacion)
     } else {
       setNombre("")
       setTipo("ambulance")
-      setNumero("")
+      setCantidad(1)
       setUbicacion("")
     }
     setError("")
   }, [editResource, isOpen])
+
+  useEffect(() => {
+    if (!editResource && tipo && ubicacion) {
+      const suggestedName = generateResourceName(tipo, ubicacion)
+      setNombre(suggestedName)
+    }
+  }, [tipo, ubicacion, editResource])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,8 +62,8 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
       const method = editResource ? "PATCH" : "POST"
 
       const body = editResource
-        ? { id: editResource.id, nombre, tipo, numero, ubicacion }
-        : { nombre, tipo, numero, ubicacion }
+        ? { id: editResource.id, nombre, tipo, cantidad, ubicacion }
+        : { nombre, tipo, cantidad, ubicacion }
 
       const res = await fetch(url, {
         method,
@@ -83,7 +91,6 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative z-10 w-full max-w-md mx-4 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/50 overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400">
@@ -107,7 +114,6 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           {error && (
             <div className="px-3 py-2 rounded-lg border border-red-500/20 bg-red-500/5">
@@ -115,7 +121,6 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
             </div>
           )}
 
-          {/* Nombre */}
           <div>
             <label className="block text-[10px] font-mono tracking-widest text-zinc-500 uppercase mb-1.5">
               Nombre del Recurso
@@ -124,28 +129,43 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
               type="text"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ej: Ambulancia SAME"
+              placeholder="Ej: Ambulancias SAME - Base Central"
               required
               className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
             />
           </div>
 
-          {/* Número */}
           <div>
             <label className="block text-[10px] font-mono tracking-widest text-zinc-500 uppercase mb-1.5">
-              Número de Unidad
+              Cantidad de Unidades
             </label>
-            <input
-              type="text"
-              value={numero}
-              onChange={(e) => setNumero(e.target.value)}
-              placeholder="Ej: 107, 02, A-3"
-              required
-              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 font-mono"
-            />
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setCantidad(Math.max(1, cantidad - 1))}
+                className="h-9 w-9 rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 flex items-center justify-center transition-colors"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                value={cantidad}
+                onChange={(e) => setCantidad(Math.max(1, parseInt(e.target.value) || 1))}
+                min="1"
+                required
+                className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-300 text-center font-mono focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
+              />
+              <button
+                type="button"
+                onClick={() => setCantidad(cantidad + 1)}
+                className="h-9 w-9 rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 flex items-center justify-center transition-colors"
+              >
+                +
+              </button>
+            </div>
+            <p className="text-[10px] text-zinc-600 mt-1">Total de unidades en este grupo</p>
           </div>
 
-          {/* Tipo */}
           <div>
             <label className="block text-[10px] font-mono tracking-widest text-zinc-500 uppercase mb-1.5">
               Tipo de Recurso
@@ -170,7 +190,6 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
             </div>
           </div>
 
-          {/* Ubicación */}
           <div>
             <label className="block text-[10px] font-mono tracking-widest text-zinc-500 uppercase mb-1.5">
               Base / Ubicación
@@ -185,14 +204,12 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
             />
           </div>
 
-          {/* Estado info */}
           <div className="px-3 py-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
             <p className="text-[11px] font-mono text-emerald-400">
               Estado: Disponible (por defecto)
             </p>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3 pt-2">
             <button
               type="button"

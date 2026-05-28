@@ -38,7 +38,7 @@ export default async function LoginPage({
             <div className="inline-flex items-center gap-2 mb-6">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               <span className="text-[10px] font-mono tracking-[0.3em] text-green-400/60 uppercase">
-                Sistema Activo
+                System Active
               </span>
             </div>
             <div className="flex justify-center mb-6">
@@ -55,8 +55,8 @@ export default async function LoginPage({
             <div className="mb-6 px-4 py-3 rounded-lg border border-red-500/20 bg-red-500/[0.05] animate-pulse">
               <p className="text-[11px] font-mono text-red-400/90 text-center tracking-wider">
                 {error === 'suspended'
-                  ? '// ACCESO DENEGADO — Cuenta suspendida'
-                  : '// ACCESO DENEGADO — Credenciales inválidas'}
+                  ? '// ACCESS DENIED — Account suspended'
+                  : '// ACCESS DENIED — Invalid credentials'}
               </p>
             </div>
           )}
@@ -69,7 +69,7 @@ export default async function LoginPage({
                 htmlFor="email"
                 className="block text-[10px] font-mono tracking-widest text-cyan-400/40 uppercase mb-2"
               >
-                Identificación // Email
+                Identification // Email
               </label>
               <input
                 id="email"
@@ -88,7 +88,7 @@ export default async function LoginPage({
                 htmlFor="password"
                 className="block text-[10px] font-mono tracking-widest text-cyan-400/40 uppercase mb-2"
               >
-                Clave de Acceso // Password
+                Access Key // Password
               </label>
               <input
                 id="password"
@@ -106,7 +106,7 @@ export default async function LoginPage({
               type="submit"
               className="w-full py-3.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-sm tracking-wider hover:from-cyan-400 hover:to-blue-500 active:scale-[0.98] transition-all duration-200 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-400/30"
             >
-              INICIAR SESIÓN
+              START SESSION
             </button>
           </form>
 

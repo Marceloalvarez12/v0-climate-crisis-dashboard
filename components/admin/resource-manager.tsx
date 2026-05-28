@@ -12,16 +12,20 @@ import {
   Trash2,
   Search,
   Loader2,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ResourceFormModal } from "./resource-form-modal"
 import { toast } from "sonner"
+import { groupResourcesByTypeAndBase, getTipoLabel, calculateEstado } from "@/lib/resource-helpers"
 
 interface DbResource {
   id: string
   tipo: string
   nombre: string
-  numero: string
+  cantidad: number
+  cantidad_disponible: number
   estado: string
   ubicacion: string
 }
@@ -36,16 +40,6 @@ const RESOURCE_ICONS: Record<string, React.ReactNode> = {
   police: <Shield className="h-4 w-4" />,
 }
 
-const RESOURCE_LABELS: Record<string, string> = {
-  ambulance: "Ambulancia",
-  firefighter: "Bomberos",
-  helicopter: "Helicóptero",
-  boat: "Lancha",
-  shelter: "Albergue",
-  medical: "Médico",
-  police: "Policía",
-}
-
 const STATUS_STYLES: Record<string, string> = {
   available: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   dispatched: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
@@ -54,10 +48,10 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  available: "Disponible",
-  dispatched: "En Camino",
-  busy: "Ocupado",
-  retired: "Retirado",
+  available: "Available",
+  dispatched: "En Route",
+  busy: "Occupied",
+  retired: "Retired",
 }
 
 export function ResourceManager() {
@@ -67,6 +61,7 @@ export function ResourceManager() {
   const [showFormModal, setShowFormModal] = useState(false)
   const [editResource, setEditResource] = useState<DbResource | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   const loadResources = useCallback(async () => {
     setLoading(true)
@@ -87,24 +82,41 @@ export function ResourceManager() {
     loadResources()
   }, [loadResources])
 
-  const filteredResources = resources.filter(
-    (r) =>
-      r.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.ubicacion.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (RESOURCE_LABELS[r.tipo] || "").toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const groupedResources = groupResourcesByTypeAndBase(resources)
+
+  const filteredGroups = groupedResources.filter((group) => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      getTipoLabel(group.tipo).toLowerCase().includes(query) ||
+      group.ubicacion.toLowerCase().includes(query) ||
+      group.resources.some((r) => r.nombre.toLowerCase().includes(query))
+    )
+  })
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
+  }
 
   const handleDelete = async (resource: DbResource) => {
-    if (!confirm(`¿Retirar "${resource.nombre}" del sistema?`)) return
+    if (!confirm(`Remove "${resource.nombre}" from system?`)) return
 
     setDeletingId(resource.id)
     try {
       const res = await fetch(`/api/recursos?id=${resource.id}`, { method: "DELETE" })
       if (res.ok) {
         setResources((prev) => prev.filter((r) => r.id !== resource.id))
-        toast.success("Recurso retirado del sistema")
+        toast.success("Resource removed from system")
       } else {
-        toast.error("Error al retirar recurso")
+        toast.error("Error removing resource")
       }
     } catch {
       toast.error("Error de conexión")
@@ -117,7 +129,7 @@ export function ResourceManager() {
     setShowFormModal(false)
     setEditResource(null)
     loadResources()
-    toast.success(editResource ? "Recurso actualizado" : "Recurso creado")
+    toast.success(editResource ? "Resource updated" : "Resource created")
   }
 
   const openEdit = (resource: DbResource) => {
@@ -131,47 +143,45 @@ export function ResourceManager() {
   }
 
   const stats = {
-    total: resources.length,
-    available: resources.filter((r) => r.estado === "available").length,
-    dispatched: resources.filter((r) => r.estado === "dispatched").length,
-    busy: resources.filter((r) => r.estado === "busy").length,
+    total: resources.reduce((sum, r) => sum + (r.cantidad || 1), 0),
+    available: resources.reduce((sum, r) => sum + (r.cantidad_disponible ?? (r.cantidad || 1)), 0),
+    dispatched: resources.filter((r) => r.estado === "dispatched").reduce((sum, r) => sum + ((r.cantidad || 1) - (r.cantidad_disponible ?? (r.cantidad || 1))), 0),
+    busy: resources.filter((r) => r.estado === "busy").reduce((sum, r) => sum + (r.cantidad || 1), 0),
   }
 
   return (
     <div className="flex flex-col h-full rounded-xl border border-zinc-800 bg-zinc-950/80 backdrop-blur-sm overflow-hidden">
-      {/* Header */}
       <div className="flex items-center gap-3 border-b border-zinc-800 px-6 py-4">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10">
           <Truck className="h-5 w-5 text-orange-400" />
         </div>
         <div>
           <h2 className="text-sm font-semibold text-zinc-100">
-            Gestión de Recursos
+            Resource Management
           </h2>
           <p className="text-[11px] text-zinc-500">
-            Administrar unidades, vehículos y equipos del sistema
+            Manage units, vehicles and equipment
           </p>
         </div>
       </div>
 
-      {/* Stats bar */}
       <div className="flex items-center gap-4 px-6 py-3 border-b border-zinc-800/50 bg-zinc-900/20">
         <div className="flex items-center gap-1.5">
           <div className="h-2 w-2 rounded-full bg-emerald-500" />
           <span className="text-[10px] text-zinc-500 font-mono">
-            {stats.available} disponibles
+            {stats.available} available
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="h-2 w-2 rounded-full bg-yellow-500" />
           <span className="text-[10px] text-zinc-500 font-mono">
-            {stats.dispatched} en camino
+            {stats.dispatched} en route
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="h-2 w-2 rounded-full bg-red-500" />
           <span className="text-[10px] text-zinc-500 font-mono">
-            {stats.busy} ocupados
+            {stats.busy} occupied
           </span>
         </div>
         <span className="text-[10px] text-zinc-600 font-mono ml-auto">
@@ -179,7 +189,6 @@ export function ResourceManager() {
         </span>
       </div>
 
-      {/* Controls */}
       <div className="flex items-center gap-3 px-6 py-4 border-b border-zinc-800/50">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600" />
@@ -196,137 +205,168 @@ export function ResourceManager() {
           className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500 active:scale-95 transition-all"
         >
           <Plus className="h-4 w-4" />
-          Añadir Recurso
+          Add Resource
         </button>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-y-auto overflow-x-auto">
+      <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[300px] gap-3">
             <Loader2 className="h-6 w-6 animate-spin text-orange-400" />
-            <p className="text-xs text-zinc-500">Cargando recursos...</p>
+            <p className="text-xs text-zinc-500">Loading resources...</p>
           </div>
-        ) : filteredResources.length === 0 ? (
+        ) : filteredGroups.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-zinc-600">
             <Truck className="h-8 w-8 mb-2" />
-            <p className="text-sm">No se encontraron recursos</p>
+            <p className="text-sm">No resources found</p>
             <p className="text-xs mt-1">
-              {searchQuery ? "Intenta con otro término de búsqueda" : "Añade un nuevo recurso para comenzar"}
+              {searchQuery ? "Try a different search term" : "Add a new resource to get started"}
             </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="sticky top-0 z-10 border-b border-zinc-800/50 bg-zinc-950">
-                <th className="text-left px-6 py-3 text-[10px] font-mono tracking-widest uppercase text-zinc-600">
-                  Recurso
-                </th>
-                <th className="text-left px-6 py-3 text-[10px] font-mono tracking-widest uppercase text-zinc-600">
-                  N°
-                </th>
-                <th className="text-left px-6 py-3 text-[10px] font-mono tracking-widest uppercase text-zinc-600">
-                  Tipo
-                </th>
-                <th className="text-left px-6 py-3 text-[10px] font-mono tracking-widest uppercase text-zinc-600">
-                  Estado
-                </th>
-                <th className="text-left px-6 py-3 text-[10px] font-mono tracking-widest uppercase text-zinc-600">
-                  Base
-                </th>
-                <th className="text-right px-6 py-3 text-[10px] font-mono tracking-widest uppercase text-zinc-600">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800/30">
-              {filteredResources.map((resource) => (
-                <tr key={resource.id} className="transition-colors hover:bg-zinc-900/20">
-                  {/* Recurso */}
-                  <td className="px-6 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-800 text-zinc-400">
-                        {RESOURCE_ICONS[resource.tipo] || <Truck className="h-4 w-4" />}
+          <div className="px-6 py-4 space-y-4">
+            {filteredGroups.map((group) => {
+              const groupKey = `${group.tipo}|${group.ubicacion}`
+              const isExpanded = expandedGroups.has(groupKey)
+              const disponible = group.totalDisponible
+              const total = group.totalCantidad
+              const percent = total > 0 ? (disponible / total) * 100 : 0
+
+              return (
+                <div key={groupKey} className="rounded-lg border border-zinc-800 bg-zinc-900/30 overflow-hidden">
+                  <button
+                    onClick={() => toggleGroup(groupKey)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/30 transition-colors"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-800 text-zinc-400 shrink-0">
+                      {RESOURCE_ICONS[group.tipo] || <Truck className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-zinc-200">
+                          {getTipoLabel(group.tipo)}
+                        </span>
+                        <span className="text-xs text-zinc-500">—</span>
+                        <span className="text-sm text-zinc-400">
+                          {group.ubicacion}
+                        </span>
                       </div>
-                      <span className="font-medium text-zinc-200">
-                        {resource.nombre}
-                      </span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={cn(
+                          "text-xs font-mono font-semibold",
+                          disponible === total ? "text-emerald-400" :
+                          disponible > 0 ? "text-yellow-400" : "text-red-400"
+                        )}>
+                          {disponible}/{total}
+                        </span>
+                        <span className="text-[10px] text-zinc-600">
+                          {disponible === total ? "available" :
+                           disponible > 0 ? `${total - disponible} in use` : "all occupied"}
+                        </span>
+                      </div>
                     </div>
-                  </td>
-
-                  {/* Número */}
-                  <td className="px-6 py-3">
-                    <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded">
-                      {resource.numero || "-"}
-                    </span>
-                  </td>
-
-                  {/* Tipo */}
-                  <td className="px-6 py-3">
-                    <span className="text-xs text-zinc-400">
-                      {RESOURCE_LABELS[resource.tipo] || resource.tipo}
-                    </span>
-                  </td>
-
-                  {/* Estado */}
-                  <td className="px-6 py-3">
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
-                        STATUS_STYLES[resource.estado] || STATUS_STYLES.available
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="w-16 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-all",
+                            percent >= 80 ? "bg-emerald-500" :
+                            percent >= 40 ? "bg-yellow-500" : "bg-red-500"
+                          )}
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-zinc-500" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-zinc-500" />
                       )}
-                    >
-                      <div
-                        className={cn(
-                          "h-1.5 w-1.5 rounded-full",
-                          resource.estado === "available" ? "bg-emerald-400" :
-                          resource.estado === "dispatched" ? "bg-yellow-400" :
-                          resource.estado === "busy" ? "bg-red-400" : "bg-zinc-500"
-                        )}
-                      />
-                      {STATUS_LABELS[resource.estado] || resource.estado}
-                    </span>
-                  </td>
-
-                  {/* Base */}
-                  <td className="px-6 py-3">
-                    <span className="text-xs text-zinc-500 font-mono">
-                      {resource.ubicacion}
-                    </span>
-                  </td>
-
-                  {/* Acciones */}
-                  <td className="px-6 py-3">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => openEdit(resource)}
-                        className="p-1.5 rounded-lg text-zinc-500 hover:text-cyan-400 hover:bg-zinc-800 transition-colors"
-                        title="Editar"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(resource)}
-                        disabled={deletingId === resource.id}
-                        className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors disabled:opacity-30"
-                        title="Retirar"
-                      >
-                        {deletingId === resource.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </button>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-zinc-800/50">
+                      {group.resources.map((resource) => {
+                        const rDisponible = resource.cantidad_disponible ?? (resource.cantidad || 1)
+                        const rTotal = resource.cantidad || 1
+                        const rPercent = rTotal > 0 ? (rDisponible / rTotal) * 100 : 0
+                        const rEstado = calculateEstado(rTotal, rDisponible)
+
+                        return (
+                          <div key={resource.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-zinc-800/30 last:border-b-0 hover:bg-zinc-800/20 transition-colors">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-zinc-300 truncate">
+                                  {resource.nombre}
+                                </span>
+                                <span className={cn(
+                                  "text-[10px] font-mono font-semibold",
+                                  rDisponible === rTotal ? "text-emerald-400" :
+                                  rDisponible > 0 ? "text-yellow-400" : "text-red-400"
+                                )}>
+                                  {rDisponible}/{rTotal}
+                                </span>
+                              </div>
+                              <div className="w-24 h-1 bg-zinc-800 rounded-full overflow-hidden mt-1">
+                                <div
+                                  className={cn(
+                                    "h-full rounded-full transition-all",
+                                    rPercent >= 80 ? "bg-emerald-500" :
+                                    rPercent >= 40 ? "bg-yellow-500" : "bg-red-500"
+                                  )}
+                                  style={{ width: `${rPercent}%` }}
+                                />
+                              </div>
+                            </div>
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium shrink-0",
+                                STATUS_STYLES[rEstado] || STATUS_STYLES.available
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "h-1 w-1 rounded-full",
+                                  rEstado === "available" ? "bg-emerald-400" :
+                                  rEstado === "dispatched" ? "bg-yellow-400" :
+                                  rEstado === "busy" ? "bg-red-400" : "bg-zinc-500"
+                                )}
+                              />
+                              {STATUS_LABELS[rEstado] || rEstado}
+                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => openEdit(resource)}
+                                className="p-1 rounded text-zinc-500 hover:text-cyan-400 hover:bg-zinc-800 transition-colors"
+                                title="Edit"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(resource)}
+                                disabled={deletingId === resource.id}
+                                className="p-1 rounded text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors disabled:opacity-30"
+                                title="Remove"
+                              >
+                                {deletingId === resource.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
 
-      {/* Form Modal */}
       <ResourceFormModal
         isOpen={showFormModal}
         onClose={() => {

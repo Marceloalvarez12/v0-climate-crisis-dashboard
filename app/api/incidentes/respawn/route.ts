@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { buildRespawnIncident, RESPAWN_ZONES } from "@/lib/mock-data"
 
-const MAX_ACTIVE_INCIDENTS = 6
+const MAX_ACTIVE_INCIDENTS = 15
 
 /**
  * POST /api/incidentes/respawn
@@ -50,13 +50,15 @@ export async function POST() {
   // Generate completely new mock data, but we will IGNORE the location part
   const newIncidentData = buildRespawnIncident()
   
-  // Extraemos solo lo que queremos actualizar (tipo, severidad, fuente, detalles)
+  // Extraemos solo lo que queremos actualizar (tipo, severidad, fuente, detalles, coordenadas)
   const updatePayload = {
     estado: "activo",
     tipo: newIncidentData.tipo,
     severidad: newIncidentData.severidad,
     fuente: newIncidentData.fuente,
     fuente_detalles: newIncidentData.fuente_detalles,
+    latitud: newIncidentData.latitud,
+    longitud: newIncidentData.longitud,
     updated_at: new Date().toISOString()
   }
 

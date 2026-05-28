@@ -1,23 +1,25 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { Truck, Users, Plane, Ship, Building2, HeartPulse } from "lucide-react"
+import { Truck, Users, Plane, Ship, Building2, HeartPulse, ChevronDown, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useResources } from "./crisis-map/use-map-data"
 import { getCurrentOperatorAssignments } from "@/app/admin/actions"
+import { getTipoLabel, groupResourcesByTypeAndBase } from "@/lib/resource-helpers"
 
-interface Resource {
+interface DbResource {
   id: string
-  name: string
-  type: "ambulance" | "firefighter" | "helicopter" | "boat" | "shelter" | "medical" | "police"
-  status: "available" | "dispatched" | "busy"
-  location: string
-  eta?: string
+  tipo: string
+  nombre: string
+  cantidad: number
+  cantidad_disponible: number
+  estado: string
+  ubicacion: string
 }
 
-const getIcon = (type: Resource["type"]) => {
+const getIcon = (type: string) => {
   switch (type) {
     case "ambulance":
       return <Truck className="h-4 w-4" />
@@ -38,49 +40,22 @@ const getIcon = (type: Resource["type"]) => {
   }
 }
 
-const getStatusBadge = (status: Resource["status"]) => {
-  switch (status) {
-    case "available":
-      return (
-        <Badge variant="outline" className="border-success/50 bg-success/10 text-success text-[10px] px-1.5 py-0">
-          Available
-        </Badge>
-      )
-    case "dispatched":
-      return (
-        <Badge variant="outline" className="border-accent/50 bg-accent/10 text-accent text-[10px] px-1.5 py-0">
-          En route
-        </Badge>
-      )
-    case "busy":
-      return (
-        <Badge variant="outline" className="border-primary/50 bg-primary/10 text-primary text-[10px] px-1.5 py-0">
-          Busy
-        </Badge>
-      )
-  }
-}
-
 export function ResourcesPanel() {
   const { data: dbResources, error } = useResources()
   const [assignedResourceIds, setAssignedResourceIds] = useState<Set<string> | null>(null)
-  const [dispatchedETAs, setDispatchedETAs] = useState<Record<string, string>>({})
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [showingError, setShowingError] = useState(false)
 
-  // Grace period: only show error after 8 seconds (covers SWR retries)
-  // SWR has errorRetryCount: 3 and errorRetryInterval: 5000, so 8s covers all retries
   useEffect(() => {
     if (error) {
       const timer = setTimeout(() => setShowingError(true), 8000)
       return () => clearTimeout(timer)
     }
-    // Reset error state when data arrives
     if (dbResources !== undefined) {
       setShowingError(false)
     }
   }, [error, dbResources])
 
-  // Fetch operator's assigned resources on mount
   useEffect(() => {
     let cancelled = false
     const timeout = setTimeout(() => {
@@ -102,7 +77,6 @@ export function ResourcesPanel() {
     }
   }, [])
 
-  // Filter resources by operator assignments (same logic as CrisisMap)
   const filteredDbResources = useMemo(() => {
     if (!dbResources) return []
     const hasExplicitAssignments = assignedResourceIds !== null && assignedResourceIds.size > 0
@@ -110,44 +84,35 @@ export function ResourcesPanel() {
     return dbResources.filter((r: { id: string }) => assignedResourceIds.has(r.id))
   }, [dbResources, assignedResourceIds])
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDispatchedETAs((prev) => {
-        const next = { ...prev }
-        let changed = false
-        Object.keys(next).forEach((id) => {
-          const match = next[id].match(/(\d+)/)
-          if (match) {
-            const val = parseInt(match[1])
-            if (val > 1) {
-              next[id] = `${val - 1} min`
-              changed = true
-            } else {
-              delete next[id]
-              changed = true
-            }
-          }
-        })
-        return changed ? next : prev
-      })
-    }, 60000)
-    return () => clearInterval(interval)
-  }, [])
+  const groupedResources = useMemo(() => {
+    if (!filteredDbResources || filteredDbResources.length === 0) return []
+    return groupResourcesByTypeAndBase(filteredDbResources as DbResource[])
+  }, [filteredDbResources])
 
-  const resources: Resource[] = filteredDbResources ? filteredDbResources.map((r: { id: string; tipo: string; nombre: string; estado: string; ubicacion: string }) => ({
-    id: r.id,
-    name: r.nombre,
-    type: r.tipo as Resource["type"],
-    status: r.estado as Resource["status"],
-    location: r.ubicacion || "Central Base",
-    eta: r.estado === "dispatched" ? (dispatchedETAs[r.id] ?? `${Math.floor(Math.random() * 15) + 5} min`) : undefined
-  })) : []
+  const stats = useMemo(() => {
+    if (!filteredDbResources) return { available: 0, dispatched: 0, busy: 0 }
+    const available = filteredDbResources.reduce((sum: number, r: DbResource) => sum + (r.cantidad_disponible ?? (r.cantidad || 1)), 0)
+    const dispatched = filteredDbResources.reduce((sum: number, r: DbResource) => {
+      const total = r.cantidad || 1
+      const disp = r.cantidad_disponible ?? total
+      return sum + (total - disp)
+    }, 0)
+    const busy = filteredDbResources.filter((r: DbResource) => r.estado === "busy").reduce((sum: number, r: DbResource) => sum + (r.cantidad || 1), 0)
+    return { available, dispatched, busy }
+  }, [filteredDbResources])
 
-  const availableCount = resources.filter(r => r.status === "available").length
-  const enRouteCount = resources.filter(r => r.status === "dispatched").length
-  const busyCount = resources.filter(r => r.status === "busy").length
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupKey)) {
+        next.delete(groupKey)
+      } else {
+        next.add(groupKey)
+      }
+      return next
+    })
+  }
 
-  // Show loading state during initial fetch and SWR retries (prevents flash of error)
   if (!dbResources && !showingError) {
     return (
       <div className="flex h-full flex-col rounded-lg border border-border bg-card p-4">
@@ -159,7 +124,6 @@ export function ResourcesPanel() {
     )
   }
 
-  // Only show error after grace period expires (8 seconds)
   if (showingError && !dbResources) {
     return (
       <div className="flex h-full flex-col rounded-lg border border-border bg-card p-4">
@@ -175,60 +139,120 @@ export function ResourcesPanel() {
         <div className="mt-2 flex items-center gap-3 text-[10px]">
           <span className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-success" />
-            <span className="text-muted-foreground">{availableCount}</span>
+            <span className="text-muted-foreground">{stats.available}</span>
           </span>
           <span className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-accent" />
-            <span className="text-muted-foreground">{enRouteCount}</span>
+            <span className="text-muted-foreground">{stats.dispatched}</span>
           </span>
           <span className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-primary" />
-            <span className="text-muted-foreground">{busyCount}</span>
+            <span className="text-muted-foreground">{stats.busy}</span>
           </span>
         </div>
       </div>
       <ScrollArea className="flex-1 px-3 py-2">
         <div className="space-y-2">
-          {resources.length === 0 ? (
+          {groupedResources.length === 0 ? (
             <p className="text-xs text-muted-foreground p-2">
               {assignedResourceIds !== null && assignedResourceIds.size === 0
                 ? "No resources assigned to you. Contact admin."
                 : "Loading resources..."}
             </p>
           ) : (
-            resources.map((resource) => (
-              <div
-                key={resource.id}
-                className={cn(
-                  "rounded-md border border-border bg-secondary/30 p-2.5 transition-all",
-                  resource.status === "dispatched" && "border-accent/30",
-                  resource.status === "busy" && "border-primary/30"
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
+            groupedResources.map((group) => {
+              const groupKey = `${group.tipo}|${group.ubicacion}`
+              const isExpanded = expandedGroups.has(groupKey)
+              const disponible = group.totalDisponible
+              const total = group.totalCantidad
+              const percent = total > 0 ? (disponible / total) * 100 : 0
+
+              return (
+                <div key={groupKey} className="rounded-md border border-border bg-secondary/30 overflow-hidden">
+                  <button
+                    onClick={() => toggleGroup(groupKey)}
+                    className="w-full flex items-center gap-2 p-2.5 hover:bg-secondary/50 transition-colors"
+                  >
                     <div className={cn(
                       "shrink-0",
-                      resource.status === "available" && "text-success",
-                      resource.status === "dispatched" && "text-accent",
-                      resource.status === "busy" && "text-primary"
+                      disponible === total ? "text-success" :
+                      disponible > 0 ? "text-accent" : "text-primary"
                     )}>
-                      {getIcon(resource.type)}
+                      {getIcon(group.tipo)}
                     </div>
-                    <div>
-                      <p className="text-xs font-medium text-foreground">{resource.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{resource.location}</p>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="text-xs font-medium text-foreground">{getTipoLabel(group.tipo)}</p>
+                      <p className="text-[10px] text-muted-foreground">{group.ubicacion}</p>
                     </div>
-                  </div>
-                  {getStatusBadge(resource.status)}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={cn(
+                        "text-xs font-mono font-semibold",
+                        disponible === total ? "text-success" :
+                        disponible > 0 ? "text-accent" : "text-primary"
+                      )}>
+                        {disponible}/{total}
+                      </span>
+                      <div className="w-12 h-1 bg-background/50 rounded-full overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-all",
+                            percent >= 80 ? "bg-success" :
+                            percent >= 40 ? "bg-accent" : "bg-primary"
+                          )}
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                      {isExpanded ? (
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-border px-2.5 py-2 bg-secondary/20">
+                      {group.resources.map((resource) => {
+                        const rDisponible = resource.cantidad_disponible ?? (resource.cantidad || 1)
+                        const rTotal = resource.cantidad || 1
+                        const rPercent = rTotal > 0 ? (rDisponible / rTotal) * 100 : 0
+
+                        const units = []
+                        for (let i = 1; i <= rTotal; i++) {
+                          const unitNum = String(i).padStart(2, "0")
+                          const unitName = `${resource.nombre} ${unitNum}`
+                          const isAvailable = i <= rDisponible
+
+                          units.push(
+                            <div key={`${resource.id}-${i}`} className="flex items-center justify-between py-1.5 px-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">
+                                  {unitName}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className={cn(
+                                  "border-[10px] px-1.5 py-0 text-[9px]",
+                                  isAvailable ? "border-success/50 bg-success/10 text-success" : "border-primary/50 bg-primary/10 text-primary"
+                                )}>
+                                  {isAvailable ? "Available" : "Busy"}
+                                </Badge>
+                              </div>
+                            </div>
+                          )
+                        }
+
+                        return (
+                          <div key={resource.id} className="space-y-0.5">
+                            {units}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
-                {resource.eta && (
-                  <p className="mt-1.5 text-[10px] font-mono text-accent">
-                    ETA: {resource.eta}
-                  </p>
-                )}
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       </ScrollArea>

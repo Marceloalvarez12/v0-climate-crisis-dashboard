@@ -48,12 +48,12 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
     setError("")
 
     if (!nombre.trim() || !email.trim() || !password.trim()) {
-      setError("Todos los campos son obligatorios")
+      setError("All fields are required")
       return
     }
 
     if (password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres")
+      setError("Password must be at least 6 characters")
       return
     }
 
@@ -67,7 +67,7 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
         onSuccess()
       }, 1500)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al crear operador")
+      setError(err instanceof Error ? err.message : "Error creating operator")
       setSaving(false)
     }
   }
@@ -86,7 +86,7 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
               <UserPlus className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-zinc-100">Añadir Nuevo Operador</h2>
+              <h2 className="text-sm font-semibold text-zinc-100">Add New Operator</h2>
               <p className="text-[10px] text-zinc-500 font-mono tracking-wider">ROL: OPERADOR</p>
             </div>
           </div>
@@ -109,21 +109,21 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
                   <CheckCircle2 className="h-8 w-8 text-emerald-400" />
                 </div>
               </div>
-              <p className="text-sm font-semibold text-emerald-400">Operador Creado</p>
-              <p className="text-[10px] text-zinc-500 font-mono">Redirigiendo...</p>
+              <p className="text-sm font-semibold text-emerald-400">Operator Created</p>
+              <p className="text-[10px] text-zinc-500 font-mono">Redirecting...</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Nombre */}
               <div>
                 <label className="block text-[10px] font-mono tracking-widest text-zinc-500 uppercase mb-1.5">
-                  Nombre Completo
+                  Full Name
                 </label>
                 <input
                   type="text"
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
-                  placeholder="Ej: Juan Pérez"
+                  placeholder="Ex: Juan Pérez"
                   className="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition-all"
                   disabled={saving}
                 />
@@ -147,14 +147,14 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
               {/* Password */}
               <div>
                 <label className="block text-[10px] font-mono tracking-widest text-zinc-500 uppercase mb-1.5">
-                  Contraseña Temporal
+                  Temporary Password
                 </label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder="Min 6 characters"
                     className="w-full px-3 py-2.5 pr-10 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition-all"
                     disabled={saving}
                   />
@@ -182,7 +182,7 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
               {/* Info */}
               <div className="px-3 py-2 rounded-lg border border-zinc-800 bg-zinc-900/30">
                 <p className="text-[10px] text-zinc-500">
-                  <span className="text-cyan-400 font-medium">Nota:</span> El operador podrá iniciar sesión inmediatamente con estas credenciales. Se recomienda cambiar la contraseña en el primer acceso.
+                  <span className="text-cyan-400 font-medium">Note:</span> The operator will be able to log in immediately with these credentials. It is recommended to change the password on first access.
                 </p>
               </div>
             </form>
@@ -198,7 +198,7 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
               disabled={saving}
               className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800/50 px-4 py-2.5 text-xs font-medium text-zinc-300 hover:bg-zinc-700/50 transition-all disabled:opacity-30"
             >
-              Cancelar
+              Cancel
             </button>
             <button
               type="button"
@@ -214,12 +214,12 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
               {saving ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Creando...
+                  Creating...
                 </>
               ) : (
                 <>
                   <UserPlus className="h-3.5 w-3.5" />
-                  Crear Operador
+                  Create Operator
                 </>
               )}
             </button>

@@ -2,14 +2,14 @@ import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { getRecommendedResourceType, getResourceLabel } from "@/lib/resource-matching"
 
-// Auto-resolve any active incident older than 5 minutes AND auto-dispatch the best matching resource.
+// Auto-resolve any active incident older than 10 minutes AND auto-dispatch the best matching resource.
 // Called periodically from the client (ai-activity-log useEffect) every 60 seconds.
 export async function POST() {
   const supabase = await createClient()
 
-  const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString()
 
-  // Find active incidents whose updated_at is older than 5 minutes.
+  // Find active incidents whose updated_at is older than 10 minutes.
   const { data: stale, error: fetchError } = await supabase
     .from("incidentes")
     .select("id, ubicacion, tipo, fuente")

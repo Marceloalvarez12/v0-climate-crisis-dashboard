@@ -122,7 +122,7 @@ export function AIActivityLog() {
   // Reactivates a random resolved incident (estado atendido → activo, updated_at = now)
   // so the dashboard stays populated even when the Gemini API quota is exhausted.
   useEffect(() => {
-    const RESPAWN_INTERVAL_MS = 90_000  // 90 segundos
+    const RESPAWN_INTERVAL_MS = 45_000  // 45 segundos
     let mutateTimer: NodeJS.Timeout | null = null
 
     const respawn = async () => {
@@ -307,10 +307,10 @@ export function AIActivityLog() {
           setTimeout(async () => {
             const respawn = buildRespawnIncident({ tipo: incidente.tipo, fuente: incidente.fuente })
             await createIncidente(respawn)
-          }, 90_000)
+          }, 45_000)
         }
 
-        await dispatchResourceWithLifecycle(incidente?.id)
+        await dispatchResourceWithLifecycle("", 1, incidente?.id)
         mutate("/api/recursos")
         mutate("/api/incidentes")
         mutate("/api/analytics")

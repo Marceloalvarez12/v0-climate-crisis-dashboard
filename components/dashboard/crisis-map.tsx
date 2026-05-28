@@ -6,22 +6,19 @@ import { MapPin, Layers } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { dispatchResourceWithLifecycle, restoreResourceTimersOnMount } from "@/hooks/use-resource-lifecycle"
 import { buildRespawnIncident } from "@/lib/mock-data"
-import { patchIncidente, createIncidente } from "@/lib/api"
+import { patchIncidente, createIncidente, patchRecursoBatch } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
-import type { Incident, IncidentSource, DbIncident } from "@/lib/types"
+import type { Incident, IncidentSource, DbIncident, DbResource } from "@/lib/types"
 import { useIncidents, useResources } from "./crisis-map/use-map-data"
 import { IncidentIcon, SourceIcon, severityColorClass, sourceLabel, incidentTypeLabel } from "./crisis-map/incident-helpers"
 import { createLeafletIcon, LEAFLET_DARK_STYLES } from "./crisis-map/leaflet-icon"
 import { IncidentDetailModal, DeployModal } from "./crisis-map/map-modals"
 import { getCurrentOperatorAssignments } from "@/app/admin/actions"
-
-// ---------------------------------------------------------------------------
-// Lazy-load de componentes Leaflet (sólo cliente)
-// ---------------------------------------------------------------------------
+import { groupResourcesByTypeAndBase } from "@/lib/resource-helpers"
 
 const MapContainer = dynamic(() => import("react-leaflet").then((m) => m.MapContainer), { ssr: false })
 const TileLayer    = dynamic(() => import("react-leaflet").then((m) => m.TileLayer),    { ssr: false })
@@ -37,10 +34,6 @@ const SEVERITY_LEGENDS = [
   { label: "Low",      color: "bg-success" },
 ]
 
-// ---------------------------------------------------------------------------
-// Componente
-// ---------------------------------------------------------------------------
-
 export function CrisisMap() {
   const [isClient, setIsClient] = useState(false)
   const [leafletCssLoaded, setLeafletCssLoaded] = useState(false)
@@ -53,18 +46,15 @@ export function CrisisMap() {
   const [assignedResourceIds, setAssignedResourceIds] = useState<Set<string> | null>(null)
   const [stableIncidents, setStableIncidents] = useState<Incident[]>([])
 
-  // ── Data ──────────────────────────────────────────────────────────────────
   const { incidents: dbIncidents, mutate: mutateIncidents } = useIncidents()
   const { data: dbRecursos, mutate: mutateRecursos }        = useResources()
 
-  // Keep incidents stable during revalidation to prevent markers from disappearing
   useEffect(() => {
     if (dbIncidents !== undefined && dbIncidents.length > 0) {
       setStableIncidents(dbIncidents)
     }
   }, [dbIncidents])
 
-  // Fetch operator's assigned resources on mount (with timeout to avoid blocking UI)
   useEffect(() => {
     let cancelled = false
     const timeout = setTimeout(() => {
@@ -86,22 +76,16 @@ export function CrisisMap() {
     }
   }, [])
 
-  // Use stable incidents that persist during revalidation
   const incidents: Incident[] = stableIncidents
 
   const resourceGroups = useMemo(() => {
     if (!dbRecursos) return []
-    const groups: Record<string, { tipo: string; ids: string[]; availableIds: string[] }> = {}
-    for (const r of dbRecursos) {
-      // Si assignedResourceIds es un Set vacío (sin asignaciones), mostrar TODOS los recursos
-      // Si tiene IDs, filtrar solo los asignados al operador
-      const hasExplicitAssignments = assignedResourceIds !== null && assignedResourceIds.size > 0
-      if (hasExplicitAssignments && !assignedResourceIds.has(r.id)) continue
-      if (!groups[r.tipo]) groups[r.tipo] = { tipo: r.tipo, ids: [], availableIds: [] }
-      groups[r.tipo].ids.push(r.id)
-      if (r.estado === "available") groups[r.tipo].availableIds.push(r.id)
-    }
-    return Object.values(groups)
+    const filtered = assignedResourceIds !== null && assignedResourceIds.size > 0
+      ? dbRecursos.filter((r: DbResource) => assignedResourceIds.has(r.id))
+      : dbRecursos
+
+    const grouped = groupResourcesByTypeAndBase(filtered as DbResource[])
+    return grouped.filter((g) => g.totalDisponible > 0)
   }, [dbRecursos, assignedResourceIds])
 
   useEffect(() => {
@@ -119,7 +103,6 @@ export function CrisisMap() {
     }
   }, [])
 
-  // ── Layer filter ─────────────────────────────────────────────────────────
   const toggleLayer = (layer: IncidentSource) => {
     setActiveLayers((prev) =>
       prev.includes(layer) ? prev.filter((l) => l !== layer) : [...prev, layer]
@@ -128,7 +111,6 @@ export function CrisisMap() {
 
   const filteredIncidents = incidents.filter((i) => activeLayers.includes(i.source))
 
-  // ── Deploy handlers ───────────────────────────────────────────────────────
   const handleOpenDeploy = () => {
     setDeploySuccess(false)
     setSelectedCounts({})
@@ -143,10 +125,10 @@ export function CrisisMap() {
     mutateRecursos()
   }
 
-  const adjustCount = (tipo: string, delta: number, max: number) => {
+  const adjustCount = (key: string, delta: number, max: number) => {
     setSelectedCounts((prev) => {
-      const next = Math.min(max, Math.max(0, (prev[tipo] ?? 0) + delta))
-      return { ...prev, [tipo]: next }
+      const next = Math.min(max, Math.max(0, (prev[key] ?? 0) + delta))
+      return { ...prev, [key]: next }
     })
   }
 
@@ -154,44 +136,85 @@ export function CrisisMap() {
     const totalSelected = Object.values(selectedCounts).reduce((a, b) => a + b, 0)
     if (totalSelected === 0) { toast.error("Select at least one resource to deploy"); return }
 
-    const incidenteId    = selectedIncident?.id
-    const incidenteTipo  = selectedIncident?.type
-    const incidenteFuente = selectedIncident?.source
+    const incidenteId = selectedIncident?.id
 
-    // IDs a despachar (calculados antes de cualquier async)
-    const idsToDispatch = resourceGroups.flatMap((g) =>
-      g.availableIds.slice(0, selectedCounts[g.tipo] ?? 0)
-    )
+    const deployments: Array<{ resourceId: string; cantidad: number }> = []
+
+    for (const [groupKey, count] of Object.entries(selectedCounts)) {
+      if (count === 0) continue
+      const [tipo, ubicacion] = groupKey.split("|")
+
+      const matchingResources = resourceGroups.filter(
+        (g) => g.tipo === tipo && g.ubicacion === ubicacion && g.totalDisponible > 0
+      )
+
+      let remaining = count
+      for (const group of matchingResources) {
+        if (remaining <= 0) break
+        for (const resource of group.resources) {
+          if (remaining <= 0) break
+          const rDisponible = resource.cantidad_disponible ?? (resource.cantidad || 1)
+          if (rDisponible <= 0) continue
+
+          const toDispatch = Math.min(remaining, rDisponible)
+          deployments.push({ resourceId: resource.id, cantidad: toDispatch })
+          remaining -= toDispatch
+        }
+      }
+    }
 
     setDeployingResources(true)
 
-    // Optimistic update en cache
     if (dbRecursos) {
+      const deployedIds = deployments.map((d) => d.resourceId)
       mutateRecursos(
-        dbRecursos.map((r: DbIncident & { estado: string }) => idsToDispatch.includes(r.id) ? { ...r, estado: "dispatched" } : r),
+        dbRecursos.map((r: DbResource) => {
+          if (!deployedIds.includes(r.id)) return r
+          const deployment = deployments.find((d) => d.resourceId === r.id)
+          if (!deployment) return r
+          const newDisponible = (r.cantidad_disponible ?? (r.cantidad || 1)) - deployment.cantidad
+          return { ...r, cantidad_disponible: newDisponible }
+        }),
         false,
       )
     }
 
-    // Dispatch resources immediately
     if (incidenteId) {
-      // Patch incident to attended state
       await patchIncidente(incidenteId, { estado: "atendido" }).catch((err) => console.error("[CrisisMap] Error updating incident:", err))
       mutateIncidents()
 
-      // Despachar recursos con ciclo de vida
-      await Promise.all(
-        idsToDispatch.map((id) => dispatchResourceWithLifecycle(incidenteId, id).catch((err) => console.error("[CrisisMap] Error dispatching resource:", err)))
-      )
+      const batchUpdates = deployments.map((d) => ({
+        id: d.resourceId,
+        cantidad_disponible: undefined as number | undefined,
+      }))
+
+      for (const deployment of deployments) {
+        const resource = dbRecursos?.find((r: DbResource) => r.id === deployment.resourceId)
+        if (!resource) continue
+        const currentDisponible = resource.cantidad_disponible ?? (resource.cantidad || 1)
+        const newDisponible = Math.max(0, currentDisponible - deployment.cantidad)
+
+        await fetch("/api/recursos", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: deployment.resourceId,
+            cantidad_disponible: newDisponible,
+            incidente_id: incidenteId,
+          }),
+        }).catch((err) => console.error("[CrisisMap] Error updating resource:", err))
+
+        await dispatchResourceWithLifecycle(deployment.resourceId, deployment.cantidad, incidenteId).catch((err) => console.error("[CrisisMap] Error starting lifecycle:", err))
+      }
+
       await mutateRecursos()
     }
 
     setDeployingResources(false)
     setDeploySuccess(true)
 
-    // Respawn 90s después
     if (incidenteId) {
-      const incidenteTipo  = selectedIncident?.type
+      const incidenteTipo = selectedIncident?.type
       const incidenteFuente = selectedIncident?.source
       setTimeout(async () => {
         const respawn = buildRespawnIncident({ tipo: incidenteTipo, fuente: incidenteFuente })
@@ -200,7 +223,7 @@ export function CrisisMap() {
     }
 
     toast.success(`Resources deployed to ${selectedIncident?.location}`, {
-      description: `${idsToDispatch.length} unit(s) on their way`,
+      description: `${totalSelected} unit(s) on their way`,
     })
 
     setTimeout(() => {
@@ -211,10 +234,8 @@ export function CrisisMap() {
     }, 2000)
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-border bg-card md:relative">
-      {/* ── Map header ─────────────────────────────────────────────── */}
       <div className="absolute left-0 right-0 top-0 z-[1000] flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-border bg-card/95 px-3 py-2 backdrop-blur-sm">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
@@ -224,7 +245,6 @@ export function CrisisMap() {
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          {/* Layer filter */}
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="h-6 gap-1 border-border px-2 text-[10px]">
@@ -256,7 +276,6 @@ export function CrisisMap() {
             </PopoverContent>
           </Popover>
 
-          {/* Severity badges */}
           {(["critical", "high", "medium", "low"] as const).map((sev) => {
             const colorMap = {
               critical: "border-primary/50 bg-primary/10 text-primary",
@@ -278,7 +297,6 @@ export function CrisisMap() {
         </div>
       </div>
 
-      {/* ── Incident list panel ────────────────────────────────────── */}
       <div className="relative z-10 mt-0 w-full rounded-none border-b border-border bg-card/95 backdrop-blur-sm shadow-none md:absolute md:right-3 md:top-14 md:z-[1000] md:w-72 md:max-h-[420px] md:rounded-lg md:border md:shadow-xl">
         <div className="flex items-center justify-between border-b border-border bg-card px-3 py-2 rounded-t-lg">
           <p className="text-xs font-semibold text-foreground">Active Incidents ({filteredIncidents.length})</p>
@@ -314,7 +332,6 @@ export function CrisisMap() {
         </div>
       </div>
 
-      {/* ── Leaflet Map ─────────────────────────────────────────────── */}
       {isClient && leafletCssLoaded ? (
         <div className="h-[400px] w-full shrink-0 pt-10 md:h-full md:flex-1">
           <style>{LEAFLET_DARK_STYLES}</style>
@@ -338,28 +355,25 @@ export function CrisisMap() {
           </MapContainer>
         </div>
       ) : (
-        <div className="flex h-[400px] w-full shrink-0 items-center justify-center bg-secondary/20 md:h-full md:flex-1">
-          <div className="flex flex-col items-center gap-2">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="text-sm text-muted-foreground">Loading map...</p>
+        <div className="flex h-[400px] w-full items-center justify-center bg-secondary/30 md:h-full md:flex-1">
+          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <p className="text-xs">Loading map...</p>
           </div>
         </div>
       )}
 
-      {/* ── Legend ──────────────────────────────────────────────────── */}
-      <div className="absolute bottom-3 left-3 z-[1000] hidden rounded-md border border-border bg-card/95 p-2 backdrop-blur-sm md:block">
-        <p className="mb-1.5 text-[10px] font-medium text-muted-foreground">Severity</p>
-        <div className="flex flex-col gap-1">
-          {SEVERITY_LEGENDS.map(({ label, color }) => (
-            <div key={label} className="flex items-center gap-1.5">
-              <div className={cn("h-2 w-2 rounded-full", color)} />
-              <span className="text-[10px] text-muted-foreground">{label}</span>
-            </div>
-          ))}
-        </div>
+      {/* Legend */}
+      <div className="absolute bottom-3 left-3 z-[1000] flex flex-wrap gap-1.5 rounded-lg border border-border bg-card/95 px-2.5 py-1.5 backdrop-blur-sm">
+        {SEVERITY_LEGENDS.map((legend) => (
+          <div key={legend.label} className="flex items-center gap-1">
+            <div className={cn("h-2 w-2 rounded-full", legend.color)} />
+            <span className="text-[9px] text-muted-foreground">{legend.label}</span>
+          </div>
+        ))}
       </div>
 
-      {/* ── Modales ─────────────────────────────────────────────────── */}
+      {/* Incident Detail Modal */}
       <IncidentDetailModal
         incident={selectedIncident}
         showDeployModal={showDeployModal}
@@ -367,10 +381,11 @@ export function CrisisMap() {
         onOpenDeploy={handleOpenDeploy}
       />
 
+      {/* Deploy Modal */}
       <DeployModal
         open={showDeployModal}
         incident={selectedIncident}
-        dbRecursos={dbRecursos}
+        dbRecursos={dbRecursos as DbResource[] | undefined}
         resourceGroups={resourceGroups}
         selectedCounts={selectedCounts}
         deployingResources={deployingResources}

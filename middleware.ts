@@ -20,7 +20,7 @@ export async function middleware(request: NextRequest) {
 
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: "Demasiadas peticiones. Intentá de nuevo en unos segundos." },
+        { error: "Too many requests. Please try again in a few seconds." },
         { status: 429 }
       )
     }
