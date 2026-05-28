@@ -1,68 +1,52 @@
 /**
  * app/api/recursos/auto-reset/route.ts
  *
- * Libera recursos atascados en estado "dispatched" o "busy".
+ * Releases resources stuck in "dispatched" or "busy" state.
  *
- * Un recurso se considera atascado si lleva más de STALE_THRESHOLD_MINUTES
- * en un estado no-disponible sin haber sido actualizado (updated_at viejo).
- * Esto ocurre cuando el servidor se reinicia o el navegador se refresca y
- * los setTimeout del ciclo de vida se pierden sin limpiar la base de datos.
+ * A resource is considered stuck if it has been in a non-available state for more
+ * than STALE_THRESHOLD_MINUTES without being updated (old updated_at).
+ * This happens when the server restarts or the browser refreshes and
+ * the lifecycle setTimeouts are lost without cleaning up the database.
  *
- * POST /api/recursos/auto-reset → restablece recursos atascados → returns { reset: number, recursos: [] }
+ * POST /api/recursos/auto-reset → resets stuck resources → returns { reset: number, recursos: [] }
  */
 
-import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { getResources, updateResource } from "@/lib/mock-db"
 
-/** Minutos máximos tolerados en un estado no-disponible antes de forzar el reset.
- * El ciclo completo dispatch→busy→available dura 35s, así que 45s da margen
- * suficiente sin dejar recursos atascados visibles por mucho tiempo. */
+/** Maximum minutes tolerated in a non-available state before forcing reset.
+ * The complete dispatch→busy→available cycle takes 35s, so 45s gives enough
+ * margin without leaving stuck resources visible for too long. */
 const STALE_THRESHOLD_MINUTES = 45 / 60
 
 export async function POST() {
   try {
-    const supabase = await createClient()
-
-    // Calcular el timestamp de corte
+    // Calculate cutoff timestamp
     const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MINUTES * 60 * 1000).toISOString()
 
-    // Buscar recursos atascados
-    const { data: staleResources, error: fetchError } = await supabase
-      .from("recursos")
-      .select("id, nombre, estado, updated_at")
-      .in("estado", ["dispatched", "busy"])
-      .lt("updated_at", staleThreshold)
+    // Find stuck resources
+    const allResources = getResources()
+    const staleResources = allResources.filter(
+      r => (r.estado === "dispatched" || r.estado === "busy") && r.updated_at < staleThreshold
+    )
 
-    if (fetchError) {
-      return NextResponse.json({ error: fetchError.message }, { status: 500 })
-    }
-
-    if (!staleResources || staleResources.length === 0) {
+    if (staleResources.length === 0) {
       return NextResponse.json({ reset: 0, recursos: [] })
     }
 
-    // Resetear todos a "available"
-    const staleIds = staleResources.map((r) => r.id)
-
-    const { data: updated, error: updateError } = await supabase
-      .from("recursos")
-      .update({
-        estado:      "available",
+    // Reset all to "available"
+    const updated = staleResources.map(r => {
+      return updateResource(r.id, {
+        estado: "available",
         incidente_id: null,
-        updated_at:  new Date().toISOString(),
       })
-      .in("id", staleIds)
-      .select("id, nombre, estado")
+    }).filter(Boolean)
 
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
-    }
-
-    console.log(`[auto-reset/recursos] ${updated?.length ?? 0} recursos liberados:`, staleIds)
+    console.log(`[auto-reset/recursos] ${updated.length} resources released:`, staleResources.map(r => r.id))
 
     return NextResponse.json({
-      reset:    updated?.length ?? 0,
-      recursos: updated ?? [],
+      reset: updated.length,
+      recursos: updated,
     })
   } catch (err) {
     console.error("[auto-reset/recursos] Error:", err)

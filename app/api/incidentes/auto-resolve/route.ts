@@ -1,43 +1,25 @@
-import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { getIncidents, updateIncident } from "@/lib/mock-db"
 
 // Auto-resolve any active incident older than 5 minutes.
 // Called periodically from the client (ai-activity-log useEffect) every 60 seconds.
 export async function POST() {
-  const supabase = await createClient()
-
   const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString()
 
   // Find active incidents whose updated_at is older than 5 minutes.
-  // updated_at is always writable and gets reset to NOW() every time an
-  // incident is spawned or reactivated, so this timer starts fresh each time.
-  const { data: stale, error: fetchError } = await supabase
-    .from("incidentes")
-    .select("id, ubicacion")
-    .eq("estado", "activo")
-    .lt("updated_at", cutoff)
+  const stale = getIncidents().filter(i => i.updated_at < cutoff)
 
-  if (fetchError) {
-    return NextResponse.json({ error: fetchError.message }, { status: 500 })
-  }
-
-  if (!stale || stale.length === 0) {
+  if (stale.length === 0) {
     return NextResponse.json({ resolved: 0 })
   }
 
-  const ids = stale.map((i: { id: string }) => i.id)
-
-  const { error: updateError } = await supabase
-    .from("incidentes")
-    .update({ estado: "atendido", updated_at: new Date().toISOString() })
-    .in("id", ids)
-
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 })
-  }
+  const resolved = stale.map(i => {
+    updateIncident(i.id, { estado: "atendido" })
+    return i
+  })
 
   return NextResponse.json({
-    resolved: ids.length,
-    locations: stale.map((i: { ubicacion: string }) => i.ubicacion),
+    resolved: resolved.length,
+    locations: resolved.map(i => i.ubicacion),
   })
 }

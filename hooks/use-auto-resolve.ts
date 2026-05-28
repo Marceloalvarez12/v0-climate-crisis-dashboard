@@ -34,13 +34,13 @@ export function useAutoResolve({
 
   const check = useCallback(async () => {
     const API_SECRET = process.env.NEXT_PUBLIC_API_SECRET ?? ""
-    const authHeaders = API_SECRET ? { "x-api-secret": API_SECRET } : {}
+    const headers: Record<string, string> = API_SECRET ? { "x-api-secret": API_SECRET } : {}
 
     // ── 1. Auto-resolve incidentes ──────────────────────────────────────────
     try {
       const res = await fetch("/api/incidentes/auto-resolve", {
         method: "POST",
-        headers: authHeaders,
+        headers,
       })
       if (res.ok) {
         const data = await res.json()
@@ -58,7 +58,7 @@ export function useAutoResolve({
     try {
       const res = await fetch("/api/recursos/auto-reset", {
         method: "POST",
-        headers: authHeaders,
+        headers,
       })
       if (res.ok) {
         const data = await res.json()

@@ -46,7 +46,7 @@ export interface Incident {
 // Recursos
 // ---------------------------------------------------------------------------
 
-export type ResourceType   = "ambulance" | "firefighter" | "helicopter" | "boat" | "shelter" | "medical" | "police"
+export type ResourceType   = "ambulance" | "firefighter" | "helicopter" | "boat" | "police"
 export type ResourceStatus = "available" | "dispatched" | "busy"
 
 export interface Resource {
@@ -58,7 +58,7 @@ export interface Resource {
   eta?:     string
 }
 
-// DB row shapes (lo que viene de Supabase antes de transformar)
+// DB row shapes (what comes from the database before transforming)
 export interface DbIncident {
   id:               string
   tipo:             string
@@ -69,7 +69,9 @@ export interface DbIncident {
   personas_afectadas: number
   fuente:           string
   fuente_detalles:  Record<string, unknown>
+  estado:           string
   created_at:       string
+  updated_at:       string
 }
 
 export interface DbResource {
@@ -78,4 +80,6 @@ export interface DbResource {
   nombre:    string
   estado:    string
   ubicacion: string
+  incidente_id: string | null
+  updated_at: string
 }

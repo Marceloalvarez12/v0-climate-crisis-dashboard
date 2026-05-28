@@ -11,12 +11,12 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/api/")) {
-    const ip = request.headers.get("x-forwarded-for") ?? request.ip ?? "unknown"
+    const ip = request.headers.get("x-forwarded-for") ?? "unknown"
     const rateLimit = checkRateLimit(ip)
 
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: "Demasiadas peticiones. Intentá de nuevo en unos segundos." },
+        { error: "Too many requests. Please try again in a few seconds." },
         { status: 429 }
       )
     }
@@ -29,7 +29,7 @@ export async function middleware(request: NextRequest) {
 
       if (authHeader !== apiSecret && urlSecret !== apiSecret) {
         return NextResponse.json(
-          { error: "No autorizado" },
+          { error: "Unauthorized" },
           { status: 401 }
         )
       }

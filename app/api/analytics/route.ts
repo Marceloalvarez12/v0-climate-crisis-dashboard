@@ -1,78 +1,43 @@
-import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { getIncidents, getResources } from "@/lib/mock-db"
 import { STATIC_RESPONSE_TIME_MIN } from "@/lib/mock-data"
 
 export async function GET() {
-  const supabase = await createClient()
-
   // 1. Active incidents
-  const { data: activeIncidents } = await supabase
-    .from("incidentes")
-    .select("id, severidad, personas_afectadas, created_at, updated_at, tipo")
-    .eq("estado", "activo")
+  const activeIncidents = getIncidents()
 
   // 2. All incidents in the last 24h (active + resolved) for trend calculation
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  const { data: incidents24h } = await supabase
-    .from("incidentes")
-    .select("id, severidad, personas_afectadas, estado, created_at")
-    .gte("created_at", since24h)
+  const allIncidents = getIncidents() // In mock, we only have active incidents
+  const incidents24h = allIncidents.filter(i => i.created_at >= since24h)
 
   // 3. Incidents in the previous 24h window (for delta %)
   const since48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
-  const { data: incidents48h } = await supabase
-    .from("incidentes")
-    .select("id, personas_afectadas, estado, created_at")
-    .gte("created_at", since48h)
-    .lt("created_at", since24h)
+  const incidents48h = allIncidents.filter(i => i.created_at >= since48h && i.created_at < since24h)
 
   // 4. Resources
-  const { data: recursos } = await supabase
-    .from("recursos")
-    .select("id, estado, updated_at")
-
-  // 5. Avg response time — try to calculate from resolved incidents, fallback to static
-  const { data: resolved } = await supabase
-    .from("incidentes")
-    .select("created_at, updated_at")
-    .eq("estado", "atendido")
-    .order("updated_at", { ascending: false })
-    .limit(50)
-
-  const validResolved = (resolved ?? []).filter((i: { created_at: string; updated_at: string }) => {
-    const diffMin = (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()) / 60000
-    return diffMin >= 1 && diffMin <= 120
-  })
-  const avgResponseMinDB: number | null = validResolved.length > 0
-    ? parseFloat((
-        validResolved.reduce((s: number, i: { created_at: string; updated_at: string }) =>
-          s + (new Date(i.updated_at).getTime() - new Date(i.created_at).getTime()) / 60000, 0
-        ) / validResolved.length
-      ).toFixed(1))
-    : null
+  const recursos = getResources()
 
   // --- Calculations ---
 
-  const active = activeIncidents ?? []
-  const curr24 = incidents24h ?? []
-  const prev24 = incidents48h ?? []
-  const allResources = recursos ?? []
+  const active = activeIncidents
+  const curr24 = incidents24h
+  const prev24 = incidents48h
+  const allResources = recursos
 
   // Affected people — only count currently active incidents
-  const affectedNow = active.reduce((s: number, i: { personas_afectadas: number }) => s + (i.personas_afectadas || 0), 0)
-  // Delta only meaningful if there were real incidents in the previous window
-  // (prev24 incidents must have been created in that window, not just seeded)
-  const prev24Active = prev24.filter((i: { estado: string }) => i.estado === "activo")
-  const affectedPrev = prev24Active.reduce((s: number, i: { personas_afectadas: number }) => s + (i.personas_afectadas || 0), 0)
+  const affectedNow = active.reduce((s, i) => s + (i.personas_afectadas || 0), 0)
+  const prev24Active = prev24.filter(i => i.estado === "activo")
+  const affectedPrev = prev24Active.reduce((s, i) => s + (i.personas_afectadas || 0), 0)
   const affectedChange = affectedPrev > 0
     ? Math.round(((affectedNow - affectedPrev) / affectedPrev) * 100)
     : 0
 
   // Risk level
-  const criticalCount = active.filter((i: { severidad: string }) => i.severidad === "critical").length
-  const highCount    = active.filter((i: { severidad: string }) => i.severidad === "high").length
-  const mediumCount  = active.filter((i: { severidad: string }) => i.severidad === "medium").length
-  const lowCount     = active.filter((i: { severidad: string }) => i.severidad === "low").length
+  const criticalCount = active.filter(i => i.severidad === "critical").length
+  const highCount    = active.filter(i => i.severidad === "high").length
+  const mediumCount  = active.filter(i => i.severidad === "medium").length
+  const lowCount     = active.filter(i => i.severidad === "low").length
   let riskLevel = "LOW"
   let riskProgress = 20
   if (criticalCount >= 2) { riskLevel = "CRITICAL"; riskProgress = 95 }
@@ -81,23 +46,19 @@ export async function GET() {
   else if (highCount === 1 || active.length >= 3) { riskLevel = "MEDIUM"; riskProgress = 50 }
   else if (active.length > 0) { riskLevel = "LOW-MEDIUM"; riskProgress = 35 }
 
-  // Avg response time — dynamic from DB when data exists, fallback to static reference
-  const avgResponseMin: number = avgResponseMinDB ?? STATIC_RESPONSE_TIME_MIN
+  // Avg response time — static reference for mock
+  const avgResponseMin: number = STATIC_RESPONSE_TIME_MIN
 
-  // Incident trend: compare last 24h vs prev 24h.
-  // Trend: only meaningful when BOTH 24h windows have incidents.
-  // If curr24 === 0 the result is always 0% or -100%, which is misleading in quiet
-  // periods or when running on seeded data with old timestamps — return null so the
-  // UI shows "Stable" instead of a spurious negative percentage.
+  // Incident trend
   const incidentsTrend = curr24.length > 0 && prev24.length > 0
     ? Math.round(((curr24.length - prev24.length) / prev24.length) * 100)
     : null
 
   // Resources
   const totalResources = allResources.length
-  const deployedResources = allResources.filter((r: { estado: string }) => r.estado !== "available").length
-  const enCamino = allResources.filter((r: { estado: string }) => r.estado === "dispatched").length
-  const ocupados = allResources.filter((r: { estado: string }) => r.estado === "busy").length
+  const deployedResources = allResources.filter(r => r.estado !== "available").length
+  const enCamino = allResources.filter(r => r.estado === "dispatched").length
+  const ocupados = allResources.filter(r => r.estado === "busy").length
 
   return NextResponse.json({
     riskLevel,
