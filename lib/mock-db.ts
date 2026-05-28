@@ -44,7 +44,7 @@ function seedData() {
 
   // Seed resources - 5 types, 11 total units
   const resourceTypes: Array<{ tipo: string; nombre: string; cantidad: number; ubicacion: string }> = [
-    { tipo: "ambulance", nombre: "SAME", cantidad: 3, ubicacion: "Centro" },
+    { tipo: "ambulance", nombre: "Ambulancia", cantidad: 3, ubicacion: "Centro" },
     { tipo: "firefighter", nombre: "Bomberos", cantidad: 2, ubicacion: "Zona Norte" },
     { tipo: "police", nombre: "Policía", cantidad: 2, ubicacion: "Comisaría Central" },
     { tipo: "helicopter", nombre: "Helicóptero", cantidad: 2, ubicacion: "Aeropuerto" },
