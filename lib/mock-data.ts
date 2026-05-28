@@ -344,7 +344,7 @@ export const STATIC_RESPONSE_TIME_MIN = 18
  * Calibrados para un simulador tipo "demo en vivo": lo suficiente para
  * ver la animación sin aburrir al usuario.
  */
-export const RESOURCE_DISPATCHED_TO_BUSY_MS  = 15_000
+export const RESOURCE_DISPATCHED_TO_BUSY_MS  = 20_000
 export const RESOURCE_BUSY_TO_AVAILABLE_MS   = 20_000
 
 /** Intervalo entre spawns de incidentes en la simulacion automatica */
