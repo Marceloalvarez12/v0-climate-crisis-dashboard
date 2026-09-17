@@ -1,35 +1,17 @@
-/**
- * app/api/recursos/auto-reset/route.ts
- *
- * Libera recursos atascados en estado "dispatched" o "busy".
- *
- * Un recurso se considera atascado si lleva más de STALE_THRESHOLD_MINUTES
- * en un estado no-disponible sin haber sido actualizado (updated_at viejo).
- * Esto ocurre cuando el servidor se reinicia o el navegador se refresca y
- * los setTimeout del ciclo de vida se pierden sin limpiar la base de datos.
- *
- * POST /api/recursos/auto-reset → restablece recursos atascados → returns { reset: number, recursos: [] }
- */
-
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
-/** Minutos máximos tolerados en un estado no-disponible antes de forzar el reset.
- * El ciclo completo dispatch→busy→available dura 35s, así que 45s da margen
- * suficiente sin dejar recursos atascados visibles por mucho tiempo. */
 const STALE_THRESHOLD_MINUTES = 45 / 60
 
 export async function POST() {
   try {
     const supabase = await createClient()
 
-    // Calcular el timestamp de corte
     const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MINUTES * 60 * 1000).toISOString()
 
-    // Buscar recursos atascados
     const { data: staleResources, error: fetchError } = await supabase
       .from("recursos")
-      .select("id, nombre, estado, updated_at")
+      .select("id, nombre, estado, updated_at, cantidad")
       .in("estado", ["dispatched", "busy"])
       .lt("updated_at", staleThreshold)
 
@@ -41,18 +23,20 @@ export async function POST() {
       return NextResponse.json({ reset: 0, recursos: [] })
     }
 
-    // Resetear todos a "available"
     const staleIds = staleResources.map((r) => r.id)
+
+    const updates = staleResources.map((r) => ({
+      id: r.id,
+      estado: "available",
+      cantidad_disponible: r.cantidad || 1,
+      incidente_id: null,
+      updated_at: new Date().toISOString(),
+    }))
 
     const { data: updated, error: updateError } = await supabase
       .from("recursos")
-      .update({
-        estado:      "available",
-        incidente_id: null,
-        updated_at:  new Date().toISOString(),
-      })
-      .in("id", staleIds)
-      .select("id, nombre, estado")
+      .upsert(updates)
+      .select("id, nombre, estado, cantidad, cantidad_disponible")
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 })
@@ -61,7 +45,7 @@ export async function POST() {
     console.log(`[auto-reset/recursos] ${updated?.length ?? 0} recursos liberados:`, staleIds)
 
     return NextResponse.json({
-      reset:    updated?.length ?? 0,
+      reset: updated?.length ?? 0,
       recursos: updated ?? [],
     })
   } catch (err) {

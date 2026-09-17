@@ -89,7 +89,7 @@ export function useSimulationLoop() {
         estado: "activo",
       })
       mutate("/api/incidentes")
-      addEvent({ type: "incident_created", message: `Nuevo incidente en ${data.ubicacion}`, incidentId: data.id })
+      addEvent({ type: "incident_created", message: `New incident at ${data.ubicacion}`, incidentId: data.id })
       return data
     } catch {
       return null
@@ -103,7 +103,7 @@ export function useSimulationLoop() {
       const available = recursos.find((r) => r.estado === "available")
 
       if (!available) {
-        addEvent({ type: "resource_dispatched", message: "Sin recursos disponibles", incidentId })
+        addEvent({ type: "resource_dispatched", message: "No resources available", incidentId })
         return
       }
 
@@ -122,7 +122,7 @@ export function useSimulationLoop() {
       setActiveDispatches((prev) => [...prev, dispatch])
       addEvent({
         type:       "resource_dispatched",
-        message:    `${available.nombre} en camino a ${incidentLocation}`,
+        message:    `${available.nombre} en route to ${incidentLocation}`,
         incidentId,
         resourceId: available.id,
       })

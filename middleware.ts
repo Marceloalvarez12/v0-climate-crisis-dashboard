@@ -20,35 +20,79 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Lógica de rate limiting y API_SECRET para rutas /api/*
+  // Rate limiting para TODOS los métodos (incluyendo GET)
   if (API_PATHS.some((p) => pathname.startsWith(p))) {
     const ip = request.headers.get("x-forwarded-for") ?? "unknown"
     const rateLimit = checkRateLimit(ip)
 
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: "Demasiadas peticiones. Intentá de nuevo en unos segundos." },
+        { error: "Too many requests. Please try again in a few seconds." },
         { status: 429 }
       )
     }
 
-    const apiSecret = process.env.API_SECRET
+    // Auth check: session OR API_SECRET
+    const method = request.method
+    const requiresAuth = method !== "GET"
 
-    if (apiSecret) {
-      const authHeader = request.headers.get("x-api-secret")
+    if (requiresAuth) {
+      // Primero intentar autenticar por sesión de Supabase
+      const response = NextResponse.next({
+        request: { headers: request.headers },
+      })
 
-      if (authHeader !== apiSecret) {
-        return NextResponse.json(
-          { error: "No autorizado" },
-          { status: 401 }
-        )
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            getAll() {
+              return request.cookies.getAll()
+            },
+            setAll(cookiesToSet) {
+              cookiesToSet.forEach(({ name, value }) =>
+                response.cookies.set(name, value)
+              )
+            },
+          },
+        }
+      )
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (session) {
+        // Usuario autenticado por sesión - permitir request
+        return response
       }
+
+      // Fallback: verificar API_SECRET para requests server-to-server
+      if (process.env.API_SECRET) {
+        const authHeader = request.headers.get("x-api-secret")
+        if (authHeader === process.env.API_SECRET) {
+          return NextResponse.next()
+        }
+      }
+
+      // Sin autenticación válida
+      return NextResponse.json(
+        { error: "No autorizado" },
+        { status: 401 }
+      )
     }
 
     return NextResponse.next()
   }
 
-  // Verificar autenticación para todas las demás rutas
+  // Create response that will carry the cookies
+  const response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -57,8 +101,10 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll() {
-          // No necesitamos setear cookies en el middleware
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            response.cookies.set(name, value)
+          )
         },
       },
     }
@@ -94,11 +140,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url))
   }
 
-  return NextResponse.next()
+  return response
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.*|apple-icon.*).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.*|apple-icon.*|.*\\.png|.*\\.jpg|.*\\.svg|.*\\.ico).*)",
   ],
 }

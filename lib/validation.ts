@@ -21,8 +21,16 @@ export const IncidentPatchSchema = z.object({
 
 export const ResourcePatchSchema = z.object({
   id: z.string().uuid(),
-  estado: z.enum(["available", "dispatched", "busy"]).optional(),
+  estado: z.enum(["available", "dispatched", "busy", "retired"]).optional(),
   incidente_id: z.string().uuid().nullable().optional(),
+  cantidad_disponible: z.number().int().min(0).optional(),
+})
+
+export const ResourceCreateSchema = z.object({
+  nombre: z.string().min(1, "El nombre es requerido"),
+  tipo: z.enum(["ambulance", "firefighter", "helicopter", "boat", "shelter", "medical", "police"]),
+  cantidad: z.number().int().min(1, "La cantidad debe ser al menos 1"),
+  ubicacion: z.string().min(1, "La ubicación es requerida"),
 })
 
 export const AgentLogSchema = z.object({

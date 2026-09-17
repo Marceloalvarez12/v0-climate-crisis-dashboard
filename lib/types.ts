@@ -73,9 +73,11 @@ export interface DbIncident {
 }
 
 export interface DbResource {
-  id:        string
-  tipo:      string
-  nombre:    string
-  estado:    string
-  ubicacion: string
+  id:                  string
+  tipo:                string
+  nombre:              string
+  cantidad:            number
+  cantidad_disponible: number
+  estado:              string
+  ubicacion:           string
 }

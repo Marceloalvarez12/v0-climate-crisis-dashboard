@@ -348,4 +348,4 @@ export const RESOURCE_DISPATCHED_TO_BUSY_MS  = 15_000
 export const RESOURCE_BUSY_TO_AVAILABLE_MS   = 20_000
 
 /** Intervalo entre spawns de incidentes en la simulacion automatica */
-export const SIMULATION_SPAWN_INTERVAL_MS = 90_000
+export const SIMULATION_SPAWN_INTERVAL_MS = 45_000

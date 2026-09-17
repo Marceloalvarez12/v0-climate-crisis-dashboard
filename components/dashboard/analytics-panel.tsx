@@ -25,6 +25,14 @@ interface AnalyticsData {
   resourceProgress: number
 }
 
+interface OperatorAnalyticsData {
+  assignedTotal: number
+  assignedDeployed: number
+  assignedAvailable: number
+  enCamino: number
+  ocupados: number
+}
+
 interface Metric {
   id: string
   label: string
@@ -44,23 +52,28 @@ export function AnalyticsPanel() {
     keepPreviousData: true,
   })
 
-  const d = data
+  const { data: operatorData } = useSWR<OperatorAnalyticsData>("/api/analytics/operator", fetcher, {
+    refreshInterval: 5000,
+    revalidateOnFocus: false,
+    dedupingInterval: 3000,
+    keepPreviousData: true,
+  })
 
-  // Risk color: muted when no data, red when critical, amber when high, green when safe
+  const d = data
+  const op = operatorData
+
   const riskColor: Metric["color"] = !d || d.activeIncidentCount === 0
     ? "muted"
     : d.criticalCount > 0 ? "primary"
     : d.highCount > 0 ? "accent"
     : "success"
 
-  // Response time: show in hours if >= 60 min, minutes otherwise
   const responseValue = d?.avgResponseMin != null
     ? d.avgResponseMin >= 60
       ? `${(d.avgResponseMin / 60).toFixed(1)}h`
       : `${d.avgResponseMin} min`
     : "—"
 
-  // Trend: null means no reliable comparison window — show "Stable"
   const trendValue = !d
     ? "—"
     : d.incidentsTrend === null
@@ -75,7 +88,6 @@ export function AnalyticsPanel() {
     {
       id: "risk",
       label: "Risk Level",
-      // Show BAJO when active but no critical/high, show — when no data yet
       value: !d || d.activeIncidentCount === 0 ? "NO INCIDENTS" : d.riskLevel,
       icon: <AlertTriangle className="h-4 w-4" />,
       color: riskColor,
@@ -85,7 +97,6 @@ export function AnalyticsPanel() {
       id: "affected",
       label: "Affected People",
       value: d ? d.affectedNow.toLocaleString("en-US") : "—",
-      // Only show change badge if it's non-zero (real comparison exists)
       change: d?.affectedChange !== 0 ? d?.affectedChange : undefined,
       icon: <Users className="h-4 w-4" />,
       color: "accent",
@@ -105,7 +116,6 @@ export function AnalyticsPanel() {
       change: d?.incidentsTrend != null && d.incidentsTrend !== 0 ? d.incidentsTrend : undefined,
       icon: <Activity className="h-4 w-4" />,
       color: d && d.activeIncidentCount > 0 ? "primary" : "muted",
-      // severity breakdown shown as sublabel
       sublabel: d && d.activeIncidentCount > 0
         ? [
             d.criticalCount > 0  ? `${d.criticalCount} crit` : null,
@@ -118,11 +128,11 @@ export function AnalyticsPanel() {
     {
       id: "resources",
       label: "Deployed Resources",
-      value: d ? `${d.deployedResources}/${d.totalResources}` : "—",
+      value: op ? `${op.assignedDeployed}/${op.assignedTotal}` : (d ? `${d.deployedResources}/${d.totalResources}` : "—"),
       icon: <Shield className="h-4 w-4" />,
-      color: d && d.deployedResources > 0 ? "accent" : "muted",
-      progress: d?.resourceProgress,
-      sublabel: d && d.enCamino > 0 ? `${d.enCamino} en route` : undefined,
+      color: op ? (op.assignedDeployed > 0 ? "accent" : "muted") : (d && d.deployedResources > 0 ? "accent" : "muted"),
+      progress: op ? (op.assignedTotal > 0 ? Math.round((op.assignedDeployed / op.assignedTotal) * 100) : 0) : d?.resourceProgress,
+      sublabel: op ? (op.enCamino > 0 ? `${op.enCamino} en route` : undefined) : (d && d.enCamino > 0 ? `${d.enCamino} en route` : undefined),
     },
     {
       id: "trend",

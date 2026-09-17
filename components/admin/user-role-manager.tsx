@@ -36,10 +36,10 @@ interface UserRoleManagerProps {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  admin: 'Administrador',
-  operador: 'Operador',
-  agente_ia: 'Agente IA',
-  visualizador: 'Visualizador',
+  admin: 'Administrator',
+  operador: 'Operator',
+  agente_ia: 'AI Agent',
+  visualizador: 'Viewer',
 }
 
 const ROLE_STYLES: Record<string, string> = {
@@ -87,7 +87,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
       )
       setActionFeedback({
         id: user.id,
-        message: newStatus === 'suspendido' ? 'Acceso suspendido' : 'Acceso restaurado',
+        message: newStatus === 'suspendido' ? 'Access suspended' : 'Access restored',
       })
       setTimeout(() => setActionFeedback(null), 2000)
     } catch (error) {
@@ -99,7 +99,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
   const handleResetPassword = useCallback(async (user: User) => {
     try {
       await resetUserPassword(user.id)
-      setActionFeedback({ id: user.id, message: 'Contraseña restablecida' })
+      setActionFeedback({ id: user.id, message: 'Password reset' })
       setTimeout(() => setActionFeedback(null), 2000)
     } catch (error) {
       console.error('Error reseteando contraseña:', error)
@@ -116,7 +116,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
           u.id === roleEditUser.id ? { ...u, role: roleEditUser.role as User['role'] } : u
         )
       )
-      setActionFeedback({ id: roleEditUser.id, message: 'Rol actualizado' })
+      setActionFeedback({ id: roleEditUser.id, message: 'Role updated' })
       setTimeout(() => setActionFeedback(null), 2000)
     } catch (error) {
       console.error('Error cambiando rol:', error)
@@ -126,7 +126,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
   }, [roleEditUser])
 
   const formatLastLogin = (date: string | null) => {
-    if (!date) return 'Nunca'
+    if (!date) return 'Never'
     const d = new Date(date)
     const now = new Date()
     const diffMs = now.getTime() - d.getTime()
@@ -134,11 +134,11 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
 
-    if (diffMins < 1) return 'Ahora mismo'
-    if (diffMins < 60) return `Hace ${diffMins} min`
-    if (diffHours < 24) return `Hace ${diffHours}h`
-    if (diffDays < 7) return `Hace ${diffDays}d`
-    return d.toLocaleDateString('es-AR')
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins} min ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    return d.toLocaleDateString('en-US')
   }
 
   const getInitials = (name: string) =>
@@ -158,10 +158,10 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
         </div>
         <div>
           <h2 className="text-sm font-semibold text-zinc-100">
-            Gestión de Personal y Accesos
+            Staff & Access Management
           </h2>
           <p className="text-[11px] text-zinc-500">
-            Administración de usuarios, roles y permisos del sistema
+            User, role and permission administration
           </p>
         </div>
       </div>
@@ -174,7 +174,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar por nombre o email..."
+            placeholder="Search by name or email..."
             className="w-full pl-9 pr-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition-all"
           />
         </div>
@@ -183,7 +183,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
           className="flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500 active:scale-95 transition-all"
         >
           <UserPlus className="h-4 w-4" />
-          Añadir Nuevo Operador
+          Add New Operator
         </button>
       </div>
 
@@ -193,22 +193,22 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
           <thead>
             <tr className="sticky top-0 z-10 border-b border-zinc-800/50 bg-zinc-950">
               <th className="text-left px-6 py-3 text-[10px] font-mono tracking-widest uppercase text-zinc-600">
-                Operador
+Operator
               </th>
               <th className="text-left px-6 py-3 text-[10px] font-mono tracking-widest uppercase text-zinc-600">
                 Email
               </th>
               <th className="text-left px-6 py-3 text-[10px] font-mono tracking-widest uppercase text-zinc-600">
-                Nivel de Acceso
+Access Level
               </th>
               <th className="text-left px-6 py-3 text-[10px] font-mono tracking-widest uppercase text-zinc-600">
-                Estado
+Status
               </th>
               <th className="text-left px-6 py-3 text-[10px] font-mono tracking-widest uppercase text-zinc-600">
-                Último Acceso
+Last Access
               </th>
               <th className="text-right px-6 py-3 text-[10px] font-mono tracking-widest uppercase text-zinc-600">
-                Acciones
+Actions
               </th>
             </tr>
           </thead>
@@ -279,7 +279,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
                           isActive ? 'text-emerald-400' : 'text-red-400'
                         )}
                       >
-                        {isActive ? 'Activo' : 'Suspendido'}
+                        {isActive ? 'Active' : 'Suspended'}
                       </span>
                     </div>
                   </td>
@@ -319,7 +319,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
                               className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
                             >
                               <Shield className="h-3.5 w-3.5" />
-                              Cambiar Nivel de Acceso
+                              Change Access Level
                             </button>
                             {user.role === 'operador' && (
                               <button
@@ -327,7 +327,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
                                 className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
                               >
                                 <Truck className="h-3.5 w-3.5" />
-                                Asignar Recursos
+                                Assign Resources
                               </button>
                             )}
                             <button
@@ -335,7 +335,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
                               className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors"
                             >
                               <RotateCcw className="h-3.5 w-3.5" />
-                              Restablecer Contraseña
+                              Reset Password
                             </button>
                             <div className="border-t border-zinc-800" />
                             <button
@@ -348,12 +348,12 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
                               {isActive ? (
                                 <>
                                   <Ban className="h-3.5 w-3.5" />
-                                  Suspender Acceso
+                                  Suspend Access
                                 </>
                               ) : (
                                 <>
                                   <Check className="h-3.5 w-3.5" />
-                                  Restaurar Acceso
+                                  Restore Access
                                 </>
                               )}
                             </button>
@@ -371,9 +371,9 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
         {filteredUsers.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-zinc-600">
             <Users className="h-8 w-8 mb-2" />
-            <p className="text-sm">No se encontraron usuarios</p>
+            <p className="text-sm">No users found</p>
             <p className="text-xs mt-1">
-              Intenta con otro término de búsqueda
+              Try a different search term
             </p>
           </div>
         )}
@@ -389,7 +389,7 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
           <div className="relative z-10 w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl mx-4">
             <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
               <h3 className="text-sm font-semibold text-zinc-100">
-                Cambiar Nivel de Acceso
+                Change Access Level
               </h3>
               <button
                 onClick={() => setRoleEditUser(null)}
@@ -424,13 +424,13 @@ export function UserRoleManager({ initialUsers }: UserRoleManagerProps) {
                 onClick={() => setRoleEditUser(null)}
                 className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-700 transition-colors"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={handleRoleChange}
                 className="flex-1 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 active:scale-95 transition-all"
               >
-                Aplicar Cambio
+                Apply Change
               </button>
             </div>
           </div>

@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 
 export async function login(formData: FormData) {
   const supabase = await createClient()
@@ -39,5 +40,11 @@ export async function login(formData: FormData) {
 export async function logout() {
   const supabase = await createClient()
   await supabase.auth.signOut()
+
+  const cookieStore = await cookies()
+  cookieStore.delete('sb-access-token')
+  cookieStore.delete('sb-refresh-token')
+  cookieStore.delete(`sb-${process.env.NEXT_PUBLIC_SUPABASE_URL!.split('://')[1].split('.')[0]}-auth-token`)
+
   redirect('/login')
 }

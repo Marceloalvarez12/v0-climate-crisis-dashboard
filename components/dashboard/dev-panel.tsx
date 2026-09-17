@@ -71,7 +71,7 @@ function DispatchCard({ dispatch, onDispatch }: {
               : "border-green-500/50 text-green-400"
           )}
         >
-          {dispatch.status === "en_camino" ? "En camino" : "Ocupado"}
+          {dispatch.status === "en_camino" ? "En route" : "Busy"}
         </Badge>
       </div>
       <p className="text-[10px] text-muted-foreground font-mono truncate">
@@ -133,10 +133,10 @@ export function DevPanel() {
               <div className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
             )}
           </div>
-          <span className="text-sm font-mono font-semibold text-cyan-400">SIMULACION</span>
+          <span className="text-sm font-mono font-semibold text-cyan-400">SIMULATION</span>
           {isRunning && (
             <Badge variant="outline" className="h-4 border-green-500/40 bg-green-500/10 px-1.5 text-[9px] font-mono text-green-400">
-              ACTIVA
+              ACTIVE
             </Badge>
           )}
         </div>
@@ -166,7 +166,7 @@ export function DevPanel() {
             variant="outline"
           >
             <Play className="mr-2 h-4 w-4" />
-            Iniciar Simulacion Dinamica
+            Start Dynamic Simulation
           </Button>
         ) : (
           <Button
@@ -175,7 +175,7 @@ export function DevPanel() {
             variant="outline"
           >
             <Square className="mr-2 h-4 w-4" />
-            Detener Simulacion
+            Stop Simulation
           </Button>
         )}
 
@@ -183,7 +183,7 @@ export function DevPanel() {
         {activeDispatches.length > 0 && (
           <div className="space-y-1.5">
             <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-              Despachos activos ({activeDispatches.length})
+              Active dispatches ({activeDispatches.length})
             </p>
             {activeDispatches.map(d => (
               <DispatchCard
@@ -209,12 +209,12 @@ export function DevPanel() {
 
             return (
               <Button
-                onClick={() => dispatchResource(lastIncident.incidentId!, lastIncident.message.replace("Nuevo incidente en ", ""))}
+                onClick={() => dispatchResource(lastIncident.incidentId!, lastIncident.message.replace("New incident at ", ""))}
                 className="w-full border-blue-500/50 bg-blue-500/10 font-mono text-blue-400 hover:bg-blue-500/20 text-xs"
                 variant="outline"
               >
                 <Ambulance className="mr-2 h-3.5 w-3.5" />
-                Enviar recurso al incidente
+                Send resource to incident
               </Button>
             )
           })()
@@ -224,7 +224,7 @@ export function DevPanel() {
         {events.length > 0 && (
           <div className="space-y-1">
             <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-              Log de eventos
+              Event log
             </p>
             <ScrollArea className="h-36">
               <div className="space-y-1 pr-2">
@@ -236,7 +236,7 @@ export function DevPanel() {
                         {e.message}
                       </p>
                       <p className="text-[9px] font-mono text-muted-foreground">
-                        {e.timestamp.toLocaleTimeString("es-AR")}
+                        {e.timestamp.toLocaleTimeString("en-US")}
                       </p>
                     </div>
                   </div>
@@ -248,7 +248,7 @@ export function DevPanel() {
 
         <div className="border-t border-cyan-500/10 pt-2 flex justify-between">
           <span className="text-[10px] font-mono text-muted-foreground">
-            Ciclo: <span className="text-cyan-400">90s spawn / 15s camino / 20s busy</span>
+            Ciclo: <span className="text-cyan-400">45s spawn / 15s en route / 20s busy</span>
           </span>
           <span className="text-[10px] font-mono text-muted-foreground">?dev=true</span>
         </div>

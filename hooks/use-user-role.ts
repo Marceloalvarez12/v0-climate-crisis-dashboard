@@ -14,6 +14,14 @@ interface CacheEntry {
   timestamp: number
 }
 
+function clearProfileCache() {
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith('zntinel_user_profile_')) {
+      localStorage.removeItem(key)
+    }
+  })
+}
+
 export function useUserRole() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -23,6 +31,7 @@ export function useUserRole() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
+        setProfile(null)
         setLoading(false)
         return
       }
@@ -62,6 +71,16 @@ export function useUserRole() {
 
   useEffect(() => {
     fetchProfile()
+
+    const supabase = createClient()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+        clearProfileCache()
+        fetchProfile()
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [fetchProfile])
 
   return { profile, loading, isAdmin: profile?.rol === 'admin', refetch: fetchProfile }

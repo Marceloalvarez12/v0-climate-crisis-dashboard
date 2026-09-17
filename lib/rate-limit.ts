@@ -1,5 +1,5 @@
 const RATE_LIMIT_WINDOW_MS = 60 * 1000
-const MAX_REQUESTS_PER_WINDOW = 30
+const MAX_REQUESTS_PER_WINDOW = 200
 
 const requestCounts = new Map<string, { count: number; resetAt: number }>()
 

@@ -9,22 +9,22 @@ export function AgentStatusPanel() {
 
   const capabilities = [
     {
-      label: 'Escaneo de redes sociales',
+      label: 'Social media scanning',
       alwaysActive: true,
       icon: Eye,
     },
     {
-      label: 'Análisis de severidad',
+      label: 'Severity analysis',
       alwaysActive: true,
       icon: Eye,
     },
     {
-      label: 'Auto-cierre de incidentes',
+      label: 'Auto-close incidents',
       alwaysActive: false,
       icon: Ban,
     },
     {
-      label: 'Auto-despacho de recursos',
+      label: 'Auto-dispatch resources',
       alwaysActive: false,
       icon: Ban,
     },
@@ -44,7 +44,7 @@ export function AgentStatusPanel() {
             isAutonomous ? 'text-emerald-400' : 'text-red-400'
           )}
         >
-          {isAutonomous ? 'IA Autónoma Activa' : 'Modo Manual'}
+          {isAutonomous ? 'Active Autonomous AI' : 'Manual Mode'}
         </span>
       </div>
 

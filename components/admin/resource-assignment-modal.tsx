@@ -17,30 +17,31 @@ import {
   assignResourcesToOperator,
 } from "@/app/admin/actions"
 
-export interface Resource {
-  id: string
-  name: string
-  category: "salud" | "rescate" | "seguridad"
-  base: string
-  icon: React.ReactNode
+const RESOURCE_TYPE_MAP: Record<string, { category: "salud" | "rescate" | "seguridad"; icon: React.ReactNode }> = {
+  ambulance:   { category: "salud",    icon: <Ambulance className="h-4 w-4" /> },
+  medical:     { category: "salud",    icon: <Ambulance className="h-4 w-4" /> },
+  helicopter:  { category: "salud",    icon: <Plane className="h-4 w-4" /> },
+  firefighter: { category: "rescate",  icon: <Truck className="h-4 w-4" /> },
+  boat:        { category: "rescate",  icon: <Ship className="h-4 w-4" /> },
+  police:      { category: "seguridad", icon: <Shield className="h-4 w-4" /> },
+  shelter:     { category: "rescate",  icon: <Truck className="h-4 w-4" /> },
 }
 
-const RESOURCES: Resource[] = [
-  { id: "amb-same-01", name: "Ambulancia SAME-01", category: "salud", base: "Base Central", icon: <Ambulance className="h-4 w-4" /> },
-  { id: "amb-same-02", name: "Ambulancia SAME-02", category: "salud", base: "Base Central", icon: <Ambulance className="h-4 w-4" /> },
-  { id: "heli-h-01", name: "Helicóptero H-01", category: "salud", base: "Aeropuerto Teniente Benjamín", icon: <Plane className="h-4 w-4" /> },
-  { id: "bomba-b-01", name: "Autobomba B-01", category: "rescate", base: "Cuartel Bomberos Zona Norte", icon: <Truck className="h-4 w-4" /> },
-  { id: "bomba-b-02", name: "Autobomba B-02", category: "rescate", base: "Cuartel Bomberos Zona Sur", icon: <Truck className="h-4 w-4" /> },
-  { id: "lancha-l-01", name: "Lancha Rescate L-01", category: "rescate", base: "Puerto Dique San Roque", icon: <Ship className="h-4 w-4" /> },
-  { id: "patrulla-p-101", name: "Patrulla P-101", category: "seguridad", base: "Comisaría 1ra", icon: <Shield className="h-4 w-4" /> },
-  { id: "patrulla-p-102", name: "Patrulla P-102", category: "seguridad", base: "Comisaría 5ta", icon: <Shield className="h-4 w-4" /> },
+const CATEGORIES = [
+  { id: "salud" as const, label: "Health", color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" },
+  { id: "rescate" as const, label: "Rescue / Firefighters", color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
+  { id: "seguridad" as const, label: "Security", color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
 ]
 
-const CATEGORIES = [
-  { id: "salud" as const, label: "Salud", color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" },
-  { id: "rescate" as const, label: "Rescate / Bomberos", color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20" },
-  { id: "seguridad" as const, label: "Seguridad", color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
-]
+interface DbResource {
+  id: string
+  tipo: string
+  nombre: string
+  cantidad: number
+  cantidad_disponible: number
+  estado: string
+  ubicacion: string
+}
 
 interface ResourceAssignmentModalProps {
   isOpen: boolean
@@ -53,14 +54,29 @@ export function ResourceAssignmentModal({ isOpen, onClose, operatorId, operatorN
   const [selectedResources, setSelectedResources] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [resources, setResources] = useState<DbResource[]>([])
 
-  const loadAssignments = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const assigned = await getOperatorAssignments(operatorId)
+      const [assigned, response] = await Promise.all([
+        getOperatorAssignments(operatorId),
+        fetch("/api/recursos"),
+      ])
+
       setSelectedResources(new Set(assigned))
-    } catch {
+
+      if (response.ok) {
+        const data = await response.json()
+        setResources(Array.isArray(data) ? data : [])
+      } else {
+        console.error("Error cargando recursos:", await response.text())
+        setResources([])
+      }
+    } catch (err) {
+      console.error("Error en loadData:", err)
       setSelectedResources(new Set())
+      setResources([])
     } finally {
       setLoading(false)
     }
@@ -68,9 +84,9 @@ export function ResourceAssignmentModal({ isOpen, onClose, operatorId, operatorN
 
   useEffect(() => {
     if (isOpen) {
-      loadAssignments()
+      loadData()
     }
-  }, [isOpen, loadAssignments])
+  }, [isOpen, loadData])
 
   const toggleResource = (resourceId: string) => {
     setSelectedResources((prev) => {
@@ -85,7 +101,9 @@ export function ResourceAssignmentModal({ isOpen, onClose, operatorId, operatorN
   }
 
   const toggleCategory = (categoryId: string) => {
-    const categoryResources = RESOURCES.filter((r) => r.category === categoryId).map((r) => r.id)
+    const categoryResources = resources
+      .filter((r) => (RESOURCE_TYPE_MAP[r.tipo]?.category ?? "rescate") === categoryId)
+      .map((r) => r.id)
     const allSelected = categoryResources.every((id) => selectedResources.has(id))
 
     setSelectedResources((prev) => {
@@ -100,12 +118,16 @@ export function ResourceAssignmentModal({ isOpen, onClose, operatorId, operatorN
   }
 
   const isCategoryFullySelected = (categoryId: string) => {
-    const categoryResources = RESOURCES.filter((r) => r.category === categoryId).map((r) => r.id)
+    const categoryResources = resources
+      .filter((r) => (RESOURCE_TYPE_MAP[r.tipo]?.category ?? "rescate") === categoryId)
+      .map((r) => r.id)
     return categoryResources.length > 0 && categoryResources.every((id) => selectedResources.has(id))
   }
 
   const isCategoryPartiallySelected = (categoryId: string) => {
-    const categoryResources = RESOURCES.filter((r) => r.category === categoryId).map((r) => r.id)
+    const categoryResources = resources
+      .filter((r) => (RESOURCE_TYPE_MAP[r.tipo]?.category ?? "rescate") === categoryId)
+      .map((r) => r.id)
     const selectedCount = categoryResources.filter((id) => selectedResources.has(id)).length
     return selectedCount > 0 && selectedCount < categoryResources.length
   }
@@ -131,21 +153,28 @@ export function ResourceAssignmentModal({ isOpen, onClose, operatorId, operatorN
 
   if (!isOpen) return null
 
-  const totalSelected = selectedResources.size
+  const totalAssignedUnits = Array.from(selectedResources).reduce((sum: number, resourceId: string) => {
+    const resource = resources.find((r) => r.id === resourceId)
+    return sum + (resource?.cantidad || 1)
+  }, 0)
+
+  const availableResources = resources.filter((r) => {
+    const disp = r.cantidad_disponible ?? (r.cantidad || 1)
+    return disp > 0
+  })
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleClose} />
 
       <div className="relative z-10 w-full max-w-lg mx-4 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/50 overflow-hidden flex flex-col max-h-[85vh]">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4 shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
               <Truck className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-zinc-100">Asignar Recursos</h2>
+              <h2 className="text-sm font-semibold text-zinc-100">Assign Resources</h2>
               <p className="text-[10px] text-zinc-500 font-mono tracking-wider">
                 {operatorName.toUpperCase()}
               </p>
@@ -160,23 +189,34 @@ export function ResourceAssignmentModal({ isOpen, onClose, operatorId, operatorN
           </button>
         </div>
 
-        {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
-              <p className="text-xs text-zinc-500">Cargando asignaciones...</p>
+              <p className="text-xs text-zinc-500">Loading assignments...</p>
+            </div>
+          ) : availableResources.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Truck className="h-8 w-8 text-zinc-700" />
+              <p className="text-sm text-zinc-500">No available resources</p>
+              <p className="text-xs text-zinc-600 text-center">
+                All resources are assigned or in use.<br />
+                Create new resources from "Resource Management".
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
               {CATEGORIES.map((cat) => {
-                const categoryResources = RESOURCES.filter((r) => r.category === cat.id)
+                const categoryResources = availableResources.filter(
+                  (r) => (RESOURCE_TYPE_MAP[r.tipo]?.category ?? "rescate") === cat.id
+                )
+                if (categoryResources.length === 0) return null
+
                 const fullySelected = isCategoryFullySelected(cat.id)
                 const partiallySelected = isCategoryPartiallySelected(cat.id)
 
                 return (
                   <div key={cat.id} className="rounded-lg border border-zinc-800 bg-zinc-900/30 overflow-hidden">
-                    {/* Category header */}
                     <button
                       onClick={() => toggleCategory(cat.id)}
                       className={cn(
@@ -199,13 +239,16 @@ export function ResourceAssignmentModal({ isOpen, onClose, operatorId, operatorN
                           ({categoryResources.filter((r) => selectedResources.has(r.id)).length}/{categoryResources.length})
                         </span>
                       </div>
-                      <span className="text-[10px] text-zinc-600 font-mono tracking-wider">SELECCIONAR TODOS</span>
+                      <span className="text-[10px] text-zinc-600 font-mono tracking-wider">SELECT ALL</span>
                     </button>
 
-                    {/* Resources */}
                     <div className="divide-y divide-zinc-800/30">
                       {categoryResources.map((resource) => {
                         const isSelected = selectedResources.has(resource.id)
+                        const typeInfo = RESOURCE_TYPE_MAP[resource.tipo] || RESOURCE_TYPE_MAP.shelter
+                        const cantidad = resource.cantidad || 1
+                        const disponible = resource.cantidad_disponible ?? cantidad
+
                         return (
                           <button
                             key={resource.id}
@@ -225,15 +268,20 @@ export function ResourceAssignmentModal({ isOpen, onClose, operatorId, operatorN
                             </div>
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <span className={cn("shrink-0", isSelected ? "text-emerald-400" : "text-zinc-500")}>
-                                {resource.icon}
+                                {typeInfo.icon}
                               </span>
                               <span className={cn("text-xs truncate", isSelected ? "text-zinc-200 font-medium" : "text-zinc-400")}>
-                                {resource.name}
+                                {resource.nombre}
                               </span>
                             </div>
-                            <span className="text-[10px] text-zinc-600 font-mono shrink-0">
-                              {resource.base}
-                            </span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={cn("text-[10px] font-mono font-semibold", isSelected ? "text-cyan-400" : "text-zinc-600")}>
+                                {disponible}/{cantidad}
+                              </span>
+                              <span className="text-[10px] text-zinc-600 font-mono shrink-0">
+                                {resource.ubicacion}
+                              </span>
+                            </div>
                           </button>
                         )
                       })}
@@ -245,16 +293,15 @@ export function ResourceAssignmentModal({ isOpen, onClose, operatorId, operatorN
           )}
         </div>
 
-        {/* Footer */}
         {!loading && (
           <div className="flex items-center justify-between border-t border-zinc-800 px-6 py-4 bg-zinc-900/30 shrink-0">
             <div className="flex items-center gap-2">
               <Truck className="h-3.5 w-3.5 text-zinc-600" />
               <span className="text-xs text-zinc-500">
-                <span className={cn("font-semibold", totalSelected > 0 ? "text-emerald-400" : "text-zinc-600")}>
-                  {totalSelected}
+                <span className={cn("font-semibold", totalAssignedUnits > 0 ? "text-emerald-400" : "text-zinc-600")}>
+                  {totalAssignedUnits}
                 </span>{" "}
-                recurso{totalSelected !== 1 ? "s" : ""} asignado{totalSelected !== 1 ? "s" : ""}
+                unidad{totalAssignedUnits !== 1 ? "es" : ""} assigned{totalAssignedUnits !== 1 ? "s" : ""}
               </span>
             </div>
             <div className="flex gap-3">
@@ -263,7 +310,7 @@ export function ResourceAssignmentModal({ isOpen, onClose, operatorId, operatorN
                 disabled={saving}
                 className="rounded-lg border border-zinc-700 bg-zinc-800/50 px-4 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-700/50 transition-all disabled:opacity-30"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={handleSave}
@@ -278,12 +325,12 @@ export function ResourceAssignmentModal({ isOpen, onClose, operatorId, operatorN
                 {saving ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Guardando...
+                    Saving...
                   </>
                 ) : (
                   <>
                     <Check className="h-3.5 w-3.5" />
-                    Guardar Asignación
+                    Save Assignment
                   </>
                 )}
               </button>

@@ -29,10 +29,10 @@ interface BroadcastAgentModalProps {
 type Phase = "generating" | "draft" | "success"
 
 const LOADING_MESSAGES = [
-  "Analizando incidentes críticos...",
-  "Extrayendo zonas afectadas...",
-  "Redactando alerta poblacional...",
-  "Validando canales de difusión...",
+  "Analyzing critical incidents...",
+  "Extracting affected zones...",
+  "Drafting population alert...",
+  "Validating broadcast channels...",
 ]
 
 const MOCK_MESSAGES: Record<ChannelType, string> = {
@@ -44,28 +44,28 @@ const MOCK_MESSAGES: Record<ChannelType, string> = {
 
 const CHANNEL_CONFIG: Record<ChannelType, { title: string; icon: React.ReactNode; maxChars: number | null; urgencyLabel: string }> = {
   sms: {
-    title: "Difusión por SMS Masivo",
+    title: "SMS Bulk Broadcast",
     icon: <Smartphone className="h-5 w-5" />,
     maxChars: 160,
-    urgencyLabel: "CRÍTICO",
+    urgencyLabel: "CRITICAL",
   },
   whatsapp: {
-    title: "Alerta de WhatsApp",
+    title: "WhatsApp Alert",
     icon: <MessageSquare className="h-5 w-5" />,
     maxChars: null,
-    urgencyLabel: "CRÍTICO",
+    urgencyLabel: "CRITICAL",
   },
   email: {
-    title: "Email a Autoridades",
+    title: "Email to Authorities",
     icon: <Mail className="h-5 w-5" />,
     maxChars: null,
-    urgencyLabel: "ALTO",
+    urgencyLabel: "HIGH",
   },
   radio: {
-    title: "Transmisión Radial",
+    title: "Radio Broadcast",
     icon: <Radio className="h-5 w-5" />,
     maxChars: null,
-    urgencyLabel: "CRÍTICO",
+    urgencyLabel: "CRITICAL",
   },
 }
 
@@ -151,7 +151,7 @@ export function BroadcastAgentModal({ isOpen, onClose, channelType, recipients }
             <div>
               <h2 className="text-sm font-semibold text-zinc-100">{config.title}</h2>
               <p className="text-[10px] text-zinc-500 font-mono tracking-wider">
-                {recipients > 0 ? `${recipients.toLocaleString()} DESTINATARIOS` : "TRANSMISIÓN EN VIVO"}
+                {recipients > 0 ? `${recipients.toLocaleString()} RECIPIENTS` : "LIVE TRANSMISSION"}
               </p>
             </div>
           </div>
@@ -200,7 +200,7 @@ export function BroadcastAgentModal({ isOpen, onClose, channelType, recipients }
               <div className="relative">
                 <div className="absolute left-3 top-3 flex items-center gap-1.5 text-zinc-600">
                   <Edit3 className="h-3 w-3" />
-                  <span className="text-[9px] font-mono tracking-wider uppercase">Mensaje generado por IA</span>
+                  <span className="text-[9px] font-mono tracking-wider uppercase">AI-generated message</span>
                 </div>
                 <textarea
                   value={message}
@@ -243,9 +243,9 @@ export function BroadcastAgentModal({ isOpen, onClose, channelType, recipients }
                 </div>
               </div>
               <div className="text-center space-y-2">
-                <p className="text-base font-semibold text-emerald-400">Transmisión Completada</p>
+                <p className="text-base font-semibold text-emerald-400">Transmission Completed</p>
                 <p className="text-[11px] text-zinc-500 font-mono">
-                  Registrada en Auditoría // {new Date().toLocaleTimeString("es-AR")}
+                  Logged to Audit // {new Date().toLocaleTimeString("en-US")}
                 </p>
               </div>
             </div>
@@ -260,7 +260,7 @@ export function BroadcastAgentModal({ isOpen, onClose, channelType, recipients }
               className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/50 px-4 py-2.5 text-xs font-medium text-zinc-300 hover:bg-zinc-700/50 hover:text-zinc-100 transition-all disabled:opacity-30"
             >
               <Sparkles className="h-3.5 w-3.5 text-violet-400" />
-              Reescribir con IA
+              Rewrite with AI
             </button>
 
             <button
@@ -276,12 +276,12 @@ export function BroadcastAgentModal({ isOpen, onClose, channelType, recipients }
               {isTransmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Transmitiendo...
+                  Transmitting...
                 </>
               ) : (
                 <>
                   <Megaphone className="h-4 w-4" />
-                  Confirmar y Transmitir
+                  Confirm and Transmit
                 </>
               )}
             </button>

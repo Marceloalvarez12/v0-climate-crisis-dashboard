@@ -14,20 +14,20 @@ interface ImpactItem {
 
 const IMPACT_ITEMS: ImpactItem[] = [
   {
-    label: 'Escaneo en Tiempo Real',
-    activeText: 'X, Facebook, Logs activos',
-    inactiveText: 'X, Facebook, Logs activos',
+    label: 'Real-Time Scanning',
+    activeText: 'X, Facebook, Logs active',
+    inactiveText: 'X, Facebook, Logs active',
     alwaysActive: true,
   },
   {
-    label: 'Auto-cierre de Incidentes',
-    activeText: 'Cierre automático habilitado',
-    inactiveText: 'Requiere intervención manual',
+    label: 'Auto-Close Incidents',
+    activeText: 'Auto-close enabled',
+    inactiveText: 'Requires manual intervention',
   },
   {
-    label: 'Análisis de Severidad',
-    activeText: 'Clasificación autónoma activa',
-    inactiveText: 'Clasificación autónoma activa',
+    label: 'Severity Analysis',
+    activeText: 'Autonomous classification active',
+    inactiveText: 'Autonomous classification active',
     alwaysActive: true,
   },
 ]
@@ -95,7 +95,7 @@ export function AgentKillSwitch({ initialAutonomous }: AgentKillSwitchProps) {
           </div>
           <div className="flex-1">
             <h2 className="text-sm font-semibold text-zinc-100">
-              Control de Mando del Agente IA
+              AI Agent Command Control
             </h2>
             <div className="flex items-center gap-2">
               <div
@@ -110,7 +110,7 @@ export function AgentKillSwitch({ initialAutonomous }: AgentKillSwitchProps) {
                   isAutonomous ? 'text-emerald-400/70' : 'text-red-400/70'
                 )}
               >
-                {isAutonomous ? 'Modo Autónomo' : 'Control Manual'}
+                {isAutonomous ? 'Autonomous Mode' : 'Manual Control'}
               </span>
             </div>
           </div>
@@ -163,13 +163,13 @@ export function AgentKillSwitch({ initialAutonomous }: AgentKillSwitchProps) {
                     )}
                   >
                     {isAutonomous
-                      ? 'Modo Autónomo (IA Activa)'
-                      : 'Control Manual (IA Suspendida)'}
+                      ? 'Autonomous Mode (AI Active)'
+                      : 'Manual Control (AI Suspended)'}
                   </p>
                   <p className="text-xs text-zinc-500 mt-0.5">
                     {isAutonomous
-                      ? 'El Agente Gemini está escaneando y tomando decisiones'
-                      : 'Se requiere 100% intervención humana'}
+                      ? 'The Gemini Agent is scanning and making decisions'
+                      : '100% human intervention required'}
                   </p>
                 </div>
               </div>
@@ -193,7 +193,7 @@ export function AgentKillSwitch({ initialAutonomous }: AgentKillSwitchProps) {
         {/* Panel de Impacto */}
         <div className="border-t border-zinc-800 px-6 py-5">
           <p className="text-[10px] font-mono tracking-widest uppercase text-zinc-500 mb-4">
-            Impacto del Cambio
+            Impact of Change
           </p>
           <div className="space-y-3">
             {IMPACT_ITEMS.map((item) => {
@@ -267,10 +267,10 @@ export function AgentKillSwitch({ initialAutonomous }: AgentKillSwitchProps) {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-red-300">
-                  ⚠️ ATENCIÓN
+                  ⚠️ WARNING
                 </h3>
                 <p className="text-[10px] font-mono text-red-400/60 uppercase tracking-wider">
-                  Acción Crítica del Sistema
+                  Critical System Action
                 </p>
               </div>
             </div>
@@ -278,12 +278,12 @@ export function AgentKillSwitch({ initialAutonomous }: AgentKillSwitchProps) {
             {/* Cuerpo del Modal */}
             <div className="px-6 py-5">
               <p className="text-sm text-zinc-300 leading-relaxed">
-                Desactivar la IA detendrá:
+                Disabling AI will stop:
               </p>
               <ul className="mt-3 space-y-2">
                 {[
-                  'Auto-despacho de recursos',
-                  'Cierre automático de incidentes',
+                  'Auto-dispatch of resources',
+                  'Automatic incident closure',
                 ].map((item) => (
                   <li
                     key={item}
@@ -295,7 +295,7 @@ export function AgentKillSwitch({ initialAutonomous }: AgentKillSwitchProps) {
                 ))}
               </ul>
               <p className="mt-4 text-sm font-medium text-zinc-200">
-                ¿Confirma pasar a modo manual?
+                Confirm switch to manual mode?
               </p>
             </div>
 
@@ -306,14 +306,14 @@ export function AgentKillSwitch({ initialAutonomous }: AgentKillSwitchProps) {
                 disabled={isUpdating}
                 className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-700 disabled:opacity-50"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={handleDeactivate}
                 disabled={isUpdating}
                 className="flex-1 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-red-500 active:scale-95 disabled:opacity-50"
               >
-                {isUpdating ? 'Procesando...' : 'Desactivar IA'}
+                {isUpdating ? 'Processing...' : 'Disable AI'}
               </button>
             </div>
           </div>
