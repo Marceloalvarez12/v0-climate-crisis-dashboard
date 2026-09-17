@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { DashboardHeader } from "@/components/dashboard/header"
+import { VoiceFab } from "@/components/dashboard/voice-fab"
 import { AIActivityLog } from "@/components/dashboard/ai-activity-log"
 import { AgentStatusPanel } from "@/components/dashboard/agent-status-panel"
 import { ResourcesPanel } from "@/components/dashboard/resources-panel"
@@ -46,6 +47,7 @@ export default function CrisisDashboard() {
       {isAdmin && <DevPanel />}
 
       <DashboardHeader />
+      <VoiceFab />
 
       {/* ── DESKTOP layout (lg+) ── */}
       <div className="hidden lg:flex flex-1 overflow-hidden">

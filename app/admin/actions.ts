@@ -18,6 +18,68 @@ export async function getAgentMode(): Promise<boolean> {
   return (data.valor as { autonomous: boolean }).autonomous
 }
 
+export async function getVoiceControlEnabled(): Promise<boolean> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('config_sistema')
+    .select('valor')
+    .eq('clave', 'voice_control_enabled')
+    .single()
+
+  if (error || !data) {
+    return false
+  }
+
+  return Boolean((data.valor as { enabled?: boolean }).enabled)
+}
+
+export async function updateVoiceControlEnabled(
+  enabled: boolean,
+): Promise<{ success: boolean }> {
+  const supabase = await createClient()
+
+  const { data: user } = await supabase.auth.getUser()
+  if (!user.user) {
+    throw new Error('No autorizado')
+  }
+
+  const { data: profile } = await supabase
+    .from('perfiles')
+    .select('rol')
+    .eq('id', user.user.id)
+    .single()
+
+  if (profile?.rol !== 'admin') {
+    throw new Error('Solo administradores pueden activar el control por voz')
+  }
+
+  const { error } = await supabase
+    .from('config_sistema')
+    .update({
+      valor: {
+        enabled,
+        updated_by: user.user.email,
+        updated_at: new Date().toISOString(),
+      },
+    })
+    .eq('clave', 'voice_control_enabled')
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  await supabase.rpc('registrar_auditoria', {
+    p_accion: 'voice_control_toggle',
+    p_detalle: JSON.stringify({
+      enabled,
+      ejecutado_por: user.user.email,
+    }),
+  })
+
+  return { success: true }
+}
+
 export async function updateAgentMode(autonomous: boolean): Promise<{ success: boolean }> {
   const supabase = await createClient()
 

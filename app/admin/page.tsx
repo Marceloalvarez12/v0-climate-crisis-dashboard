@@ -1,12 +1,13 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getAgentMode, getAgentThresholds, getApiCredentials, getUsers } from './actions'
+import { getAgentMode, getAgentThresholds, getApiCredentials, getUsers, getVoiceControlEnabled } from './actions'
 import { logout } from '@/app/login/actions'
 import { AgentKillSwitch } from '@/components/admin/agent-kill-switch'
 import { AgentThresholdConfig } from '@/components/admin/agent-threshold-config'
 import { ApiConnectionManager } from '@/components/admin/api-connection-manager'
 import { UserRoleManager } from '@/components/admin/user-role-manager'
-import { Shield, Sliders, Link as LinkIcon, Users, LogOut, Monitor, User, Radio } from 'lucide-react'
+import { VoiceControlKillSwitch } from '@/components/admin/voice-control-kill-switch'
+import { Shield, Sliders, Link as LinkIcon, Users, LogOut, Monitor, User, Radio, Mic } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -20,6 +21,12 @@ const SECTIONS = [
     label: 'Control del Agente',
     icon: Shield,
     description: 'Interruptor de emergencia y modo autónomo',
+  },
+  {
+    id: 'voice',
+    label: 'Control por Voz',
+    icon: Mic,
+    description: 'Activa comandos por voz con OpenAI Realtime',
   },
   {
     id: 'thresholds',
@@ -50,7 +57,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         ? 'connections'
         : section === 'users'
           ? 'users'
-          : 'control'
+          : section === 'voice'
+            ? 'voice'
+            : 'control'
 
   const supabase = await createClient()
 
@@ -72,11 +81,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     redirect('/')
   }
 
-  const [initialAutonomous, thresholds, apiKeys, adminUsers] = await Promise.all([
+  const [initialAutonomous, thresholds, apiKeys, adminUsers, initialVoiceEnabled] = await Promise.all([
     activeSection === 'control' ? getAgentMode() : Promise.resolve(false),
     activeSection === 'thresholds' ? getAgentThresholds() : Promise.resolve({ autoResolve: 5, confidence: 80 }),
     activeSection === 'connections' ? getApiCredentials() : Promise.resolve({}),
     activeSection === 'users' ? getUsers() : Promise.resolve([]),
+    activeSection === 'voice' ? getVoiceControlEnabled() : Promise.resolve(false),
   ])
 
   return (
@@ -185,6 +195,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         <main className="flex-1 px-8 py-10">
           {activeSection === 'control' && (
             <AgentKillSwitch initialAutonomous={initialAutonomous} />
+          )}
+          {activeSection === 'voice' && (
+            <VoiceControlKillSwitch initialEnabled={initialVoiceEnabled} />
           )}
           {activeSection === 'thresholds' && (
             <AgentThresholdConfig

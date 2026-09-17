@@ -57,8 +57,13 @@ CREATE TABLE IF NOT EXISTS public.config_sistema (
 );
 
 -- 7. Insertar configuración inicial del agente
-INSERT INTO public.config_sistema (clave, valor)
+INSERT INTO config_sistema (clave, valor)
 VALUES ('agent_mode', '{"autonomous": true, "updated_by": "system"}')
+ON CONFLICT (clave) DO NOTHING;
+
+-- 7b. Insertar configuración inicial de control por voz (DESACTIVADO por defecto)
+INSERT INTO config_sistema (clave, valor)
+VALUES ('voice_control_enabled', '{"enabled": false, "updated_by": "system"}')
 ON CONFLICT (clave) DO NOTHING;
 
 -- 8. Habilitar RLS en config_sistema
