@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { MapPin, Layers, Globe2 } from "lucide-react"
+import { MapPin, Layers, Globe2, Activity, Cloud } from "lucide-react"
 import { preferGlobe3D } from "@/lib/map/prefer-globe"
+import { useEarthquakes, useWeather } from "@/hooks/use-live-layers"
 import { cn } from "@/lib/utils"
 import { dispatchResourceWithLifecycle, restoreResourceTimersOnMount } from "@/hooks/use-resource-lifecycle"
 import { buildRespawnIncident } from "@/lib/mock-data"
@@ -57,7 +58,12 @@ export function CrisisMap() {
   const [selectedCounts,     setSelectedCounts]     = useState<Record<string, number>>({})
   const [assignedResourceIds, setAssignedResourceIds] = useState<Set<string> | null>(null)
   const [mapEngine, setMapEngine] = useState<"pending" | "cesium" | "leaflet">("pending")
+  const [showEarthquakes, setShowEarthquakes] = useState(true)
+  const [showWeather, setShowWeather] = useState(true)
   const handleCesiumError = useCallback(() => setMapEngine("leaflet"), [])
+
+  const { earthquakes } = useEarthquakes(showEarthquakes && mapEngine === "cesium")
+  const { weather } = useWeather(showWeather && mapEngine === "cesium", -26.8241, -65.2226, "San Miguel de Tucumán")
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const { incidents: dbIncidents, mutate: mutateIncidents } = useIncidents()
@@ -207,10 +213,32 @@ export function CrisisMap() {
 
         <div className="flex shrink-0 items-center gap-1.5">
           {mapEngine === "cesium" && (
-            <Badge variant="outline" className="hidden h-6 gap-1 border-primary/40 bg-primary/10 px-2 text-[10px] text-primary sm:inline-flex">
-              <Globe2 className="h-3 w-3" />
-              3D
-            </Badge>
+            <>
+              <Button
+                variant={showEarthquakes ? "secondary" : "outline"}
+                size="sm"
+                className="hidden h-6 gap-1 border-border px-2 text-[10px] sm:inline-flex"
+                onClick={() => setShowEarthquakes((v) => !v)}
+                title="Sismos USGS últimos 7 días"
+              >
+                <Activity className="h-3 w-3" />
+                Sismos
+              </Button>
+              <Button
+                variant={showWeather ? "secondary" : "outline"}
+                size="sm"
+                className="hidden h-6 gap-1 border-border px-2 text-[10px] sm:inline-flex"
+                onClick={() => setShowWeather((v) => !v)}
+                title="Clima Open-Meteo Tucumán"
+              >
+                <Cloud className="h-3 w-3" />
+                Clima
+              </Button>
+              <Badge variant="outline" className="hidden h-6 gap-1 border-primary/40 bg-primary/10 px-2 text-[10px] text-primary sm:inline-flex">
+                <Globe2 className="h-3 w-3" />
+                3D
+              </Badge>
+            </>
           )}
           {/* Layer filter */}
           <Popover>
@@ -307,6 +335,10 @@ export function CrisisMap() {
         <div className="h-[400px] w-full shrink-0 pt-10 md:h-full md:flex-1">
           <CesiumGlobe
             incidents={filteredIncidents}
+            earthquakes={earthquakes}
+            weather={weather}
+            showEarthquakes={showEarthquakes}
+            showWeather={showWeather}
             selectedId={selectedIncident?.id ?? null}
             onSelect={setSelectedIncident}
             onInitError={handleCesiumError}

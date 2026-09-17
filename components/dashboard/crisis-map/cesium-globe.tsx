@@ -2,19 +2,35 @@
 
 import { useEffect, useRef, useState } from "react"
 import type { Incident } from "@/lib/types"
+import type { Earthquake, WeatherSnapshot } from "@/lib/data/layers"
 import { severityHex } from "@/components/dashboard/crisis-map/incident-helpers"
 import { createZntinelViewer, type CesiumModule, type ZntinelViewer } from "@/lib/map/create-cesium-viewer"
 import { incidentBillboardCanvas, pulseRadiusMeters } from "@/lib/map/cesium-markers"
+import { earthquakeCanvas, weatherCanvas } from "@/lib/map/layer-markers"
+import { ID_EQ, ID_INC, ID_WX_TUCUMAN, incidentIdFromEntity } from "@/lib/map/layer-ids"
 import { TUCUMAN_CENTER } from "@/lib/map/tucuman"
 
 interface CesiumGlobeProps {
   incidents: Incident[]
+  earthquakes: Earthquake[]
+  weather: WeatherSnapshot | null
+  showEarthquakes: boolean
+  showWeather: boolean
   selectedId: string | null
   onSelect: (incident: Incident) => void
   onInitError?: () => void
 }
 
-export function CesiumGlobe({ incidents, selectedId, onSelect, onInitError }: CesiumGlobeProps) {
+export function CesiumGlobe({
+  incidents,
+  earthquakes,
+  weather,
+  showEarthquakes,
+  showWeather,
+  selectedId,
+  onSelect,
+  onInitError,
+}: CesiumGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<ZntinelViewer | null>(null)
   const cesiumRef = useRef<CesiumModule | null>(null)
@@ -50,8 +66,11 @@ export function CesiumGlobe({ incidents, selectedId, onSelect, onInitError }: Ce
           const picked = viewer.scene.pick(click.position)
           if (!Cesium.defined(picked) || !picked.id) return
           const id = String(picked.id.id)
-          const incident = incidentsRef.current.find((item) => item.id === id)
-          if (incident) onSelectRef.current(incident)
+          if (id.startsWith("inc:")) {
+            const realId = incidentIdFromEntity(id)
+            const incident = incidentsRef.current.find((item) => item.id === realId)
+            if (incident) onSelectRef.current(incident)
+          }
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
 
         setReady(true)
@@ -74,34 +93,36 @@ export function CesiumGlobe({ incidents, selectedId, onSelect, onInitError }: Ce
     }
   }, [onInitError])
 
+  // ── Incidentes ─────────────────────────────────────────────────────────
   useEffect(() => {
     const viewer = viewerRef.current
     const Cesium = cesiumRef.current
     if (!ready || !viewer || !Cesium) return
 
-    const incoming = new Set(incidents.map((item) => item.id))
+    const incoming = new Set(incidents.map((item) => ID_INC(item.id)))
     const toRemove: string[] = []
     for (const entity of viewer.entities.values) {
-      if (!incoming.has(String(entity.id))) toRemove.push(String(entity.id))
+      const id = String(entity.id)
+      if (id.startsWith("inc:") && !incoming.has(id)) toRemove.push(id)
     }
     for (const id of toRemove) viewer.entities.removeById(id)
 
     for (const incident of incidents) {
+      const entityId = ID_INC(incident.id)
       const color = Cesium.Color.fromCssColorString(severityHex(incident.severity))
       const position = Cesium.Cartesian3.fromDegrees(
         incident.coordinates.lng,
         incident.coordinates.lat,
         40,
       )
-      const existing = viewer.entities.getById(incident.id)
+      const existing = viewer.entities.getById(entityId)
       if (existing) {
         existing.position = new Cesium.ConstantPositionProperty(position)
         continue
       }
-
       const radius = pulseRadiusMeters(incident.severity)
       viewer.entities.add({
-        id: incident.id,
+        id: entityId,
         name: incident.location,
         position,
         billboard: {
@@ -135,10 +156,114 @@ export function CesiumGlobe({ incidents, selectedId, onSelect, onInitError }: Ce
         },
       })
     }
-
     viewer.scene.requestRender()
   }, [incidents, ready])
 
+  // ── Terremotos ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const viewer = viewerRef.current
+    const Cesium = cesiumRef.current
+    if (!ready || !viewer || !Cesium) return
+
+    const incoming = new Set(earthquakes.map((item) => ID_EQ(item.id)))
+    const toRemove: string[] = []
+    for (const entity of viewer.entities.values) {
+      const id = String(entity.id)
+      if (id.startsWith("eq:") && !incoming.has(id)) toRemove.push(id)
+    }
+    for (const id of toRemove) viewer.entities.removeById(id)
+
+    for (const eq of earthquakes) {
+      const entityId = ID_EQ(eq.id)
+      const position = Cesium.Cartesian3.fromDegrees(
+        eq.coordinates.lng,
+        eq.coordinates.lat,
+        0,
+      )
+      const existing = viewer.entities.getById(entityId)
+      if (existing) {
+        existing.position = new Cesium.ConstantPositionProperty(position)
+        existing.show = showEarthquakes
+        continue
+      }
+      viewer.entities.add({
+        id: entityId,
+        name: `M${eq.magnitude.toFixed(1)} — ${eq.place}`,
+        position,
+        show: showEarthquakes,
+        billboard: {
+          image: earthquakeCanvas(eq.magnitude),
+          verticalOrigin: Cesium.VerticalOrigin.CENTER,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          scale: 0.8,
+        },
+        label: {
+          text: `M${eq.magnitude.toFixed(1)}`,
+          font: "10px sans-serif",
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.TOP,
+          pixelOffset: new Cesium.Cartesian2(0, -22),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          showBackground: true,
+          backgroundColor: Cesium.Color.fromCssColorString("#7c2d12").withAlpha(0.85),
+          translucencyByDistance: new Cesium.NearFarScalar(50_000, 1, 4_000_000, 0.4),
+        },
+      })
+    }
+    viewer.scene.requestRender()
+  }, [earthquakes, showEarthquakes, ready])
+
+  // ── Clima ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const viewer = viewerRef.current
+    const Cesium = cesiumRef.current
+    if (!ready || !viewer || !Cesium) return
+
+    const existing = viewer.entities.getById(ID_WX_TUCUMAN)
+    if (!weather) {
+      if (existing) existing.show = false
+      viewer.scene.requestRender()
+      return
+    }
+    const position = Cesium.Cartesian3.fromDegrees(
+      weather.location.lng,
+      weather.location.lat,
+      220,
+    )
+    const image = weatherCanvas({
+      tempC: weather.temperatureC,
+      windKmh: weather.windSpeedKmh,
+      precipMm: weather.precipitationMm,
+    })
+    if (existing) {
+      existing.position = new Cesium.ConstantPositionProperty(position)
+      if (existing.billboard) {
+        existing.billboard.image = new Cesium.ConstantProperty(image)
+      }
+      existing.show = showWeather
+      viewer.scene.requestRender()
+      return
+    }
+    viewer.entities.add({
+      id: ID_WX_TUCUMAN,
+      name: `Clima: ${weather.temperatureC.toFixed(0)}°C, ${weather.windSpeedKmh.toFixed(0)} km/h`,
+      position,
+      show: showWeather,
+      billboard: {
+        image: new Cesium.ConstantProperty(image),
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        horizontalOrigin: Cesium.HorizontalOrigin.LEFT,
+        pixelOffset: new Cesium.Cartesian2(20, -120),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    })
+    viewer.scene.requestRender()
+  }, [weather, showWeather, ready])
+
+  // ── Fly-to ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const viewer = viewerRef.current
     const Cesium = cesiumRef.current
@@ -173,7 +298,7 @@ export function CesiumGlobe({ incidents, selectedId, onSelect, onInitError }: Ce
         </div>
       )}
       <div className="pointer-events-none absolute bottom-2 left-2 z-10 rounded border border-border bg-card/90 px-2 py-1 text-[9px] text-muted-foreground">
-        Powered by Esri — Esri, Maxar, Earthstar Geographics
+        Tiles © Esri · Sismos USGS (PD) · Clima Open-Meteo (CC BY 4.0)
       </div>
     </div>
   )
