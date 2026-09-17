@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { checkRateLimit } from "@/lib/rate-limit"
 
-const PUBLIC_PATHS = ["/_next", "/favicon.ico", "/login"]
+const PUBLIC_PATHS = ["/_next", "/favicon.ico", "/login", "/cesium"]
 const API_PATHS = ["/api/"]
 
 export async function middleware(request: NextRequest) {

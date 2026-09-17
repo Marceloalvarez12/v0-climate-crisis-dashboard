@@ -5,6 +5,9 @@
 /.next/
 /out/
 
+# Cesium static workers/assets (copied from node_modules on postinstall)
+/public/cesium/
+
 # production
 /build
 

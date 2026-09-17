@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { MapPin, Layers } from "lucide-react"
+import { MapPin, Layers, Globe2 } from "lucide-react"
+import { preferGlobe3D } from "@/lib/map/prefer-globe"
 import { cn } from "@/lib/utils"
 import { dispatchResourceWithLifecycle, restoreResourceTimersOnMount } from "@/hooks/use-resource-lifecycle"
 import { buildRespawnIncident } from "@/lib/mock-data"
@@ -26,6 +27,10 @@ import { getCurrentOperatorAssignments } from "@/app/admin/actions"
 const MapContainer = dynamic(() => import("react-leaflet").then((m) => m.MapContainer), { ssr: false })
 const TileLayer    = dynamic(() => import("react-leaflet").then((m) => m.TileLayer),    { ssr: false })
 const Marker       = dynamic(() => import("react-leaflet").then((m) => m.Marker),       { ssr: false })
+const CesiumGlobe  = dynamic(
+  () => import("./crisis-map/cesium-globe").then((m) => m.CesiumGlobe),
+  { ssr: false },
+)
 
 const MAP_CENTER: [number, number] = [-26.8241, -65.2226]
 const SOURCE_TYPES: IncidentSource[] = ["social", "sensor", "camera"]
@@ -51,6 +56,8 @@ export function CrisisMap() {
   const [deploySuccess,      setDeploySuccess]      = useState(false)
   const [selectedCounts,     setSelectedCounts]     = useState<Record<string, number>>({})
   const [assignedResourceIds, setAssignedResourceIds] = useState<Set<string> | null>(null)
+  const [mapEngine, setMapEngine] = useState<"pending" | "cesium" | "leaflet">("pending")
+  const handleCesiumError = useCallback(() => setMapEngine("leaflet"), [])
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const { incidents: dbIncidents, mutate: mutateIncidents } = useIncidents()
@@ -80,6 +87,7 @@ export function CrisisMap() {
 
   useEffect(() => {
     setIsClient(true)
+    setMapEngine(preferGlobe3D() ? "cesium" : "leaflet")
     const link = document.createElement("link")
     link.rel = "stylesheet"
     link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -198,6 +206,12 @@ export function CrisisMap() {
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {mapEngine === "cesium" && (
+            <Badge variant="outline" className="hidden h-6 gap-1 border-primary/40 bg-primary/10 px-2 text-[10px] text-primary sm:inline-flex">
+              <Globe2 className="h-3 w-3" />
+              3D
+            </Badge>
+          )}
           {/* Layer filter */}
           <Popover>
             <PopoverTrigger asChild>
@@ -288,8 +302,17 @@ export function CrisisMap() {
         </div>
       </div>
 
-      {/* ── Leaflet Map ─────────────────────────────────────────────── */}
-      {isClient && leafletCssLoaded ? (
+      {/* ── Map canvas: Cesium 3D on desktop, Leaflet on mobile / fallback ── */}
+      {isClient && mapEngine === "cesium" ? (
+        <div className="h-[400px] w-full shrink-0 pt-10 md:h-full md:flex-1">
+          <CesiumGlobe
+            incidents={filteredIncidents}
+            selectedId={selectedIncident?.id ?? null}
+            onSelect={setSelectedIncident}
+            onInitError={handleCesiumError}
+          />
+        </div>
+      ) : isClient && leafletCssLoaded && mapEngine === "leaflet" ? (
         <div className="h-[400px] w-full shrink-0 pt-10 md:h-full md:flex-1">
           <style>{LEAFLET_DARK_STYLES}</style>
           <MapContainer center={MAP_CENTER} zoom={13} scrollWheelZoom style={{ height: "100%", width: "100%" }}>
