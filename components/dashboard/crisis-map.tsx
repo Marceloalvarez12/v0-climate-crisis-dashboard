@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import dynamic from "next/dynamic"
-import { MapPin, Layers, Globe2, Activity, Cloud } from "lucide-react"
+import { MapPin, Layers, Globe2, Activity, Cloud, Eye } from "lucide-react"
 import { preferGlobe3D } from "@/lib/map/prefer-globe"
 import { useEarthquakes, useWeather } from "@/hooks/use-live-layers"
+import type { VisualMode } from "@/lib/map/visual-modes"
 import { cn } from "@/lib/utils"
 import { dispatchResourceWithLifecycle, restoreResourceTimersOnMount } from "@/hooks/use-resource-lifecycle"
 import { buildRespawnIncident } from "@/lib/mock-data"
@@ -28,8 +29,12 @@ import { getCurrentOperatorAssignments } from "@/app/admin/actions"
 const MapContainer = dynamic(() => import("react-leaflet").then((m) => m.MapContainer), { ssr: false })
 const TileLayer    = dynamic(() => import("react-leaflet").then((m) => m.TileLayer),    { ssr: false })
 const Marker       = dynamic(() => import("react-leaflet").then((m) => m.Marker),       { ssr: false })
-const CesiumGlobe  = dynamic(
+const CesiumGlobe = dynamic(
   () => import("./crisis-map/cesium-globe").then((m) => m.CesiumGlobe),
+  { ssr: false },
+)
+const GlobeHud = dynamic(
+  () => import("./crisis-map/globe-hud").then((m) => m.GlobeHud),
   { ssr: false },
 )
 
@@ -60,6 +65,9 @@ export function CrisisMap() {
   const [mapEngine, setMapEngine] = useState<"pending" | "cesium" | "leaflet">("pending")
   const [showEarthquakes, setShowEarthquakes] = useState(true)
   const [showWeather, setShowWeather] = useState(true)
+  const [visualMode, setVisualMode] = useState<VisualMode>("satellite")
+  const globeRef = useRef<import("./crisis-map/cesium-globe").CesiumGlobeHandle>(null)
+  const [cesiumViewer, setCesiumViewer] = useState<import("@/lib/map/create-cesium-viewer").ZntinelViewer | null>(null)
   const handleCesiumError = useCallback(() => setMapEngine("leaflet"), [])
 
   const { earthquakes } = useEarthquakes(showEarthquakes && mapEngine === "cesium")
@@ -234,6 +242,47 @@ export function CrisisMap() {
                 <Cloud className="h-3 w-3" />
                 Clima
               </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="hidden h-6 gap-1 border-border px-2 text-[10px] sm:inline-flex"
+                    title="Modo de visualización del globo"
+                  >
+                    <Eye className="h-3 w-3" />
+                    {visualMode === "satellite" ? "Satélite" : visualMode === "street" ? "Calles" : visualMode === "topo" ? "Topo" : "Noche"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-3" align="end">
+                  <p className="mb-2 text-xs font-medium text-foreground">Modo de visualización</p>
+                  <div className="space-y-1">
+                    {([
+                      { id: "satellite", label: "Satélite", desc: "Esri alta resolución" },
+                      { id: "street", label: "Calles", desc: "OpenStreetMap" },
+                      { id: "topo", label: "Topográfico", desc: "OpenTopoMap relieve" },
+                      { id: "dark", label: "Noche táctica", desc: "Stadia Alidade dark" },
+                    ] as const).map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => setVisualMode(m.id)}
+                        className={cn(
+                          "flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-secondary",
+                          visualMode === m.id && "bg-primary/10 text-primary",
+                        )}
+                      >
+                        <div>
+                          <p className="font-medium">{m.label}</p>
+                          <p className="text-[10px] text-muted-foreground">{m.desc}</p>
+                        </div>
+                        {visualMode === m.id && (
+                          <span className="text-[10px] text-primary">●</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
               <Badge variant="outline" className="hidden h-6 gap-1 border-primary/40 bg-primary/10 px-2 text-[10px] text-primary sm:inline-flex">
                 <Globe2 className="h-3 w-3" />
                 3D
@@ -334,15 +383,19 @@ export function CrisisMap() {
       {isClient && mapEngine === "cesium" ? (
         <div className="h-[400px] w-full shrink-0 pt-10 md:h-full md:flex-1">
           <CesiumGlobe
+            ref={globeRef}
             incidents={filteredIncidents}
             earthquakes={earthquakes}
             weather={weather}
             showEarthquakes={showEarthquakes}
             showWeather={showWeather}
+            visualMode={visualMode}
             selectedId={selectedIncident?.id ?? null}
             onSelect={setSelectedIncident}
             onInitError={handleCesiumError}
+            onViewerReady={setCesiumViewer}
           />
+          {mapEngine === "cesium" && <GlobeHud viewer={cesiumViewer} visualMode={visualMode} />}
         </div>
       ) : isClient && leafletCssLoaded && mapEngine === "leaflet" ? (
         <div className="h-[400px] w-full shrink-0 pt-10 md:h-full md:flex-1">

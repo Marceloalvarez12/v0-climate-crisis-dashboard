@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
 import type { Incident } from "@/lib/types"
 import type { Earthquake, WeatherSnapshot } from "@/lib/data/layers"
 import { severityHex } from "@/components/dashboard/crisis-map/incident-helpers"
@@ -9,6 +9,11 @@ import { incidentBillboardCanvas, pulseRadiusMeters } from "@/lib/map/cesium-mar
 import { earthquakeCanvas, weatherCanvas } from "@/lib/map/layer-markers"
 import { ID_EQ, ID_INC, ID_WX_TUCUMAN, incidentIdFromEntity } from "@/lib/map/layer-ids"
 import { TUCUMAN_CENTER } from "@/lib/map/tucuman"
+import { getVisualMode, type VisualMode } from "@/lib/map/visual-modes"
+
+export interface CesiumGlobeHandle {
+  getViewer: () => ZntinelViewer | null
+}
 
 interface CesiumGlobeProps {
   incidents: Incident[]
@@ -16,29 +21,40 @@ interface CesiumGlobeProps {
   weather: WeatherSnapshot | null
   showEarthquakes: boolean
   showWeather: boolean
+  visualMode: VisualMode
   selectedId: string | null
   onSelect: (incident: Incident) => void
   onInitError?: () => void
+  onViewerReady?: (viewer: ZntinelViewer) => void
 }
 
-export function CesiumGlobe({
-  incidents,
-  earthquakes,
-  weather,
-  showEarthquakes,
-  showWeather,
-  selectedId,
-  onSelect,
-  onInitError,
-}: CesiumGlobeProps) {
+export const CesiumGlobe = forwardRef<CesiumGlobeHandle, CesiumGlobeProps>(function CesiumGlobe(
+  {
+    incidents,
+    earthquakes,
+    weather,
+    showEarthquakes,
+    showWeather,
+    visualMode,
+    selectedId,
+    onSelect,
+    onInitError,
+    onViewerReady,
+  },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewerRef = useRef<ZntinelViewer | null>(null)
   const cesiumRef = useRef<CesiumModule | null>(null)
   const onSelectRef = useRef(onSelect)
+  const onViewerReadyRef = useRef(onViewerReady)
   const incidentsRef = useRef(incidents)
+  const lastVisualModeRef = useRef<VisualMode | null>(null)
   const [ready, setReady] = useState(false)
 
+  useImperativeHandle(ref, () => ({ getViewer: () => viewerRef.current }), [])
   onSelectRef.current = onSelect
+  onViewerReadyRef.current = onViewerReady
   incidentsRef.current = incidents
 
   useEffect(() => {
@@ -73,6 +89,7 @@ export function CesiumGlobe({
           }
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK)
 
+        onViewerReadyRef.current?.(viewer)
         setReady(true)
       })
       .catch((err) => {
@@ -92,6 +109,32 @@ export function CesiumGlobe({
       if (link.parentNode) link.parentNode.removeChild(link)
     }
   }, [onInitError])
+
+  // ── Visual mode (switch imagery + scene settings) ──────────────────────
+  useEffect(() => {
+    const viewer = viewerRef.current
+    const Cesium = cesiumRef.current
+    if (!ready || !viewer || !Cesium) return
+    if (lastVisualModeRef.current === visualMode) return
+    lastVisualModeRef.current = visualMode
+
+    const mode = getVisualMode(visualMode)
+    const provider = new Cesium.UrlTemplateImageryProvider({
+      url: mode.url,
+      maximumLevel: 19,
+      credit: new Cesium.Credit(mode.credit, false),
+    })
+    const layer = new Cesium.ImageryLayer(provider)
+
+    const firstLayer = viewer.imageryLayers.get(0)
+    if (firstLayer) viewer.imageryLayers.remove(firstLayer, false)
+    viewer.imageryLayers.add(layer, 0)
+
+    viewer.scene.globe.enableLighting = mode.lighting
+    if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = mode.atmosphere
+    viewer.scene.backgroundColor = Cesium.Color.fromCssColorString(mode.backgroundColor)
+    viewer.scene.requestRender()
+  }, [visualMode, ready])
 
   // ── Incidentes ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -302,4 +345,4 @@ export function CesiumGlobe({
       </div>
     </div>
   )
-}
+})

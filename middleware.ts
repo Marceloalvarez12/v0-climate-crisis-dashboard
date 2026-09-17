@@ -8,6 +8,8 @@ const API_PATHS = ["/api/"]
 const ALLOWED_UPSTREAMS = [
   "https://earthquake.usgs.gov",
   "https://api.open-meteo.com",
+  "https://*.tile.opentopomap.org",
+  "https://tiles.stadiamaps.com",
 ]
 
 export async function middleware(request: NextRequest) {
