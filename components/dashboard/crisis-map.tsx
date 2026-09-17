@@ -6,6 +6,7 @@ import { MapPin, Layers, Globe2, Activity, Cloud, Eye } from "lucide-react"
 import { preferGlobe3D } from "@/lib/map/prefer-globe"
 import { useEarthquakes, useWeather } from "@/hooks/use-live-layers"
 import type { VisualMode } from "@/lib/map/visual-modes"
+import { TUCUMAN_CENTER } from "@/lib/map/tucuman"
 import { cn } from "@/lib/utils"
 import { dispatchResourceWithLifecycle, restoreResourceTimersOnMount } from "@/hooks/use-resource-lifecycle"
 import { buildRespawnIncident } from "@/lib/mock-data"
@@ -37,6 +38,10 @@ const GlobeHud = dynamic(
   () => import("./crisis-map/globe-hud").then((m) => m.GlobeHud),
   { ssr: false },
 )
+const VoiceFab = dynamic(
+  () => import("./voice-fab").then((m) => m.VoiceFab),
+  { ssr: false },
+)
 
 const MAP_CENTER: [number, number] = [-26.8241, -65.2226]
 const SOURCE_TYPES: IncidentSource[] = ["social", "sensor", "camera"]
@@ -47,6 +52,11 @@ const SEVERITY_LEGENDS = [
   { label: "Medium",   color: "bg-yellow-500" },
   { label: "Low",      color: "bg-success" },
 ]
+
+interface CesiumNSLike {
+  Math: { toRadians: (deg: number) => number }
+  Cartesian3: { fromDegrees: (lng: number, lat: number, h: number) => never }
+}
 
 // ---------------------------------------------------------------------------
 // Componente
@@ -396,6 +406,43 @@ export function CrisisMap() {
             onViewerReady={setCesiumViewer}
           />
           {mapEngine === "cesium" && <GlobeHud viewer={cesiumViewer} visualMode={visualMode} />}
+          {mapEngine === "cesium" && (
+            <VoiceFab
+              context={{
+                incidents: filteredIncidents,
+                earthquakes,
+                weather,
+                showEarthquakes,
+                showWeather,
+                visualMode,
+              }}
+              actions={{
+                selectIncident: setSelectedIncident,
+                flyToOverview: () => {
+                  if (!cesiumViewer) return
+                  const Cesium = (
+                    cesiumViewer.scene.camera as unknown as { constructor: CesiumNSLike }
+                  ).constructor
+                  cesiumViewer.camera.flyTo({
+                    destination: Cesium.Cartesian3.fromDegrees(
+                      TUCUMAN_CENTER.lng,
+                      TUCUMAN_CENTER.lat,
+                      TUCUMAN_CENTER.overviewHeightM,
+                    ) as never,
+                    orientation: {
+                      heading: 0,
+                      pitch: Cesium.Math.toRadians(-55),
+                      roll: 0,
+                    },
+                    duration: 1.6,
+                  })
+                },
+                setShowEarthquakes,
+                setShowWeather,
+                setVisualMode,
+              }}
+            />
+          )}
         </div>
       ) : isClient && leafletCssLoaded && mapEngine === "leaflet" ? (
         <div className="h-[400px] w-full shrink-0 pt-10 md:h-full md:flex-1">
