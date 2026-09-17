@@ -36,6 +36,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark bg-background">
+      <head>
+        {/* Preload crítico: el bundle Cesium + los workers más usados.
+            El bundle del viewer viene del chunk webpack, los workers de /cesium/. */}
+        <link rel="preload" href="/cesium/Workers/transferTypedArrayTest.js" as="script" />
+      </head>
       <body className="font-sans antialiased">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}

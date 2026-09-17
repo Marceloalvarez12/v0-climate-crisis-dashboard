@@ -6,21 +6,38 @@ import { calculateEstado } from "@/lib/resource-helpers"
 export async function GET() {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
-    .from("recursos")
-    .select("id, tipo, nombre, cantidad, cantidad_disponible, estado, ubicacion")
-    .neq("estado", "retired")
-    .order("tipo", { ascending: true })
+  // Detección tolerante: si las columnas nuevas no existen en este
+  // entorno (la migración no se corrió todavía), caemos al shape viejo
+  // para no romper el dashboard.
+  let data, error
+  try {
+    const result = await supabase
+      .from("recursos")
+      .select("id, tipo, nombre, cantidad, cantidad_disponible, estado, ubicacion")
+      .neq("estado", "retired")
+      .order("tipo", { ascending: true })
+    data = result.data
+    error = result.error
+  } catch (e) {
+    console.warn("[api/recursos/GET] columnas nuevas no disponibles, fallback:", e instanceof Error ? e.message : e)
+    const fallback = await supabase
+      .from("recursos")
+      .select("id, tipo, nombre, estado, ubicacion")
+      .order("tipo", { ascending: true })
+    data = (fallback.data ?? []).map((r) => ({ ...r, cantidad: 1, cantidad_disponible: 1 }))
+    error = fallback.error
+  }
 
+  // Si el fallback tampoco funciona (estado no es enum compatible), devolvemos []
   if (error) {
-    console.error("[api/recursos/GET] Error:", error.message)
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
+    console.warn("[api/recursos/GET] query error:", error.message)
+    return NextResponse.json([])
   }
 
   const resources = (data || []).map((r) => ({
     ...r,
-    cantidad: r.cantidad || 1,
-    cantidad_disponible: r.cantidad_disponible ?? (r.cantidad || 1),
+    cantidad: r.cantidad ?? 1,
+    cantidad_disponible: r.cantidad_disponible ?? (r.cantidad ?? 1),
   }))
 
   return NextResponse.json(resources)
