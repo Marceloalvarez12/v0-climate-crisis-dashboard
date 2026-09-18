@@ -1,35 +1,33 @@
-import { createClient } from "@/lib/supabase/server"
-import { NextResponse } from "next/server"
+import { getAgentLogs } from "@/lib/mock-db"
+import { AgentLogSchema } from "@/lib/validation"
+import { apiSuccess, apiError, apiValidationError } from "@/lib/services/api-response"
 
 export async function GET() {
-  const supabase = await createClient()
-  
-  const { data, error } = await supabase
-    .from("agent_logs")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(50)
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  try {
+    const data = getAgentLogs()
+    return apiSuccess(data)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return apiError(message)
   }
-
-  return NextResponse.json(data)
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const body = await request.json()
+  try {
+    const body = await request.json()
 
-  const { data, error } = await supabase
-    .from("agent_logs")
-    .insert(body)
-    .select()
-    .single()
+    const parsed = AgentLogSchema.safeParse(body)
+    if (!parsed.success) {
+      return apiValidationError(parsed.error.flatten())
+    }
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return apiSuccess({
+      id: `log-${Date.now()}`,
+      ...parsed.data,
+      created_at: new Date().toISOString(),
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return apiError(message)
   }
-
-  return NextResponse.json(data)
 }

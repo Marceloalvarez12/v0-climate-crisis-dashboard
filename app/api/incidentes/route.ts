@@ -1,102 +1,97 @@
-import { createClient } from "@/lib/supabase/server"
-import { NextResponse } from "next/server"
+import { NextRequest } from "next/server"
+import { IncidentService } from "@/lib/services/incident-service"
+import { apiSuccess, apiError, apiValidationError } from "@/lib/services/api-response"
+import { IncidentCreateSchema, IncidentPatchSchema } from "@/lib/validation"
 
-export async function GET() {
-  const supabase = await createClient()
-  
-  const { data, error } = await supabase
-    .from("incidentes")
-    .select("*")
-    .eq("estado", "activo")
-    .order("created_at", { ascending: false })
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const estado = searchParams.get("estado") || "activo"
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const data = estado === "atendido"
+      ? await IncidentService.getAttendedIncidents()
+      : await IncidentService.getActiveIncidents()
+
+    return apiSuccess(data)
+  } catch (err) {
+    return apiError(String(err))
   }
-
-  return NextResponse.json(data)
 }
 
-const MAX_ACTIVE_INCIDENTS = 11
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
 
-export async function POST(request: Request) {
-  const supabase = await createClient()
-  const body = await request.json()
+    const parsed = IncidentCreateSchema.safeParse(body)
+    if (!parsed.success) {
+      return apiValidationError(parsed.error.flatten())
+    }
 
-  // Check if an active incident with the same ubicacion already exists
-  // to avoid duplicates when the agent "rediscovers" a seeded incident
-  const { data: existing } = await supabase
-    .from("incidentes")
-    .select("id, estado")
-    .eq("ubicacion", body.ubicacion)
-    .limit(1)
-    .single()
+    const validatedBody = { ...parsed.data, fuente_detalles: parsed.data.fuente_detalles ?? {} }
 
-  if (existing) {
-    // If it exists but was resolved/attended, reactivate it
-    // but only if we haven't hit the active limit
-    if (existing.estado !== "activo") {
-      const { count } = await supabase
-        .from("incidentes")
-        .select("*", { count: "exact", head: true })
-        .eq("estado", "activo")
+    const existing = await IncidentService.findByLocation(validatedBody.ubicacion)
 
-      if ((count ?? 0) >= MAX_ACTIVE_INCIDENTS) {
-        return NextResponse.json({ skipped: true, reason: "max_active_reached" }, { status: 200 })
+    if (existing) {
+      if (existing.estado === "activo") {
+        return apiSuccess(existing)
       }
 
-      const { data, error } = await supabase
-        .from("incidentes")
-        .update({ estado: "activo", updated_at: new Date().toISOString() })
-        .eq("id", existing.id)
-        .select()
-        .single()
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      return NextResponse.json(data)
+      if (!(await IncidentService.canCreateMore())) {
+        return apiSuccess({ skipped: true, reason: "max_active_reached" })
+      }
+
+      const updated = await IncidentService.update(existing.id, {
+        ...validatedBody,
+        estado: "activo",
+      })
+      return apiSuccess(updated)
     }
-    // Already active — return existing without inserting a duplicate
-    return NextResponse.json(existing)
+
+    if (!(await IncidentService.canCreateMore())) {
+      return apiSuccess({ skipped: true, reason: "max_active_reached" })
+    }
+
+    const created = await IncidentService.create(validatedBody)
+    return apiSuccess(created)
+  } catch (err) {
+    return apiError(String(err))
   }
-
-  // Check active incident cap before a fresh INSERT
-  const { count } = await supabase
-    .from("incidentes")
-    .select("*", { count: "exact", head: true })
-    .eq("estado", "activo")
-
-  if ((count ?? 0) >= MAX_ACTIVE_INCIDENTS) {
-    return NextResponse.json({ skipped: true, reason: "max_active_reached" }, { status: 200 })
-  }
-
-  // No existing record and under the cap — do a fresh INSERT
-  const { data, error } = await supabase
-    .from("incidentes")
-    .insert(body)
-    .select()
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json(data)
 }
 
-export async function PATCH(request: Request) {
-  const supabase = await createClient()
-  const body = await request.json()
-  const { id, ...updates } = body
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json()
 
-  const { data, error } = await supabase
-    .from("incidentes")
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select()
-    .single()
+    const parsed = IncidentPatchSchema.safeParse(body)
+    if (!parsed.success) {
+      return apiValidationError(parsed.error.flatten())
+    }
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const { id, ...updates } = parsed.data
+    const updated = await IncidentService.update(id, updates)
+    return apiSuccess(updated)
+  } catch (err) {
+    return apiError(String(err))
   }
+}
 
-  return NextResponse.json(data)
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { id, estado, simulated } = body
+
+    if (id) {
+      await IncidentService.deleteById(id)
+      return apiSuccess({ deleted: id })
+    }
+
+    if (simulated) {
+      await IncidentService.deleteSimulated(estado)
+      return apiSuccess({ cleaned: true })
+    }
+
+    return apiValidationError({ formErrors: ["Se requiere id o simulated=true"], fieldErrors: {} })
+  } catch (err) {
+    return apiError(String(err))
+  }
 }

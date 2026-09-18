@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { DashboardHeader } from "@/components/dashboard/header"
 import { AIActivityLog } from "@/components/dashboard/ai-activity-log"
 import { ResourcesPanel } from "@/components/dashboard/resources-panel"
@@ -11,18 +11,68 @@ import { DevPanel } from "@/components/dashboard/dev-panel"
 import { Suspense } from "react"
 import { Map, Bot, Shield, BarChart2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { mutate } from "swr"
+import { supabaseClient } from "@/lib/supabase-client"
 
 type MobileTab = "map" | "agent" | "resources" | "analytics"
 
 const MOBILE_TABS: { id: MobileTab; label: string; icon: React.ReactNode }[] = [
-  { id: "map",       label: "Mapa",      icon: <Map className="h-5 w-5" /> },
-  { id: "agent",     label: "Agente IA", icon: <Bot className="h-5 w-5" /> },
-  { id: "resources", label: "Recursos",  icon: <Shield className="h-5 w-5" /> },
-  { id: "analytics", label: "Datos",     icon: <BarChart2 className="h-5 w-5" /> },
+  { id: "map",       label: "Map",       icon: <Map className="h-5 w-5" /> },
+  { id: "agent",     label: "AI Agent",  icon: <Bot className="h-5 w-5" /> },
+  { id: "resources", label: "Resources", icon: <Shield className="h-5 w-5" /> },
+  { id: "analytics", label: "Analytics", icon: <BarChart2 className="h-5 w-5" /> },
 ]
 
 export default function CrisisDashboard() {
   const [activeTab, setActiveTab] = useState<MobileTab>("map")
+
+  // Realtime subscription to Supabase changes
+  useEffect(() => {
+    if (!supabaseClient) return
+
+    const client = supabaseClient
+    const channel = client
+      .channel("realtime-dashboard")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "incidentes" },
+        (payload) => {
+          console.log("Realtime incidentes change:", payload)
+          mutate("/api/incidentes?estado=activo")
+          mutate("/api/incidentes?estado=atendido")
+          mutate("/api/analytics")
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "recursos" },
+        (payload) => {
+          console.log("Realtime recursos change:", payload)
+          mutate("/api/recursos")
+          mutate("/api/analytics")
+        }
+      )
+      .subscribe()
+
+    return () => {
+      client.removeChannel(channel)
+    }
+  }, [])
+
+  // Revalidate all SWR data when user returns to the page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        mutate("/api/incidentes?estado=activo")
+        mutate("/api/incidentes?estado=atendido")
+        mutate("/api/recursos")
+        mutate("/api/analytics")
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
+  }, [])
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background">
@@ -30,7 +80,7 @@ export default function CrisisDashboard() {
         <DevPanel />
       </Suspense>
 
-      <DashboardHeader />
+      <DashboardHeader incidents={[]} />
 
       {/* ── DESKTOP layout (lg+) ── */}
       <div className="hidden lg:flex flex-1 overflow-hidden">

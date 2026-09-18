@@ -1,235 +1,74 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
-import useSWR from "swr"
-import { AlertTriangle, Droplets, Flame, Wind, MapPin, Layers, Twitter, Thermometer, Camera, Users, Clock, MapPinned, Ambulance, Shield, Truck, Phone, Send, CheckCircle2 } from "lucide-react"
+import { useState, useEffect, useMemo, useRef } from "react"
+import dynamic from "next/dynamic"
+import { MapPin, Layers, Eye } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { dispatchResourceWithLifecycle } from "@/hooks/use-resource-lifecycle"
+import { mutate } from "swr"
+import { dispatchResourceWithLifecycle, restoreResourceTimersOnMount } from "@/hooks/use-resource-lifecycle"
 import { buildRespawnIncident } from "@/lib/mock-data"
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
-
+import { patchIncidente, createIncidente } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
-import dynamic from "next/dynamic"
+import type { Incident, IncidentSource, DbIncident } from "@/lib/types"
+import { useIncidents, useResources } from "./crisis-map/use-map-data"
+import { IncidentIcon, SourceIcon, severityColorClass, sourceLabel, incidentTypeLabel } from "./crisis-map/incident-helpers"
+import { IncidentDetailModal, DeployModal } from "./crisis-map/map-modals"
+import { IncidentDispatchCard } from "./incident-dispatch-card"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 
-const MapContainer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.MapContainer),
+// ---------------------------------------------------------------------------
+// Lazy-load de componentes Leaflet (sólo cliente)
+// ---------------------------------------------------------------------------
+
+// Single dynamic import of the complete map component — fixes the bug where
+// individual dynamic imports broke React reconciliation and prevented new
+// markers from appearing without a page reload.
+const MapInner = dynamic(
+  () => import("./crisis-map/map-inner").then((m) => m.MapInner),
   { ssr: false }
 )
-const TileLayer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.TileLayer),
-  { ssr: false }
-)
-const Marker = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Marker),
-  { ssr: false }
-)
 
-type SourceType = "social" | "sensor" | "camera"
+const MAP_CENTER: [number, number] = [-26.8241, -65.2226]
+const SOURCE_TYPES: IncidentSource[] = ["social", "sensor", "camera", "citizen"]
 
-interface Incident {
-  id: string
-  type: "flood" | "fire" | "storm" | "general"
-  severity: "critical" | "high" | "medium" | "low"
-  location: string
-  coordinates: { lat: number; lng: number }
-  affectedPeople: number
-  timestamp: Date
-  source: SourceType
-  sourceDetails: {
-    platform?: string
-    username?: string
-    content?: string
-    imageUrl?: string
-    sensorId?: string
-    temperature?: number
-    humidity?: number
-    windSpeed?: number
-    pressure?: number
-    cameraId?: string
-    cameraLocation?: string
-  }
-}
+const SEVERITY_LEGENDS = [
+  { label: "Critical", color: "bg-primary" },
+  { label: "High",     color: "bg-accent" },
+  { label: "Medium",   color: "bg-yellow-500" },
+  { label: "Low",      color: "bg-success" },
+]
 
-// Incidents are now fetched from Supabase via SWR
+// ---------------------------------------------------------------------------
+// Componente
+// ---------------------------------------------------------------------------
 
-const getIcon = (type: Incident["type"]) => {
-  switch (type) {
-    case "flood":
-      return <Droplets className="h-3 w-3" />
-    case "fire":
-      return <Flame className="h-3 w-3" />
-    case "storm":
-      return <Wind className="h-3 w-3" />
-    case "general":
-      return <AlertTriangle className="h-3 w-3" />
-  }
-}
-
-const getSeverityColor = (severity: Incident["severity"]) => {
-  switch (severity) {
-    case "critical":
-      return "bg-primary border-primary text-primary-foreground"
-    case "high":
-      return "bg-accent border-accent text-accent-foreground"
-    case "medium":
-      return "bg-yellow-500 border-yellow-500 text-black"
-    case "low":
-      return "bg-success border-success text-success-foreground"
-  }
-}
-
-const getSeverityHex = (severity: Incident["severity"]) => {
-  switch (severity) {
-    case "critical":
-      return "#dc2626"
-    case "high":
-      return "#f97316"
-    case "medium":
-      return "#eab308"
-    case "low":
-      return "#22c55e"
-  }
-}
-
-const getSourceIcon = (source: SourceType) => {
-  switch (source) {
-    case "social":
-      return <Twitter className="h-3 w-3" />
-    case "sensor":
-      return <Thermometer className="h-3 w-3" />
-    case "camera":
-      return <Camera className="h-3 w-3" />
-  }
-}
-
-const getSourceLabel = (source: SourceType) => {
-  switch (source) {
-    case "social":
-      return "Redes Sociales"
-    case "sensor":
-      return "Sensores"
-    case "camera":
-      return "Camaras"
-  }
-}
-
-const createCustomIcon = (severity: Incident["severity"], type: Incident["type"], source: SourceType) => {
-  if (typeof window === "undefined") return null
-  
-  const L = require("leaflet")
-  const color = getSeverityHex(severity)
-  const iconMap = {
-    flood: "💧",
-    fire: "🔥",
-    storm: "🌪️",
-    general: "⚠️"
-  }
-  const sourceIndicator = source === "social" ? "🐦" : source === "sensor" ? "📡" : "📹"
-  
-  return L.divIcon({
-    className: "custom-marker",
-    html: `
-      <div style="
-        position: relative;
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      ">
-        <div style="
-          position: absolute;
-          width: 40px;
-          height: 40px;
-          background: ${color};
-          border-radius: 50%;
-          opacity: 0.3;
-          animation: pulse 2s infinite;
-        "></div>
-        <div style="
-          width: 28px;
-          height: 28px;
-          background: ${color};
-          border: 2px solid white;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 14px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-          z-index: 1;
-          cursor: pointer;
-        ">${iconMap[type]}</div>
-        <div style="
-          position: absolute;
-          top: -4px;
-          right: -4px;
-          width: 16px;
-          height: 16px;
-          background: #171717;
-          border: 1px solid ${color};
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 8px;
-          z-index: 2;
-        ">${sourceIndicator}</div>
-      </div>
-    `,
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
-    popupAnchor: [0, -20]
-  })
-}
-
-interface ResourceOption {
-  id: string
-  name: string
-  tipo: string
-  estado: string // "available" | "dispatched" | "busy"
-  ubicacion: string
-  selected: boolean
-}
-
-interface CrisisMapProps {
-  pendingIncident?: import("@/app/page").AlertIncident | null
-  onPendingIncidentHandled?: () => void
-}
-
-export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisMapProps = {}) {
+export function CrisisMap() {
   const [isClient, setIsClient] = useState(false)
-  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
-  const [showDeployModal, setShowDeployModal] = useState(false)
-  const [activeLayers, setActiveLayers] = useState<SourceType[]>(["social", "sensor", "camera"])
+  const [leafletCssLoaded, setLeafletCssLoaded] = useState(false)
+  const [selectedIncident,   setSelectedIncident]   = useState<Incident | null>(null)
+  const [showDeployModal,    setShowDeployModal]     = useState(false)
+  const [showBlockchainModal, setShowBlockchainModal] = useState(false)
+  const [viewMode,           setViewMode]           = useState<"activo" | "atendido">("activo")
+  const [activeLayers,       setActiveLayers]       = useState<IncidentSource[]>(["social", "sensor", "camera", "citizen"])
+  const [tileStyle, setTileStyle] = useState<("satellite" | "street" | "topo")>("street")
   const [deployingResources, setDeployingResources] = useState(false)
-  const [deploySuccess, setDeploySuccess] = useState(false)
-  // How many units of each tipo the user wants to dispatch
-  const [selectedCounts, setSelectedCounts] = useState<Record<string, number>>({})
+  const [deploySuccess,      setDeploySuccess]      = useState(false)
+  const [selectedCounts,     setSelectedCounts]     = useState<Record<string, number>>({})
 
-  // Load resources from Supabase, refresh every 3s to reflect state changes
-  const { data: dbRecursos, mutate: mutateRecursos } = useSWR<Array<{
-    id: string; nombre: string; tipo: string; estado: string; ubicacion: string
-  }>>("/api/recursos", fetcher, { refreshInterval: 3000 })
+  // Ref for respawn timers cleanup on unmount
+  const respawnTimersRef = useRef<Set<NodeJS.Timeout>>(new Set())
 
-  // Group resources by tipo for the deploy modal
+  // ── Data ──────────────────────────────────────────────────────────────────
+  const { incidents: dbIncidents, mutate: mutateIncidents } = useIncidents(viewMode)
+  const { data: dbRecursos, mutate: mutateRecursos }        = useResources()
+
+  // All incidents come from the database (real + respawned)
+  const incidents: Incident[] = dbIncidents
+
   const resourceGroups = useMemo(() => {
     if (!dbRecursos) return []
     const groups: Record<string, { tipo: string; ids: string[]; availableIds: string[] }> = {}
@@ -241,87 +80,69 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
     return Object.values(groups)
   }, [dbRecursos])
 
-  // Fetch incidents from Supabase
-  const { data: dbIncidents, error, mutate } = useSWR("/api/incidentes", fetcher, {
-    refreshInterval: 2000, // Poll every 2s so map updates within seconds of agent discovery
-  })
-
-  // Transform database incidents to local format
-  const incidents: Incident[] = useMemo(() => {
-    if (!dbIncidents || error) return []
-    return dbIncidents.map((inc: { id: string; tipo: string; severidad: string; ubicacion: string; latitud: number; longitud: number; personas_afectadas: number; fuente: string; fuente_detalles: Record<string, unknown>; created_at: string }) => ({
-      id: inc.id,
-      type: inc.tipo as Incident["type"],
-      severity: inc.severidad as Incident["severity"],
-      location: inc.ubicacion,
-      coordinates: { lat: inc.latitud, lng: inc.longitud },
-      affectedPeople: inc.personas_afectadas,
-      timestamp: new Date(inc.created_at),
-      source: inc.fuente as SourceType,
-      sourceDetails: inc.fuente_detalles || {}
-    }))
-  }, [dbIncidents, error])
-  
   useEffect(() => {
     setIsClient(true)
+
+    // Injectar CSS de Leaflet (CSP permite https://unpkg.com via connect-src)
+    let cancelled = false
+    fetch("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css")
+      .then((r) => r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then((css) => {
+        if (cancelled) return
+        const style = document.createElement("style")
+        style.dataset.leaflet = "true"
+        style.textContent = css
+        document.head.appendChild(style)
+        setLeafletCssLoaded(true)
+      })
+      .catch((err) => {
+        console.error("[CrisisMap] Failed to load Leaflet CSS:", err)
+        // En Vercel/prod puede haber CSP estricto. Mostrar el mapa de todas formas
+        // (Leaflet puede funcionar sin su CSS, sólo se ve menos bonito)
+        setLeafletCssLoaded(true)
+      })
+
+    restoreResourceTimersOnMount().catch((err) => console.error("[CrisisMap] Error restoring resource timers:", err))
+
+    return () => {
+      cancelled = true
+      const style = document.querySelector("style[data-leaflet]")
+      if (style) style.remove()
+      respawnTimersRef.current.forEach((t) => clearTimeout(t))
+      respawnTimersRef.current.clear()
+    }
   }, [])
 
-  // When LiveAlert fires "DESPLEGAR EMERGENCIA", open the detail modal with that incident
-  useEffect(() => {
-    if (!pendingIncident) return
-    // Cast the AlertIncident shape to the local Incident shape (same structure)
-    setSelectedIncident(pendingIncident as unknown as Incident)
-    onPendingIncidentHandled?.()
-  }, [pendingIncident, onPendingIncidentHandled])
-
-  const toggleLayer = (layer: SourceType) => {
-    setActiveLayers(prev => 
-      prev.includes(layer) 
-        ? prev.filter(l => l !== layer)
-        : [...prev, layer]
+  // ── Layer filter ─────────────────────────────────────────────────────────
+  const toggleLayer = (layer: IncidentSource) => {
+    setActiveLayers((prev) =>
+      prev.includes(layer) ? prev.filter((l) => l !== layer) : [...prev, layer]
     )
   }
 
-  const getRecursoIcon = (tipo: string) => {
-    switch (tipo) {
-      case "ambulance":   return <Ambulance className="h-5 w-5" />
-      case "firefighter": return <Truck className="h-5 w-5" />
-      case "police":      return <Shield className="h-5 w-5" />
-      case "boat":        return <AlertTriangle className="h-5 w-5" />
-      case "helicopter":  return <Wind className="h-5 w-5" />
-      default:            return <Shield className="h-5 w-5" />
+  const filteredIncidents = useMemo(
+    () => incidents.filter((i) => activeLayers.includes(i.source)),
+    [incidents, activeLayers]
+  )
+
+  const sourceCounts = useMemo(() => {
+    const counts: Record<IncidentSource, number> = { social: 0, sensor: 0, camera: 0, citizen: 0 }
+    for (const i of incidents) {
+      if (i.source in counts) counts[i.source]++
     }
-  }
+    return counts
+  }, [incidents])
 
-  const getTipoLabel = (tipo: string) => {
-    switch (tipo) {
-      case "ambulance":   return "Ambulancias SAME"
-      case "firefighter": return "Bomberos Voluntarios"
-      case "police":      return "Policia Provincial"
-      case "boat":        return "Lanchas de Rescate"
-      case "helicopter":  return "Helicopteros"
-      default:            return tipo
+  const severityCounts = useMemo(() => {
+    const counts: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0 }
+    for (const i of filteredIncidents) {
+      if (i.severity in counts) counts[i.severity]++
     }
-  }
+    return counts
+  }, [filteredIncidents])
 
-  const adjustCount = (tipo: string, delta: number, max: number) => {
-    setSelectedCounts(prev => {
-      const current = prev[tipo] ?? 0
-      const next = Math.min(max, Math.max(0, current + delta))
-      return { ...prev, [tipo]: next }
-    })
-  }
-
-  const handleOpenDetails = useCallback((incident: Incident) => {
-    setSelectedIncident(incident)
-  }, [])
-
-  const handleCloseDetails = () => {
-    setSelectedIncident(null)
-  }
-
+  // ── Deploy handlers ───────────────────────────────────────────────────────
   const handleOpenDeploy = () => {
-    // Always reset to a clean state before opening for a new incident
     setDeploySuccess(false)
     setSelectedCounts({})
     mutateRecursos()
@@ -332,123 +153,151 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
     setShowDeployModal(false)
     setDeploySuccess(false)
     setSelectedCounts({})
-    // Force revalidation so next open shows fresh server state
+    mutateRecursos()
+  }
+
+  const adjustCount = (tipo: string, delta: number, max: number) => {
+    setSelectedCounts((prev) => {
+      const next = Math.min(max, Math.max(0, (prev[tipo] ?? 0) + delta))
+      return { ...prev, [tipo]: next }
+    })
+  }
+
+  const handleConfirmDeploymentTransition = () => {
+    const totalSelected = Object.values(selectedCounts).reduce((a, b) => a + b, 0)
+    if (totalSelected === 0) {
+      toast.error("Select at least one resource to deploy")
+      return
+    }
+    setShowDeployModal(false)
+    setShowBlockchainModal(true)
+  }
+
+  const handleCloseConfirmDispatch = () => {
+    setShowBlockchainModal(false)
+    setSelectedIncident(null)
+    setSelectedCounts({})
     mutateRecursos()
   }
 
   const handleDeployResources = async () => {
     const totalSelected = Object.values(selectedCounts).reduce((a, b) => a + b, 0)
     if (totalSelected === 0) {
-      toast.error("Selecciona al menos un recurso para desplegar")
+      toast.error("Select at least one resource to deploy")
       return
     }
 
     const incidenteId = selectedIncident?.id
-    const incidenteTipo = selectedIncident?.type
-    const incidenteFuente = selectedIncident?.source
-
-    // Collect the actual IDs to dispatch based on counts BEFORE any async work
-    const idsToDispatch: string[] = []
-    for (const group of resourceGroups) {
-      const count = selectedCounts[group.tipo] ?? 0
-      idsToDispatch.push(...group.availableIds.slice(0, count))
-    }
-
-    setDeployingResources(true)
-
-    // Optimistically update the SWR cache so the modal counters drop immediately
-    // while the real PATCHs happen in the background
-    if (dbRecursos) {
-      const optimistic = dbRecursos.map(r =>
-        idsToDispatch.includes(r.id) ? { ...r, estado: "dispatched" } : r
-      )
-      mutateRecursos(optimistic, false)
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setDeployingResources(false)
-    setDeploySuccess(true)
-
-    // Mark incident as atendido in Supabase (disappears from map via SWR)
-    if (incidenteId) {
-      await fetch("/api/incidentes", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: incidenteId, estado: "atendido" }),
-      }).catch(() => {})
-
-      // Despachar cada recurso con su ciclo de vida:
-      // dispatched → busy (50s) → available (60s)
-      const dispatchPromises = idsToDispatch.map(resourceId =>
-        dispatchResourceWithLifecycle(incidenteId, resourceId).catch(() => {})
-      )
-      await Promise.all(dispatchPromises)
-      // Force revalidation to get real server state (clears optimistic update)
-      await mutateRecursos()
-
-      // Respawn: nuevo incidente en coordenadas aleatorias, 2 minutos despues de ser atendido
-      setTimeout(async () => {
-        const respawn = buildRespawnIncident({ tipo: incidenteTipo, fuente: incidenteFuente })
-        await fetch("/api/incidentes", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(respawn),
-        }).catch(() => {})
-      }, 2 * 60 * 1000)
-    }
-
-    toast.success(
-      `Recursos desplegados a ${selectedIncident?.location}`,
-      { description: `${idsToDispatch.length} unidad(es) en camino` }
+    const idsToDispatch = resourceGroups.flatMap((g) =>
+      g.availableIds.slice(0, selectedCounts[g.tipo] ?? 0)
     )
 
-    // Wait briefly so user sees the success screen, then close and reset
-    setTimeout(() => {
-      setShowDeployModal(false)
-      setDeploySuccess(false)
-      setSelectedCounts({})
-      mutateRecursos()
-    }, 2000)
+    // Optimistic update in cache
+    if (dbRecursos) {
+      mutateRecursos(
+        dbRecursos.map((r: DbIncident & { estado: string }) => idsToDispatch.includes(r.id) ? { ...r, estado: "dispatched" } : r),
+        false,
+      )
+    }
+
+    // Dispatch resources immediately
+    if (incidenteId) {
+      // Patch incident to attended state
+      await patchIncidente(incidenteId, { estado: "atendido" }).catch((err) => console.error("[CrisisMap] Error updating incident:", err))
+      
+      // Force global revalidation of both lists and analytics
+      mutate("/api/incidentes?estado=activo")
+      mutate("/api/incidentes?estado=atendido")
+      mutate("/api/analytics")
+
+      // Dispatch resources with lifecycle
+      await Promise.all(
+        idsToDispatch.map((id) => dispatchResourceWithLifecycle(incidenteId, id, () => mutateRecursos()).catch((err) => console.error("[CrisisMap] Error dispatching resource:", err)))
+      )
+      await mutateRecursos()
+    }
+
+    // Respawn 90s later — stored in ref for cleanup on unmount
+    if (incidenteId) {
+      const incidenteTipo  = selectedIncident?.type
+      const incidenteFuente = selectedIncident?.source
+      const timer = setTimeout(async () => {
+        try {
+          const respawn = buildRespawnIncident({ tipo: incidenteTipo, fuente: incidenteFuente })
+          await createIncidente(respawn)
+        } catch (err) {
+          console.error("[CrisisMap] Error creating respawn incident:", err)
+        } finally {
+          respawnTimersRef.current.delete(timer)
+        }
+      }, 90_000)
+      respawnTimersRef.current.add(timer)
+    }
   }
 
-  const filteredIncidents = incidents.filter(i => activeLayers.includes(i.source))
-  const center: [number, number] = [-26.8241, -65.2226]
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-border bg-card md:relative">
-      {/* Map Header */}
+      {/* ── Map header ─────────────────────────────────────────────── */}
       <div className="absolute left-0 right-0 top-0 z-[1000] flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-border bg-card/95 px-3 py-2 backdrop-blur-sm">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
           <h2 className="truncate text-xs font-semibold text-foreground sm:text-sm">
-            San Miguel de Tucuman - Mapa de Incidentes
+            San Miguel de Tucumán — Incident Map
           </h2>
         </div>
+
         <div className="flex shrink-0 items-center gap-1.5">
-          {/* Layer Filter */}
+          {/* Vistas del mapa: siempre visibles para cambiar rápidamente de cartografía */}
+          <div className="flex items-center rounded-md border border-border bg-secondary/40 p-0.5" role="group" aria-label="Vistas del mapa">
+            {([
+              { id: "street", label: "Oscuro", desc: "Mapa táctico" },
+              { id: "satellite", label: "Satélite", desc: "Imagen aérea" },
+              { id: "topo", label: "Topo", desc: "Relieve" },
+            ] as const).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                title={opt.desc}
+                aria-pressed={tileStyle === opt.id}
+                onClick={() => setTileStyle(opt.id)}
+                className={cn(
+                  "flex items-center gap-1 rounded px-1.5 py-1 text-[10px] transition-colors sm:px-2",
+                  tileStyle === opt.id
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                )}
+              >
+                <Eye className="h-3 w-3" />
+                <span>{opt.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Layer filter */}
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="h-6 gap-1 border-border px-2 text-[10px]">
                 <Layers className="h-3 w-3" />
-                Capas ({activeLayers.length})
+                Layers ({activeLayers.length})
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-56 p-3" align="end">
               <div className="space-y-3">
-                <p className="text-xs font-medium text-foreground">Filtrar por Fuente</p>
+                <p className="text-xs font-medium text-foreground">Filter by Source</p>
                 <div className="space-y-2">
-                  {(["social", "sensor", "camera"] as SourceType[]).map((layer) => (
+                  {SOURCE_TYPES.map((layer) => (
                     <label key={layer} className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         checked={activeLayers.includes(layer)}
                         onCheckedChange={() => toggleLayer(layer)}
                       />
                       <div className="flex items-center gap-1.5">
-                        {getSourceIcon(layer)}
-                        <span className="text-xs">{getSourceLabel(layer)}</span>
+                        <SourceIcon source={layer} />
+                        <span className="text-xs">{sourceLabel(layer)}</span>
                       </div>
                       <Badge variant="outline" className="ml-auto text-[10px] h-5">
-                        {incidents.filter(i => i.source === layer).length}
+                        {sourceCounts[layer]}
                       </Badge>
                     </label>
                   ))}
@@ -456,457 +305,198 @@ export function CrisisMap({ pendingIncident, onPendingIncidentHandled }: CrisisM
               </div>
             </PopoverContent>
           </Popover>
-          <Badge variant="outline" className="hidden border-primary/50 bg-primary/10 text-primary text-[10px] sm:inline-flex">
-            {filteredIncidents.filter(i => i.severity === "critical").length} Criticos
-          </Badge>
-          <Badge variant="outline" className="hidden border-accent/50 bg-accent/10 text-accent text-[10px] sm:inline-flex">
-            {filteredIncidents.filter(i => i.severity === "high").length} Altos
-          </Badge>
-          <Badge variant="outline" className="hidden border-yellow-500/50 bg-yellow-500/10 text-yellow-400 text-[10px] sm:inline-flex">
-            {filteredIncidents.filter(i => i.severity === "medium").length} Medios
-          </Badge>
-          <Badge variant="outline" className="hidden border-success/50 bg-success/10 text-success text-[10px] sm:inline-flex">
-            {filteredIncidents.filter(i => i.severity === "low").length} Bajos
-          </Badge>
+
+          {/* Severity badges */}
+          {(["critical", "high", "medium", "low"] as const).map((sev) => {
+            const colorMap = {
+              critical: "border-primary/50 bg-primary/10 text-primary",
+              high:     "border-accent/50 bg-accent/10 text-accent",
+              medium:   "border-yellow-500/50 bg-yellow-500/10 text-yellow-400",
+              low:      "border-success/50 bg-success/10 text-success",
+            }
+            const labelMap = { critical: "Critical", high: "High", medium: "Medium", low: "Low" }
+            return (
+              <Badge
+                key={sev}
+                variant="outline"
+                className={cn("hidden text-[10px] sm:inline-flex", colorMap[sev])}
+              >
+                {severityCounts[sev]} {labelMap[sev]}
+              </Badge>
+            )
+          })}
         </div>
       </div>
 
-      {/* Incident List Panel — static on mobile, floating on md+ */}
+      {/* ── Incident list panel ────────────────────────────────────── */}
       <div className="relative z-10 mt-0 w-full rounded-none border-b border-border bg-card/95 backdrop-blur-sm shadow-none md:absolute md:right-3 md:top-14 md:z-[1000] md:w-72 md:max-h-[420px] md:rounded-lg md:border md:shadow-xl">
-        <div className="flex items-center justify-between border-b border-border bg-card px-3 py-2 rounded-t-lg">
-          <p className="text-xs font-semibold text-foreground">Incidentes Activos ({filteredIncidents.length})</p>
-          <Badge variant="outline" className="text-[9px] border-primary/50 text-primary animate-pulse">En vivo</Badge>
-        </div>
-        <div className="overflow-y-auto max-h-48 p-2 space-y-1.5 custom-scrollbar md:max-h-[370px]">
-          {filteredIncidents.map((incident) => (
+        <div className="flex flex-col border-b border-border bg-card rounded-t-lg">
+          <div className="flex border-b border-border/60">
             <button
-              key={incident.id}
-              onClick={() => handleOpenDetails(incident)}
+              onClick={() => setViewMode("activo")}
               className={cn(
-                "w-full text-left rounded-lg border p-2 transition-all hover:bg-secondary/50 hover:scale-[1.01]",
-                incident.severity === "critical" ? "border-primary/50 bg-primary/5" :
-                incident.severity === "high" ? "border-accent/50 bg-accent/5" :
-                "border-border"
+                "flex-1 py-2 text-[10px] font-semibold transition-all border-b-2 text-center cursor-pointer",
+                viewMode === "activo"
+                  ? "border-primary text-primary bg-primary/5"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/20"
               )}
             >
-              <div className="flex items-start gap-2">
-                <div className={cn("rounded-full p-1.5 flex items-center justify-center shrink-0", getSeverityColor(incident.severity))}>
-                  {getIcon(incident.type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground truncate">{incident.location}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="outline" className="text-[9px] h-4 px-1">
-                      {incident.type === "flood" ? "Inundacion" : incident.type === "fire" ? "Incendio" : incident.type === "storm" ? "Tormenta" : "General"}
-                    </Badge>
-                    <span className="text-[9px] text-muted-foreground">{incident.affectedPeople} afectados</span>
+              Active ({viewMode === "activo" ? filteredIncidents.length : 0})
+            </button>
+            <button
+              onClick={() => setViewMode("atendido")}
+              className={cn(
+                "flex-1 py-2 text-[10px] font-semibold transition-all border-b-2 text-center cursor-pointer",
+                viewMode === "atendido"
+                  ? "border-accent text-accent bg-accent/5"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/20"
+              )}
+            >
+              History ({viewMode === "atendido" ? filteredIncidents.length : 0})
+            </button>
+          </div>
+          <div className="flex items-center justify-between px-3 py-1.5 bg-secondary/10">
+            <p className="text-[9px] font-medium text-muted-foreground">
+              {viewMode === "activo" ? "Real-Time Monitoring" : "On-Chain Audit Trail"}
+            </p>
+            {viewMode === "activo" ? (
+              <Badge variant="outline" className="text-[8px] h-4 border-primary/50 text-primary animate-pulse px-1.5">LIVE</Badge>
+            ) : (
+              <Badge variant="outline" className="text-[8px] h-4 border-emerald-500/50 text-emerald-400 gap-1 px-1.5 font-mono">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                ON-CHAIN
+              </Badge>
+            )}
+          </div>
+        </div>
+        <div className="overflow-y-auto max-h-48 p-2 space-y-1.5 custom-scrollbar md:max-h-[350px]">
+          {filteredIncidents.length === 0 ? (
+            <p className="text-[10px] text-muted-foreground text-center py-4">No incidents to display</p>
+          ) : (
+            filteredIncidents.map((incident) => (
+              <button
+                key={incident.id}
+                onClick={() => setSelectedIncident(incident)}
+                className={cn(
+                  "w-full text-left rounded-lg border p-2 transition-all hover:bg-secondary/50 hover:scale-[1.01] cursor-pointer",
+                  viewMode === "activo"
+                    ? (incident.severity === "critical" ? "border-primary/50 bg-primary/5" :
+                       incident.severity === "high"     ? "border-accent/50 bg-accent/5"   : "border-border")
+                    : (incident.estado === "activo"
+                        ? "border-yellow-500/30 bg-yellow-500/5 hover:border-yellow-500/50 hover:bg-yellow-500/10"
+                        : "border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40")
+                )}
+              >
+                <div className="flex items-start gap-2">
+                  <div className={cn("rounded-full p-1.5 flex items-center justify-center shrink-0", 
+                    viewMode === "activo" ? severityColorClass(incident.severity) : (incident.estado === "activo" ? "bg-yellow-500/10 text-yellow-400" : "bg-emerald-500/10 text-emerald-400")
+                  )}>
+                    <IncidentIcon type={incident.type} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="text-xs font-medium text-foreground truncate">{incident.location}</p>
+                      {viewMode === "atendido" && (
+                        incident.estado === "activo" ? (
+                          <Badge variant="outline" className="text-[7px] h-3 px-1 border-yellow-500/40 text-yellow-400 font-mono shrink-0 animate-pulse">
+                            PENDING
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[7px] h-3 px-1 border-emerald-500/30 text-emerald-400 font-mono shrink-0">
+                            ON-CHAIN
+                          </Badge>
+                        )
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="text-[9px] h-4 px-1">
+                        {incidentTypeLabel(incident.type)}
+                      </Badge>
+                      <span className="text-[9px] text-muted-foreground">{incident.affectedPeople} affected</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            ))
+          )}
         </div>
       </div>
 
-      {/* Leaflet Map */}
-      {isClient ? (
-        <div className="h-[400px] w-full shrink-0 pt-10 md:h-full md:flex-1">
-          <link
-            rel="stylesheet"
-            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-            integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-            crossOrigin=""
+      {/* ── Leaflet Map ─────────────────────────────────────────────── */}
+      {isClient && leafletCssLoaded ? (
+        <div className="h-[400px] w-full shrink-0 pt-10 md:h-[min(70vh,680px)] md:flex-none">
+          <MapInner
+            incidents={filteredIncidents}
+            onMarkerClick={(incident) => setSelectedIncident(incident)}
+            tileStyle={tileStyle}
           />
-          <style>{`
-            .leaflet-container {
-              height: 100%;
-              width: 100%;
-              background: #1a1a1a;
-            }
-            .leaflet-popup-content-wrapper {
-              background: #171717;
-              border: 1px solid #2a2a2a;
-              border-radius: 8px;
-            }
-            .leaflet-popup-content {
-              color: #fafafa;
-              margin: 12px;
-            }
-            .leaflet-popup-tip {
-              background: #171717;
-              border: 1px solid #2a2a2a;
-            }
-            .leaflet-control-zoom a {
-              background: #171717 !important;
-              color: #fafafa !important;
-              border-color: #2a2a2a !important;
-            }
-            .leaflet-control-zoom a:hover {
-              background: #2a2a2a !important;
-            }
-            .leaflet-control-attribution {
-              background: rgba(23, 23, 23, 0.8) !important;
-              color: #737373 !important;
-            }
-            .leaflet-control-attribution a {
-              color: #a3a3a3 !important;
-            }
-            @keyframes pulse {
-              0% { transform: scale(1); opacity: 0.3; }
-              50% { transform: scale(1.5); opacity: 0.1; }
-              100% { transform: scale(1); opacity: 0.3; }
-            }
-          `}</style>
-          <MapContainer
-            center={center}
-            zoom={13}
-            scrollWheelZoom={true}
-            style={{ height: "100%", width: "100%" }}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            />
-            {filteredIncidents.map((incident) => {
-              const icon = createCustomIcon(incident.severity, incident.type, incident.source)
-              if (!icon) return null
-              return (
-                <Marker
-                  key={incident.id}
-                  position={[incident.coordinates.lat, incident.coordinates.lng]}
-                  icon={icon}
-                  eventHandlers={{
-                    click: () => handleOpenDetails(incident)
-                  }}
-                />
-              )
-            })}
-          </MapContainer>
         </div>
       ) : (
         <div className="flex h-[400px] w-full shrink-0 items-center justify-center bg-secondary/20 md:h-full md:flex-1">
           <div className="flex flex-col items-center gap-2">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="text-sm text-muted-foreground">Cargando mapa...</p>
+            <p className="text-sm text-muted-foreground">Loading map...</p>
           </div>
         </div>
       )}
 
-      {/* Legend - hidden on mobile, visible bottom-left on md+ */}
+      {/* ── Legend ──────────────────────────────────────────────────── */}
       <div className="absolute bottom-3 left-3 z-[1000] hidden rounded-md border border-border bg-card/95 p-2 backdrop-blur-sm md:block">
-        <p className="mb-1.5 text-[10px] font-medium text-muted-foreground">Severidad</p>
+        <p className="mb-1.5 text-[10px] font-medium text-muted-foreground">Severity</p>
         <div className="flex flex-col gap-1">
-          {[
-            { label: "Critico", color: "bg-primary" },
-            { label: "Alto", color: "bg-accent" },
-            { label: "Medio", color: "bg-yellow-500" },
-            { label: "Bajo", color: "bg-success" },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center gap-1.5">
-              <div className={cn("h-2 w-2 rounded-full", item.color)} />
-              <span className="text-[10px] text-muted-foreground">{item.label}</span>
+          {SEVERITY_LEGENDS.map(({ label, color }) => (
+            <div key={label} className="flex items-center gap-1.5">
+              <div className={cn("h-2 w-2 rounded-full", color)} />
+              <span className="text-[10px] text-muted-foreground">{label}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Incident Detail Modal */}
-      <Dialog open={!!selectedIncident && !showDeployModal} onOpenChange={handleCloseDetails}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto z-[9999]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              <div className={cn("rounded-full p-2", getSeverityColor(selectedIncident?.severity || "low"))}>
-                {selectedIncident && getIcon(selectedIncident.type)}
-              </div>
-              <div>
-                <span className="text-base">{selectedIncident?.location}</span>
-                <p className="text-xs font-normal text-muted-foreground mt-0.5">
-                  {selectedIncident?.type === "flood" ? "Inundacion" : selectedIncident?.type === "fire" ? "Incendio" : selectedIncident?.type === "storm" ? "Tormenta" : "General"} - Severidad {selectedIncident?.severity === "critical" ? "Critica" : selectedIncident?.severity === "high" ? "Alta" : selectedIncident?.severity === "medium" ? "Media" : "Baja"}
-                </p>
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-          
+      {/* ── Modales ─────────────────────────────────────────────────── */}
+      <IncidentDetailModal
+        isOpen={!!selectedIncident && !showDeployModal && !showBlockchainModal}
+        incident={selectedIncident}
+        onClose={() => setSelectedIncident(null)}
+        onOpenDeploy={handleOpenDeploy}
+      />
+
+      <DeployModal
+        open={showDeployModal}
+        incident={selectedIncident}
+        dbRecursos={dbRecursos}
+        resourceGroups={resourceGroups}
+        selectedCounts={selectedCounts}
+        deployingResources={deployingResources}
+        deploySuccess={deploySuccess}
+        onClose={handleCloseDeploy}
+        onDeploy={handleConfirmDeploymentTransition}
+        onAdjustCount={adjustCount}
+      />
+
+      <Dialog open={showBlockchainModal} onOpenChange={handleCloseConfirmDispatch}>
+        <DialogContent className="max-w-md p-0 bg-transparent border-none z-[9999]">
+          <DialogTitle className="sr-only">Deploy Resources</DialogTitle>
           {selectedIncident && (
-            <div className="space-y-4">
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-lg bg-secondary/50 p-3 text-center">
-                  <Users className="h-4 w-4 mx-auto mb-1 text-primary" />
-                  <p className="text-lg font-bold text-foreground">{selectedIncident.affectedPeople.toLocaleString()}</p>
-                  <p className="text-[10px] text-muted-foreground">Afectados</p>
-                </div>
-                <div className="rounded-lg bg-secondary/50 p-3 text-center">
-                  <Clock className="h-4 w-4 mx-auto mb-1 text-accent" />
-                  <p className="text-lg font-bold text-foreground">
-                    {selectedIncident.timestamp.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">Reportado</p>
-                </div>
-                <div className="rounded-lg bg-secondary/50 p-3 text-center">
-                  <MapPinned className="h-4 w-4 mx-auto mb-1 text-blue-400" />
-                  <p className="text-[10px] font-bold text-foreground">
-                    {selectedIncident.coordinates.lat.toFixed(4)}, {selectedIncident.coordinates.lng.toFixed(4)}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">Coordenadas</p>
-                </div>
-              </div>
-
-              {/* Source Info */}
-              <div className="rounded-lg border border-border bg-secondary/30 p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  {getSourceIcon(selectedIncident.source)}
-                  <span className="text-sm font-medium">Fuente: {getSourceLabel(selectedIncident.source)}</span>
-                  <Badge variant="outline" className="ml-auto text-[10px]">
-                    {selectedIncident.source === "social" ? selectedIncident.sourceDetails.platform : 
-                     selectedIncident.source === "sensor" ? selectedIncident.sourceDetails.sensorId :
-                     selectedIncident.sourceDetails.cameraId}
-                  </Badge>
-                </div>
-
-                {selectedIncident.source === "social" && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-                        <Twitter className="h-4 w-4 text-blue-400" />
-                      </div>
-                      <span className="text-sm font-medium text-blue-400">{selectedIncident.sourceDetails.username}</span>
-                    </div>
-                    <p className="text-sm text-foreground bg-secondary/50 rounded-lg p-3 italic">
-                      &quot;{selectedIncident.sourceDetails.content}&quot;
-                    </p>
-                    {selectedIncident.sourceDetails.imageUrl && (
-                      <div className="relative aspect-video rounded-lg overflow-hidden">
-                        <img 
-                          src={selectedIncident.sourceDetails.imageUrl} 
-                          alt="Imagen del incidente"
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute bottom-2 right-2">
-                          <Badge className="bg-black/70 text-white text-[10px]">
-                            Imagen adjunta al tweet
-                          </Badge>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {selectedIncident.source === "sensor" && (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-lg bg-secondary/50 p-3">
-                        <p className="text-[10px] text-muted-foreground mb-1">Temperatura</p>
-                        <p className="text-xl font-bold text-foreground">{selectedIncident.sourceDetails.temperature}°C</p>
-                      </div>
-                      <div className="rounded-lg bg-secondary/50 p-3">
-                        <p className="text-[10px] text-muted-foreground mb-1">Humedad</p>
-                        <p className="text-xl font-bold text-foreground">{selectedIncident.sourceDetails.humidity}%</p>
-                      </div>
-                      <div className="rounded-lg bg-secondary/50 p-3">
-                        <p className="text-[10px] text-muted-foreground mb-1">Viento</p>
-                        <p className="text-xl font-bold text-foreground">{selectedIncident.sourceDetails.windSpeed} km/h</p>
-                      </div>
-                      <div className="rounded-lg bg-secondary/50 p-3">
-                        <p className="text-[10px] text-muted-foreground mb-1">Presion</p>
-                        <p className="text-xl font-bold text-foreground">{selectedIncident.sourceDetails.pressure} hPa</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Datos en tiempo real del sensor {selectedIncident.sourceDetails.sensorId}
-                    </p>
-                  </div>
-                )}
-
-                {selectedIncident.source === "camera" && (
-                  <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground">
-                      Ubicacion: {selectedIncident.sourceDetails.cameraLocation}
-                    </p>
-                    {selectedIncident.sourceDetails.imageUrl && (
-                      <div className="relative aspect-video rounded-lg overflow-hidden">
-                        <img 
-                          src={selectedIncident.sourceDetails.imageUrl} 
-                          alt="Captura de camara"
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute top-2 left-2">
-                          <Badge className="bg-red-500/90 text-white text-[10px] animate-pulse">
-                            EN VIVO
-                          </Badge>
-                        </div>
-                        <div className="absolute bottom-2 right-2">
-                          <Badge className="bg-black/70 text-white text-[10px]">
-                            {selectedIncident.sourceDetails.cameraId}
-                          </Badge>
-                        </div>
-                        <div className="absolute bottom-2 left-2">
-                          <Badge className="bg-black/70 text-white text-[10px]">
-                            {new Date().toLocaleTimeString("es-AR")}
-                          </Badge>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2">
-                <Button className="flex-1" variant="default" onClick={handleOpenDeploy}>
-                  <Send className="h-4 w-4 mr-2" />
-                  Desplegar Recursos
-                </Button>
-                <Button className="flex-1" variant="outline">
-                  <Phone className="h-4 w-4 mr-2" />
-                  Contactar Autoridades
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Deploy Resources Modal */}
-      <Dialog open={showDeployModal} onOpenChange={handleCloseDeploy}>
-        <DialogContent className="max-w-md z-[9999]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Send className="h-5 w-5 text-primary" />
-              Desplegar Recursos de Emergencia
-            </DialogTitle>
-            <DialogDescription>
-              Selecciona los recursos a enviar a <span className="font-medium text-foreground">{selectedIncident?.location}</span>
-            </DialogDescription>
-          </DialogHeader>
-
-          {deploySuccess ? (
-            <div className="py-8 flex flex-col items-center gap-3">
-              <div className="h-16 w-16 rounded-full bg-success/20 flex items-center justify-center">
-                <CheckCircle2 className="h-8 w-8 text-success" />
-              </div>
-              <p className="text-lg font-semibold text-foreground">Recursos Desplegados</p>
-              <p className="text-sm text-muted-foreground text-center">
-                Las unidades han sido notificadas y estan en camino
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-2 py-2">
-                {!dbRecursos ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Cargando recursos...</p>
-                ) : resourceGroups.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No hay recursos registrados</p>
-                ) : (
-                  resourceGroups.map((group) => {
-                    const available = group.availableIds.length
-                    const total = group.ids.length
-                    const busy = total - available
-                    const count = selectedCounts[group.tipo] ?? 0
-                    const noStock = available === 0
-
-                    return (
-                      <div
-                        key={group.tipo}
-                        className={cn(
-                          "flex items-center gap-3 rounded-lg border p-3 transition-all",
-                          noStock
-                            ? "border-border bg-secondary/20 opacity-60"
-                            : count > 0
-                            ? "border-primary bg-primary/10"
-                            : "border-border hover:bg-secondary/30"
-                        )}
-                      >
-                        {/* Icon */}
-                        <div className={cn(
-                          "h-10 w-10 shrink-0 rounded-full flex items-center justify-center",
-                          noStock ? "bg-secondary/50 text-muted-foreground"
-                          : count > 0 ? "bg-primary text-primary-foreground"
-                          : "bg-secondary text-foreground"
-                        )}>
-                          {getRecursoIcon(group.tipo)}
-                        </div>
-
-                        {/* Label + availability */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground">{getTipoLabel(group.tipo)}</p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={cn(
-                              "text-xs font-semibold",
-                              available > 0 ? "text-success" : "text-muted-foreground"
-                            )}>
-                              {available} disponible{available !== 1 ? "s" : ""}
-                            </span>
-                            {busy > 0 && (
-                              <span className="text-[10px] text-muted-foreground">
-                                · {busy} ocupado{busy !== 1 ? "s" : ""}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Counter +/- */}
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            onClick={() => adjustCount(group.tipo, -1, available)}
-                            disabled={count === 0}
-                            className="h-7 w-7 rounded-md border border-border flex items-center justify-center text-sm hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                          >
-                            −
-                          </button>
-                          <span className="w-5 text-center text-sm font-bold tabular-nums text-foreground">
-                            {count}
-                          </span>
-                          <button
-                            onClick={() => adjustCount(group.tipo, +1, available)}
-                            disabled={count >= available}
-                            className="h-7 w-7 rounded-md border border-border flex items-center justify-center text-sm hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-
-              {/* Summary */}
-              <div className="rounded-lg bg-secondary/50 p-3">
-                <p className="text-xs text-muted-foreground mb-1">Resumen del despliegue</p>
-                <p className="text-sm font-medium text-foreground">
-                  {Object.values(selectedCounts).reduce((a, b) => a + b, 0) > 0
-                    ? Object.entries(selectedCounts)
-                        .filter(([, v]) => v > 0)
-                        .map(([tipo, v]) => `${v} ${getTipoLabel(tipo)}`)
-                        .join(", ")
-                    : "Ningun recurso seleccionado"
-                  }
-                </p>
-              </div>
-
-              <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={handleCloseDeploy}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleDeployResources}
-                  disabled={deployingResources || Object.values(selectedCounts).reduce((a, b) => a + b, 0) === 0}
-                >
-                  {deployingResources ? (
-                    <>
-                      <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      Desplegando...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Confirmar Despliegue
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </>
+            <IncidentDispatchCard
+              incident={{
+                id: selectedIncident.id,
+                tipo: selectedIncident.type === "flood" || selectedIncident.type === "fire" ? selectedIncident.type : "general",
+                severidad: selectedIncident.severity as "critical" | "high" | "medium" | "low",
+                ubicacion: selectedIncident.location,
+                afectados: selectedIncident.affectedPeople,
+                timestamp: selectedIncident.timestamp ? new Date(selectedIncident.timestamp).toISOString() : new Date().toISOString(),
+                arkivKey: selectedIncident.arkiv_key,
+              }}
+              selectedCounts={selectedCounts}
+              onConfirmDispatch={handleDeployResources}
+              onDispatchSuccess={() => {
+                mutate("/api/incidentes?estado=activo")
+                mutate("/api/incidentes?estado=atendido")
+                mutate("/api/analytics")
+              }}
+              onDismiss={handleCloseConfirmDispatch}
+            />
           )}
         </DialogContent>
       </Dialog>

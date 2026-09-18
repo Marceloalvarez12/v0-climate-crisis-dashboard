@@ -1,43 +1,40 @@
-import { createClient } from "@/lib/supabase/server"
-import { NextResponse } from "next/server"
+import { supabase } from "@/lib/supabase"
+import { apiSuccess, apiError } from "@/lib/services/api-response"
 
-// Auto-resolve any active incident older than 60 minutes.
-// Called periodically from the client (ai-activity-log useEffect) every 60 seconds.
 export async function POST() {
-  const supabase = await createClient()
+  try {
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString()
 
-  const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const { data: stale, error: selectError } = await supabase
+      .from("incidentes")
+      .select("*")
+      .eq("estado", "activo")
+      .lt("updated_at", cutoff)
 
-  // Find active incidents whose updated_at is older than 60 minutes.
-  // updated_at is always writable and gets reset to NOW() every time an
-  // incident is spawned or reactivated, so this timer starts fresh each time.
-  const { data: stale, error: fetchError } = await supabase
-    .from("incidentes")
-    .select("id, ubicacion")
-    .eq("estado", "activo")
-    .lt("updated_at", cutoff)
+    if (selectError) return apiError(selectError.message)
 
-  if (fetchError) {
-    return NextResponse.json({ error: fetchError.message }, { status: 500 })
+    if (!stale || stale.length === 0) {
+      return apiSuccess({ resolved: 0 })
+    }
+
+    const ids = stale.map(i => i.id)
+    const { data: updated, error: updateError } = await supabase
+      .from("incidentes")
+      .update({
+        estado: "atendido",
+        updated_at: new Date().toISOString(),
+      })
+      .in("id", ids)
+      .select()
+
+    if (updateError) return apiError(updateError.message)
+
+    return apiSuccess({
+      resolved: updated ? updated.length : 0,
+      locations: (updated || []).map(i => i.ubicacion),
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return apiError(message)
   }
-
-  if (!stale || stale.length === 0) {
-    return NextResponse.json({ resolved: 0 })
-  }
-
-  const ids = stale.map((i: { id: string }) => i.id)
-
-  const { error: updateError } = await supabase
-    .from("incidentes")
-    .update({ estado: "atendido", updated_at: new Date().toISOString() })
-    .in("id", ids)
-
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 })
-  }
-
-  return NextResponse.json({
-    resolved: ids.length,
-    locations: stale.map((i: { ubicacion: string }) => i.ubicacion),
-  })
 }

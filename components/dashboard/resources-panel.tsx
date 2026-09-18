@@ -1,12 +1,11 @@
 "use client"
 
+import { useState, useEffect, useMemo } from "react"
 import { Truck, Users, Plane, Ship, Building2, HeartPulse } from "lucide-react"
-import useSWR from "swr"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+import { useResources } from "./crisis-map/use-map-data"
 
 interface Resource {
   id: string
@@ -43,38 +42,62 @@ const getStatusBadge = (status: Resource["status"]) => {
     case "available":
       return (
         <Badge variant="outline" className="border-success/50 bg-success/10 text-success text-[10px] px-1.5 py-0">
-          Disponible
+          Available
         </Badge>
       )
     case "dispatched":
       return (
         <Badge variant="outline" className="border-accent/50 bg-accent/10 text-accent text-[10px] px-1.5 py-0">
-          En camino
+          En route
         </Badge>
       )
     case "busy":
       return (
         <Badge variant="outline" className="border-primary/50 bg-primary/10 text-primary text-[10px] px-1.5 py-0">
-          Ocupado
+          Busy
         </Badge>
       )
   }
 }
 
 export function ResourcesPanel() {
-  // Fetch resources from Supabase
-  const { data: dbResources, error } = useSWR("/api/recursos", fetcher, {
-    refreshInterval: 2000,
-  })
+  // Fetch resources from shared hook (unified SWR cache)
+  const { data: dbResources, error } = useResources()
 
   // Transform database resources to local format
+  const [dispatchedETAs, setDispatchedETAs] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDispatchedETAs((prev) => {
+        const next = { ...prev }
+        let changed = false
+        Object.keys(next).forEach((id) => {
+          const match = next[id].match(/(\d+)/)
+          if (match) {
+            const val = parseInt(match[1])
+            if (val > 1) {
+              next[id] = `${val - 1} min`
+              changed = true
+            } else {
+              delete next[id]
+              changed = true
+            }
+          }
+        })
+        return changed ? next : prev
+      })
+    }, 60000)
+    return () => clearInterval(interval)
+  }, [])
+
   const resources: Resource[] = dbResources ? dbResources.map((r: { id: string; tipo: string; nombre: string; estado: string; ubicacion: string }) => ({
     id: r.id,
     name: r.nombre,
     type: r.tipo as Resource["type"],
     status: r.estado as Resource["status"],
-    location: r.ubicacion || "Base Central",
-    eta: r.estado === "dispatched" ? `${Math.floor(Math.random() * 15) + 5} min` : undefined
+    location: r.ubicacion || "Central Base",
+    eta: r.estado === "dispatched" ? (dispatchedETAs[r.id] ?? `${Math.floor(Math.random() * 15) + 5} min`) : undefined
   })) : []
 
   const availableCount = resources.filter(r => r.status === "available").length
@@ -84,7 +107,7 @@ export function ResourcesPanel() {
   if (error) {
     return (
       <div className="flex h-full flex-col rounded-lg border border-border bg-card p-4">
-        <p className="text-sm text-muted-foreground">Error cargando recursos</p>
+        <p className="text-sm text-muted-foreground">Error loading resources</p>
       </div>
     )
   }
@@ -92,7 +115,7 @@ export function ResourcesPanel() {
   return (
     <div className="flex h-full flex-col rounded-lg border border-border bg-card">
       <div className="border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold text-foreground">Recursos Disponibles</h2>
+        <h2 className="text-sm font-semibold text-foreground">Available Resources</h2>
         <div className="mt-2 flex items-center gap-3 text-[10px]">
           <span className="flex items-center gap-1">
             <span className="h-2 w-2 rounded-full bg-success" />
@@ -111,7 +134,7 @@ export function ResourcesPanel() {
       <ScrollArea className="flex-1 px-3 py-2">
         <div className="space-y-2">
           {resources.length === 0 ? (
-            <p className="text-xs text-muted-foreground p-2">Cargando recursos...</p>
+            <p className="text-xs text-muted-foreground p-2">Loading resources...</p>
           ) : (
             resources.map((resource) => (
               <div
