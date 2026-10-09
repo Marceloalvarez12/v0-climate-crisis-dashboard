@@ -221,7 +221,7 @@ export function CrisisMap() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="relative flex h-full w-full flex-col overflow-visible rounded-lg border border-border bg-card">
+    <div className="relative flex h-full w-full flex-col overflow-visible rounded-lg lg:overflow-hidden border border-border bg-card">
       {/* ── Map header ─────────────────────────────────────────────── */}
       <div className="sticky top-0 z-[1000] flex min-h-12 w-full shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-border bg-card px-3 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -426,7 +426,7 @@ export function CrisisMap() {
 
       {/* ── Leaflet Map ─────────────────────────────────────────────── */}
       {isClient && leafletCssLoaded ? (
-        <div className="relative isolate h-[min(70vh,680px)] min-h-[420px] w-full shrink-0 overscroll-contain md:h-[min(70vh,680px)] md:flex-none">
+        <div className="relative isolate h-[min(70vh,680px)] min-h-[420px] w-full shrink-0 overscroll-contain md:h-[min(70vh,680px)] md:flex-none lg:h-auto lg:min-h-0 lg:flex-1 lg:shrink">
           <MapInner
             incidents={filteredIncidents}
             onMarkerClick={handleMarkerClick}
@@ -434,7 +434,7 @@ export function CrisisMap() {
           />
         </div>
       ) : (
-        <div className="flex h-[min(70vh,680px)] min-h-[420px] w-full shrink-0 items-center justify-center bg-secondary/20 md:h-[min(70vh,680px)] md:flex-none">
+        <div className="flex h-[min(70vh,680px)] min-h-[420px] w-full shrink-0 items-center justify-center bg-secondary/20 md:h-[min(70vh,680px)] md:flex-none lg:h-auto lg:min-h-0 lg:flex-1 lg:shrink">
           <div className="flex flex-col items-center gap-2">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             <p className="text-sm text-muted-foreground">Loading map...</p>
