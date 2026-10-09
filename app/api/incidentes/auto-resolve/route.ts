@@ -1,14 +1,9 @@
-import { getDb } from "@/lib/db"
 import { apiSuccess, apiError } from "@/lib/services/api-response"
-import { getConfigNumber } from "@/lib/services/config-service"
+import { resolveExpiredSimulated } from "@/lib/services/simulation-service"
 
 export async function POST() {
   try {
-    const db = await getDb()
-    const minutes = await getConfigNumber("auto_resolve_minutes", 5)
-    const cutoff = new Date(Date.now() - minutes * 60 * 1000).toISOString()
-
-    const updated = await db.resolveStaleSimulated(cutoff)
+    const updated = await resolveExpiredSimulated()
 
     return apiSuccess({
       resolved: updated.length,

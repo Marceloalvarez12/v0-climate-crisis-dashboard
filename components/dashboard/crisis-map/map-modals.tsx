@@ -1,6 +1,8 @@
 "use client"
 
 import { useMemo, useState, useEffect } from "react"
+import { mutate } from "swr"
+import { toast } from "sonner"
 import { Users, Clock, MapPinned, Twitter, Facebook, Instagram, Hash, Repeat2, Send, CheckCircle2, Truck, ShieldAlert, ShieldCheck, Loader2, ExternalLink, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -178,6 +180,29 @@ export function IncidentDetailModal({
   onOpenDeploy,
 }: IncidentDetailModalProps) {
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isConfirming, setIsConfirming] = useState(false)
+  const pendingConfirmation = incident?.estado === "atendido" && incident.sourceDetails.pending_confirmation === true
+
+  // Auto-resuelto por la simulación → el operador confirma el cierre (sella en Arkiv si está configurado).
+  const handleConfirmResolution = async (inc: Incident) => {
+    setIsConfirming(true)
+    try {
+      const res = await fetch("/api/incidentes/arkiv-dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: inc.id }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      toast.success(`Resolution confirmed: ${inc.location}`)
+      await Promise.allSettled([mutate("/api/incidentes?estado=atendido"), mutate("/api/analytics")])
+      onClose()
+    } catch (err) {
+      console.error("Error confirming incident resolution:", err)
+      toast.error("Could not confirm the resolution. Try again.")
+    } finally {
+      setIsConfirming(false)
+    }
+  }
 
   const handleDownloadReport = async (inc: Incident) => {
     setIsGenerating(true)
@@ -217,7 +242,12 @@ export function IncidentDetailModal({
                     <span className="text-xs font-normal text-muted-foreground">
                       {incidentTypeLabel(incident.type)} — Severity {incidentSeverityLabel(incident.severity)}
                     </span>
-                    {incident.estado === "atendido" && (
+                    {pendingConfirmation && (
+                      <Badge className="bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500/20 text-[9px] px-1.5 py-0 border border-yellow-500/30 animate-pulse">
+                        Awaiting Confirmation
+                      </Badge>
+                    )}
+                    {incident.estado === "atendido" && !pendingConfirmation && (
                       <Badge className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25 text-[9px] px-1.5 py-0 border border-emerald-500/30">
                         Attended & Audited
                       </Badge>
@@ -267,7 +297,31 @@ export function IncidentDetailModal({
               <IncidentVerifyPanel incident={incident} />
 
               {/* On-Chain Verification / Dispatch Action */}
-              {incident.estado === "atendido" ? (
+              {pendingConfirmation ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-yellow-400">
+                      <Clock className="h-4 w-4" />
+                      <span className="text-xs font-semibold">Auto-resolved — awaiting operator confirmation</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      This simulated incident was closed automatically
+                      {incident.sourceDetails.auto_resolved_at
+                        ? ` at ${new Date(incident.sourceDetails.auto_resolved_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`
+                        : ""}{" "}
+                      after its time window without attention. Confirm the resolution to seal it in the audit trail.
+                    </p>
+                  </div>
+                  <Button
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center justify-center gap-2 py-5 cursor-pointer"
+                    onClick={() => handleConfirmResolution(incident)}
+                    disabled={isConfirming}
+                  >
+                    {isConfirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                    {isConfirming ? "Confirming..." : "Confirm Resolution"}
+                  </Button>
+                </div>
+              ) : incident.estado === "atendido" ? (
                 <div className="space-y-3">
                   {incident.arkiv_key ? (
                     <OnChainVerifier arkivKey={incident.arkiv_key} />

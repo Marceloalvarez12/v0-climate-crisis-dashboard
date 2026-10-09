@@ -39,8 +39,11 @@ function seedData(): MemoryState {
     { nombre: "Plaza Independencia - Centro Historico", lat: -26.8305, lng: -65.2038 },
   ]
 
+  // Los semillas entran al mismo ciclo de vida que los auto-generados por
+  // lib/services/simulation-service.ts (vida aleatoria ~5 min → historial).
   const incidents: DbIncident[] = SEED_ZONES.map((zona) => {
     const fuente = randomFrom(FUENTES)
+    const createdAt = Date.now() - randomInt(60000, 180000)
     return {
       id: randomUUID(),
       tipo: randomFrom(INCIDENT_TYPES),
@@ -54,9 +57,12 @@ function seedData(): MemoryState {
         platform: "Seed simulado",
         content: `Incidente semilla en ${zona.nombre}`,
         reports_count: 1,
+        simulated: true,
+        auto_spawned: true,
+        auto_resolve_at: new Date(createdAt + randomInt(240000, 420000)).toISOString(),
       },
       estado: "activo",
-      created_at: new Date(Date.now() - randomInt(60000, 600000)).toISOString(),
+      created_at: new Date(createdAt).toISOString(),
       updated_at: now(),
     }
   })
@@ -184,18 +190,6 @@ export const memoryDb: DataStore = {
       (i) => !(i.fuente_detalles?.simulated === true && (!estado || i.estado === estado)),
     )
     return before - state.incidents.length
-  },
-
-  async resolveStaleSimulated(cutoffIso) {
-    const stale = state.incidents.filter(
-      (i) => i.estado === "activo" && i.fuente_detalles?.simulated === true && i.updated_at < cutoffIso,
-    )
-    const now = new Date().toISOString()
-    for (const inc of stale) {
-      inc.estado = "atendido"
-      inc.updated_at = now
-    }
-    return stale
   },
 
   async listResources() {

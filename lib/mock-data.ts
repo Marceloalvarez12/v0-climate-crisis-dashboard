@@ -297,7 +297,11 @@ export const RESPAWN_ZONES = [
   { nombre: "Parque Avellaneda - Av. Mate de Luna", lat: -26.8261, lng: -65.2239 },
   { nombre: "Terminal de Omnibus - Av. Brigido Teran", lat: -26.8366, lng: -65.1954 },
   { nombre: "Av. Fco. de Aguirre y Juan B. Justo", lat: -26.8001, lng: -65.2014 },
-  { nombre: "Av. Roca y Lincoln - Zona Sur", lat: -26.8453, lng: -65.2198 }
+  { nombre: "Av. Roca y Lincoln - Zona Sur", lat: -26.8453, lng: -65.2198 },
+  { nombre: "Yerba Buena - Av. Aconquija", lat: -26.8160, lng: -65.3160 },
+  { nombre: "Barrio San Pablo", lat: -26.8400, lng: -65.2500 },
+  { nombre: "Barrio Ciudadela", lat: -26.8150, lng: -65.2250 },
+  { nombre: "Villa 9 de Julio", lat: -26.8030, lng: -65.2120 },
 ]
 
 export const TIPOS: IncidentTipo[] = ["flood", "fire", "storm", "looting", "violence", "accident", "general"]

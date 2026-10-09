@@ -27,7 +27,7 @@
 
 import { randomUUID } from "crypto"
 import { CONFIG } from "@/lib/config"
-import { isNonReportIncident } from "@/lib/types"
+import { isAutoSpawned, isNonReportIncident } from "@/lib/types"
 import { LlmAnalyzer } from "@/lib/agents/llm-analyzer"
 import { analyzePostHeuristically } from "@/lib/agents/heuristic-analyzer"
 import { containsTriggerHashtag, extractHashtags, TRIGGER_HASHTAG } from "@/lib/agents/hashtag"
@@ -165,7 +165,7 @@ export async function ingestSocialPost(post: SocialPost, { dryRun = false }: Ing
   }
 
   const active = await db.listIncidents({ estado: "activo" })
-  if (active.filter(i => !isNonReportIncident(i)).length >= CONFIG.INCIDENTS.MAX_ACTIVE) {
+  if (active.filter(i => !isNonReportIncident(i) && !isAutoSpawned(i)).length >= CONFIG.INCIDENTS.MAX_ACTIVE) {
     return { ...base, status: "skipped", analyzer, analysis, location: location.nombre, reason: `Límite de ${CONFIG.INCIDENTS.MAX_ACTIVE} incidentes activos alcanzado` }
   }
 

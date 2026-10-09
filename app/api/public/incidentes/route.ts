@@ -17,6 +17,8 @@ export const dynamic = "force-dynamic"
 export async function GET() {
   try {
     const { getDb } = await import("@/lib/db")
+    const { runSimulationTick } = await import("@/lib/services/simulation-service")
+    await runSimulationTick()
     const db = await getDb()
 
     const data = await db.listIncidents({ estado: "activo", limit: 1000 })

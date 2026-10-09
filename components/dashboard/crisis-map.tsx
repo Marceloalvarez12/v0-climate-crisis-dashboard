@@ -384,14 +384,14 @@ export function CrisisMap() {
                   viewMode === "activo"
                     ? (incident.severity === "critical" ? "border-primary/50 bg-primary/5" :
                        incident.severity === "high"     ? "border-accent/50 bg-accent/5"   : "border-border")
-                    : (incident.estado === "activo"
+                    : (incident.estado === "activo" || incident.sourceDetails.pending_confirmation
                         ? "border-yellow-500/30 bg-yellow-500/5 hover:border-yellow-500/50 hover:bg-yellow-500/10"
                         : "border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40")
                 )}
               >
                 <div className="flex items-start gap-2">
                   <div className={cn("rounded-full p-1.5 flex items-center justify-center shrink-0", 
-                    viewMode === "activo" ? severityColorClass(incident.severity) : (incident.estado === "activo" ? "bg-yellow-500/10 text-yellow-400" : "bg-emerald-500/10 text-emerald-400")
+                    viewMode === "activo" ? severityColorClass(incident.severity) : (incident.estado === "activo" || incident.sourceDetails.pending_confirmation ? "bg-yellow-500/10 text-yellow-400" : "bg-emerald-500/10 text-emerald-400")
                   )}>
                     <IncidentIcon type={incident.type} />
                   </div>
@@ -399,7 +399,7 @@ export function CrisisMap() {
                     <div className="flex items-center justify-between gap-1">
                       <p className="text-xs font-medium text-foreground truncate">{incident.location}</p>
                       {viewMode === "atendido" && (
-                        incident.estado === "activo" ? (
+                        incident.estado === "activo" || incident.sourceDetails.pending_confirmation ? (
                           <Badge variant="outline" className="text-[7px] h-3 px-1 border-yellow-500/40 text-yellow-400 font-mono shrink-0 animate-pulse">
                             PENDING
                           </Badge>

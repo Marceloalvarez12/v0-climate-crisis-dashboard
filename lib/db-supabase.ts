@@ -91,26 +91,6 @@ export const supabaseDb: DataStore = {
     return 0
   },
 
-  async resolveStaleSimulated(cutoffIso) {
-    const { data: stale, error: selectError } = await supabase
-      .from("incidentes")
-      .select("*")
-      .eq("estado", "activo")
-      .contains("fuente_detalles", { simulated: true })
-      .lt("updated_at", cutoffIso)
-    assertNoError(selectError, "Failed to select stale incidents")
-    if (!stale?.length) return []
-
-    const ids = stale.map((i) => i.id)
-    const { data: updated, error: updateError } = await supabase
-      .from("incidentes")
-      .update({ estado: "atendido", updated_at: new Date().toISOString() })
-      .in("id", ids)
-      .select()
-    assertNoError(updateError, "Failed to auto-resolve incidents")
-    return (updated ?? []) as DbIncident[]
-  },
-
   // ── Recursos ────────────────────────────────────────────────────────────
 
   async listResources() {

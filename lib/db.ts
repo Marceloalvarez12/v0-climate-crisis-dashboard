@@ -44,8 +44,6 @@ export interface DataStore {
   updateIncident(id: string, updates: Partial<DbIncident>): Promise<DbIncident | null>
   deleteIncident(id: string): Promise<void>
   deleteSimulatedIncidents(estado?: "activo" | "atendido"): Promise<number>
-  /** Auto-resolve de mantenimiento: marca "atendido" a los simulados activos con updated_at < cutoffIso */
-  resolveStaleSimulated(cutoffIso: string): Promise<DbIncident[]>
 
   // ── Recursos ────────────────────────────────────────────────────────────
   listResources(): Promise<DbResource[]>

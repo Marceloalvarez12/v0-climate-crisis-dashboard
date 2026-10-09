@@ -52,6 +52,8 @@ export async function POST(request: NextRequest): Promise<Response> {
       dispatched_at: dispatchedAt, lease_extended: lease,
       arkiv_audit_status: entityKey ? "confirmed" : "unavailable",
       ...(stellarAudit ? { stellar_audit: stellarAudit } : {}),
+      // Auto-resuelto por la simulación: el operador confirma el cierre acá.
+      ...(incident.fuente_detalles.pending_confirmation ? { pending_confirmation: false, confirmed_at: dispatchedAt } : {}),
     }
     await IncidentService.update(incident.id, { estado: "atendido", fuente_detalles: details })
     const response: ArkivDispatchResponse = { success: true, onChain: Boolean(entityKey), entityKey, isSimulated: !entityKey, stellarAudit: stellarAudit ?? undefined }

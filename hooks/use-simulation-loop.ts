@@ -11,10 +11,11 @@ import {
 import { fetchRecursos, patchRecurso, patchIncidente, createZkCitizenReport, postSocialMention } from "@/lib/api"
 import { buildSimulatedPost, type SimulatedPostPayload } from "@/lib/social-feed-simulator"
 import type { MentionOutcome } from "@/lib/agents/types"
-import type { DbIncident } from "@/lib/types"
+import { isAutoSpawned, type DbIncident } from "@/lib/types"
 
+// Cupo propio del feed del panel dev; los auto-generados por el servidor no cuentan.
+// La auto-resolución (→ historial pendiente de confirmación) la hace el servidor.
 const MAX_ACTIVE_SIMULATED_INCIDENTS = 5
-const AUTO_RESOLVE_UNATTENDED_MS = 120_000
 
 // ---------------------------------------------------------------------------
 // Tipos exportados
@@ -69,23 +70,6 @@ export function useSimulationLoop() {
     mutate("/api/analytics")
   }, [mutate])
 
-  // Auto-resolución de incidentes simulados no atendidos
-  const scheduleAutoResolve = useCallback((incidentId: string, location: string, label = "incidente") => {
-    const timer = setTimeout(async () => {
-      try {
-        const current = await fetch(`/api/incidentes/${incidentId}`).then(r => r.ok ? r.json() : null)
-        if (current?.data?.estado === "activo") {
-          await patchIncidente(incidentId, { estado: "atendido" })
-          refreshIncidents()
-          addEvent({ type: "incident_resolved", message: `Auto-resuelto: ${label} en ${location}`, incidentId, location })
-        }
-      } catch (err) {
-        console.error("[use-simulation-loop] Auto-resolve failed:", err)
-      }
-    }, AUTO_RESOLVE_UNATTENDED_MS)
-    dispatchTimersRef.current.set(`autoresolve-${incidentId}`, timer)
-  }, [addEvent, refreshIncidents])
-
   // Publica un post (simulado o escrito a mano) en el webhook de menciones.
   // Sólo los posts con #AlertaTucuman que describen una emergencia crean incidentes.
   const publishSocialPost = useCallback(async (input?: SocialPostInput): Promise<MentionOutcome | null> => {
@@ -98,7 +82,6 @@ export function useSimulationLoop() {
         case "created":
           refreshIncidents()
           addEvent({ type: "incident_created", message: `${outcome.hashtag} en ${net} (${post.author}) → incidente en ${where}`, incidentId: outcome.incidentId, location: where, platform: post.platform })
-          if (outcome.incidentId) scheduleAutoResolve(outcome.incidentId, where)
           break
         case "corroborated":
           refreshIncidents()
@@ -122,7 +105,7 @@ export function useSimulationLoop() {
       addEvent({ type: "post_rejected", message: `Error al procesar post de ${net}`, platform: post.platform })
       return null
     }
-  }, [addEvent, refreshIncidents, scheduleAutoResolve])
+  }, [addEvent, refreshIncidents])
 
   const spawnCitizenZkReport = useCallback(async () => {
     const report = CITIZEN_REPORTS[Math.floor(Math.random() * CITIZEN_REPORTS.length)]
@@ -138,19 +121,18 @@ export function useSimulationLoop() {
       })
       refreshIncidents()
       addEvent({ type: "citizen_zk_report", message: `Reporte ciudadano ZK en ${data.incident.ubicacion}`, incidentId: data.incident.id, location: data.incident.ubicacion })
-      scheduleAutoResolve(data.incident.id, data.incident.ubicacion, "reporte ciudadano")
       return data.incident
     } catch (err) {
       console.error("[use-simulation-loop] Failed to spawn citizen ZK report:", err)
       return null
     }
-  }, [addEvent, refreshIncidents, scheduleAutoResolve])
+  }, [addEvent, refreshIncidents])
 
   const activeCount = useCallback(async () => {
     try {
       const res = await fetch("/api/incidentes?estado=activo")
-      const data = await res.json()
-      return Array.isArray(data) ? data.length : 0
+      const data: DbIncident[] = await res.json()
+      return Array.isArray(data) ? data.filter((i) => !isAutoSpawned(i)).length : 0
     } catch {
       return Infinity
     }
@@ -160,7 +142,7 @@ export function useSimulationLoop() {
     try {
       const res = await fetch("/api/incidentes?estado=activo")
       const data: DbIncident[] = await res.json()
-      const simulated = (Array.isArray(data) ? data : []).filter((i) => i.fuente_detalles?.simulated)
+      const simulated = (Array.isArray(data) ? data : []).filter((i) => i.fuente_detalles?.simulated && !isAutoSpawned(i))
       await Promise.all(
         simulated.map((i) =>
           fetch("/api/incidentes", {

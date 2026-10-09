@@ -29,6 +29,13 @@ export interface IncidentSourceDetails {
   corroborations?: Array<{ post_id: string; platform: string; author: string; content: string; at: string }>
   analyzer?:       "llm" | "heuristic"
   simulated?:      boolean
+  // Ciclo de vida simulado (lib/services/simulation-service.ts)
+  auto_spawned?:         boolean
+  auto_resolve_at?:      string
+  auto_resolved?:        boolean
+  auto_resolved_at?:     string
+  pending_confirmation?: boolean
+  confirmed_at?:         string
   // Sensor
   sensorId?:       string
   temperature?:    number
@@ -123,6 +130,15 @@ export interface DbIncident {
 export function isNonReportIncident(incident: Pick<DbIncident, "fuente" | "fuente_detalles">): boolean {
   return incident.fuente === "sensor" &&
     (incident.fuente_detalles?.source_api === "usgs" || incident.fuente_detalles?.source_api === "eonet")
+}
+
+export function isSimulatedIncident(incident: Pick<DbIncident, "fuente_detalles">): boolean {
+  return incident.fuente_detalles?.simulated === true
+}
+
+/** Incidente generado por la simulación server-side (lib/services/simulation-service.ts). */
+export function isAutoSpawned(incident: Pick<DbIncident, "fuente_detalles">): boolean {
+  return incident.fuente_detalles?.auto_spawned === true
 }
 
 export interface DbResource {

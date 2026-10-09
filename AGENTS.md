@@ -29,11 +29,20 @@ In local development only, append `?dev=true` to enable the simulation control p
 
 ## Social Hashtag Trigger
 
-Social incidents are created ONLY from posts containing the trigger hashtag (`#AlertaTucuman`, override with `NEXT_PUBLIC_TRIGGER_HASHTAG`). There is no random incident spawning anymore.
+Social incidents are created ONLY from posts containing the trigger hashtag (`#AlertaTucuman`, override with `NEXT_PUBLIC_TRIGGER_HASHTAG`).
+
+## Server-side simulation lifecycle
+
+`lib/services/simulation-service.ts` → `runSimulationTick()` runs lazily (throttled, 5s/process) from `GET /api/incidentes`, `/api/analytics` and `/api/public/incidentes`:
+
+- Keeps up to `CONFIG.SIMULATION.MAX_ACTIVE_SIMULATED` (12) simulated incidents active, spawning one every 15s from `RESPAWN_ZONES` (`fuente_detalles.auto_spawned=true`, no fake Arkiv key). Spawning is always on in memory mode; in Supabase mode only with `SIMULATION_AUTOSPAWN=true`.
+- Each simulated incident gets a randomized `auto_resolve_at` (`auto_resolve_minutes` ±40%; fallback `updated_at` cutoff). When expired it moves to History as `atendido` with `pending_confirmation=true` (yellow PENDING badge). The operator clicks **Confirm Resolution** in the detail modal → `POST /api/incidentes/arkiv-dispatch` clears the flag and sets `confirmed_at`.
+- Auto-spawned incidents do not consume `CONFIG.INCIDENTS.MAX_ACTIVE` (real report capacity) nor the dev-panel feed cap. Only `simulated: true` rows are ever auto-resolved.
+- With the in-memory store on serverless hosting each instance has its own state, so active/history can differ between requests; use Supabase for a consistent deployed demo.
 
 - Single pipeline: `lib/services/social-incident-service.ts` → `ingestSocialPost()` (hashtag filter → dedup by post id → LLM/heuristic analysis → gazetteer geocoding → corroborate or create).
 - Entry points: `POST /api/social/mention` (webhook, supports `?dryRun=true`) and `SocialMediaAgent.runScan()` (`POST /api/agent`).
-- `UsgsConnector` and `EonetConnector` are not active sources: incidents require an incoming citizen report or social mention. The dashboard no longer triggers agent scans. Historical USGS/EONET rows remain in Supabase but are excluded from incident reads and analytics with `isNonReportIncident`; do not delete them without approval. `/api/incidentes/respawn` returns 410. Real reports are not auto-resolved or expired by simulation maintenance.
+- `UsgsConnector` and `EonetConnector` are not active sources: incidents require an incoming citizen report or social mention. The dashboard no longer triggers agent scans. Historical USGS/EONET rows remain in Supabase but are excluded from incident reads and analytics with `isNonReportIncident`; do not delete them without approval. `/api/incidentes/respawn` returns 410. Real (non-`simulated`) reports are not auto-resolved or expired by simulation maintenance.
 - Analyzer fallback chain: OpenRouter → Gemini → `lib/agents/heuristic-analyzer.ts` (rule-based, no key needed).
 - Isomorphic helpers (safe in client): `lib/agents/hashtag.ts`, `lib/agents/tucuman-gazetteer.ts`, `lib/social-feed-simulator.ts`.
 - Active social incidents show in the map's Active tab with a "Pending Validation" badge; posts dedup via `fuente_detalles.related_post_ids`.
