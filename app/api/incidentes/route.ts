@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server"
 import { IncidentService } from "@/lib/services/incident-service"
-import { runSimulationTick } from "@/lib/services/simulation-service"
 import { apiSuccess, apiError, apiValidationError } from "@/lib/services/api-response"
 import { IncidentCreateSchema, IncidentPatchSchema } from "@/lib/validation"
 
@@ -8,7 +7,6 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const estado = searchParams.get("estado") || "activo"
-    await runSimulationTick()
 
     const data = estado === "atendido"
       ? await IncidentService.getAttendedIncidents()

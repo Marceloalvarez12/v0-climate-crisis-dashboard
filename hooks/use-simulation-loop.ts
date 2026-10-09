@@ -11,9 +11,8 @@ import {
 import { fetchRecursos, patchRecurso, patchIncidente, createZkCitizenReport, postSocialMention } from "@/lib/api"
 import { buildSimulatedPost, type SimulatedPostPayload } from "@/lib/social-feed-simulator"
 import type { MentionOutcome } from "@/lib/agents/types"
-import { isAutoSpawned, type DbIncident } from "@/lib/types"
+import type { DbIncident } from "@/lib/types"
 
-// Cupo propio del feed del panel dev; los auto-generados por el servidor no cuentan.
 // La auto-resolución (→ historial pendiente de confirmación) la hace el servidor.
 const MAX_ACTIVE_SIMULATED_INCIDENTS = 5
 
@@ -131,8 +130,8 @@ export function useSimulationLoop() {
   const activeCount = useCallback(async () => {
     try {
       const res = await fetch("/api/incidentes?estado=activo")
-      const data: DbIncident[] = await res.json()
-      return Array.isArray(data) ? data.filter((i) => !isAutoSpawned(i)).length : 0
+      const data = await res.json()
+      return Array.isArray(data) ? data.length : 0
     } catch {
       return Infinity
     }
@@ -142,7 +141,7 @@ export function useSimulationLoop() {
     try {
       const res = await fetch("/api/incidentes?estado=activo")
       const data: DbIncident[] = await res.json()
-      const simulated = (Array.isArray(data) ? data : []).filter((i) => i.fuente_detalles?.simulated && !isAutoSpawned(i))
+      const simulated = (Array.isArray(data) ? data : []).filter((i) => i.fuente_detalles?.simulated)
       await Promise.all(
         simulated.map((i) =>
           fetch("/api/incidentes", {

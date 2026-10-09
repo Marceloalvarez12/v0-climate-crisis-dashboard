@@ -1,6 +1,6 @@
 import { getDb } from "@/lib/db"
 import { CONFIG } from "@/lib/config"
-import { isAutoSpawned, isNonReportIncident, type DbIncident } from "@/lib/types"
+import { isNonReportIncident, type DbIncident } from "@/lib/types"
 
 export class IncidentService {
   static async getActiveIncidents(): Promise<DbIncident[]> {
@@ -15,9 +15,8 @@ export class IncidentService {
     return data.filter(i => !isNonReportIncident(i))
   }
 
-  /** Los incidentes auto-generados por la simulación no consumen el cupo de reportes reales. */
   static async countActive(): Promise<number> {
-    return (await this.getActiveIncidents()).filter(i => !isAutoSpawned(i)).length
+    return (await this.getActiveIncidents()).length
   }
 
   static async findByLocation(ubicacion: string): Promise<DbIncident | null> {

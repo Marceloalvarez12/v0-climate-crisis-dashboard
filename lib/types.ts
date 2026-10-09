@@ -29,9 +29,7 @@ export interface IncidentSourceDetails {
   corroborations?: Array<{ post_id: string; platform: string; author: string; content: string; at: string }>
   analyzer?:       "llm" | "heuristic"
   simulated?:      boolean
-  // Ciclo de vida simulado (lib/services/simulation-service.ts)
-  auto_spawned?:         boolean
-  auto_resolve_at?:      string
+  // Auto-resolución de simulados del panel dev (lib/services/simulation-service.ts)
   auto_resolved?:        boolean
   auto_resolved_at?:     string
   pending_confirmation?: boolean
@@ -134,11 +132,6 @@ export function isNonReportIncident(incident: Pick<DbIncident, "fuente" | "fuent
 
 export function isSimulatedIncident(incident: Pick<DbIncident, "fuente_detalles">): boolean {
   return incident.fuente_detalles?.simulated === true
-}
-
-/** Incidente generado por la simulación server-side (lib/services/simulation-service.ts). */
-export function isAutoSpawned(incident: Pick<DbIncident, "fuente_detalles">): boolean {
-  return incident.fuente_detalles?.auto_spawned === true
 }
 
 export interface DbResource {

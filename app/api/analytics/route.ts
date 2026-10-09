@@ -1,11 +1,9 @@
 import { getDb } from "@/lib/db"
 import { apiSuccess, apiError } from "@/lib/services/api-response"
 import { isNonReportIncident } from "@/lib/types"
-import { runSimulationTick } from "@/lib/services/simulation-service"
 
 export async function GET() {
   try {
-    await runSimulationTick()
     const db = await getDb()
     const since48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()

@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto"
-import type { DbIncident, DbResource, IncidentType, IncidentSeverity, IncidentSource } from "./types"
+import type { DbIncident, DbResource } from "./types"
 import type { DataStore, Perfil } from "./db"
 
 // ---------------------------------------------------------------------------
@@ -24,48 +24,10 @@ declare global {
 
 function seedData(): MemoryState {
   const now = () => new Date().toISOString()
-  const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
-  const randomFrom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]
 
-  const INCIDENT_TYPES: IncidentType[] = ["flood", "fire", "storm", "looting", "violence", "accident", "general"]
-  const SEVERIDADES: IncidentSeverity[] = ["low", "medium", "high", "critical"]
-  const FUENTES: IncidentSource[] = ["social", "sensor", "camera"]
-
-  const SEED_ZONES = [
-    { nombre: "Barrio San Pablo", lat: -26.84, lng: -65.25 },
-    { nombre: "Parque 9 de Julio - Av. Soldati", lat: -26.8288, lng: -65.1912 },
-    { nombre: "Yerba Buena", lat: -26.816, lng: -65.316 },
-    { nombre: "Av. Roca y Lincoln - Zona Sur", lat: -26.8453, lng: -65.2198 },
-    { nombre: "Plaza Independencia - Centro Historico", lat: -26.8305, lng: -65.2038 },
-  ]
-
-  // Los semillas entran al mismo ciclo de vida que los auto-generados por
-  // lib/services/simulation-service.ts (vida aleatoria ~5 min → historial).
-  const incidents: DbIncident[] = SEED_ZONES.map((zona) => {
-    const fuente = randomFrom(FUENTES)
-    const createdAt = Date.now() - randomInt(60000, 180000)
-    return {
-      id: randomUUID(),
-      tipo: randomFrom(INCIDENT_TYPES),
-      severidad: randomFrom(SEVERIDADES),
-      ubicacion: zona.nombre,
-      latitud: zona.lat + (Math.random() - 0.5) * 0.01,
-      longitud: zona.lng + (Math.random() - 0.5) * 0.01,
-      personas_afectadas: randomInt(5, 100),
-      fuente,
-      fuente_detalles: {
-        platform: "Seed simulado",
-        content: `Incidente semilla en ${zona.nombre}`,
-        reports_count: 1,
-        simulated: true,
-        auto_spawned: true,
-        auto_resolve_at: new Date(createdAt + randomInt(240000, 420000)).toISOString(),
-      },
-      estado: "activo",
-      created_at: new Date(createdAt).toISOString(),
-      updated_at: now(),
-    }
-  })
+  // Sin incidentes precargados: sólo aparecen los que llegan por reporte
+  // ciudadano o mención social con el hashtag disparador.
+  const incidents: DbIncident[] = []
 
   const resourceTypes: Array<{ tipo: string; nombre: string; cantidad: number; ubicacion: string }> = [
     { tipo: "ambulance", nombre: "Ambulancia", cantidad: 3, ubicacion: "Centro" },

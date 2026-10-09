@@ -9,7 +9,7 @@ Next.js 16 (App Router) + TypeScript dashboard for climate emergency management 
 `getDb()` returns a `DataStore` selected at runtime:
 
 - `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set → `lib/db-supabase.ts` (real Supabase, same queries as the PMV schema: `incidentes`, `recursos`, `config_sistema`, `perfiles`, `asignaciones_recursos`).
-- Not set → `lib/mock-db.ts` (in-memory store on `globalThis`, HMR-safe, seeded with 5 incidents + 11 resources + `agent_mode.autonomous=true` + demo profiles). Incident/resource IDs are real UUIDs.
+- Not set → `lib/mock-db.ts` (in-memory store on `globalThis`, HMR-safe, seeded with no incidents + 11 resources + `agent_mode.autonomous=true` + demo profiles). Incident/resource IDs are real UUIDs.
 
 **No services or routes import `@/lib/supabase` directly** — everything goes through the `DataStore` interface. `lib/auth.ts` replaces Supabase Auth: `requireStaff()` always returns a demo admin profile, `auditAdmin()` writes to the store's audit log. `proxy.ts` only enforces body-size cap + rate limits; every page and API is public.
 
@@ -29,16 +29,10 @@ In local development only, append `?dev=true` to enable the simulation control p
 
 ## Social Hashtag Trigger
 
-Social incidents are created ONLY from posts containing the trigger hashtag (`#AlertaTucuman`, override with `NEXT_PUBLIC_TRIGGER_HASHTAG`).
+Social incidents are created ONLY from posts containing the trigger hashtag (`#AlertaTucuman`, override with `NEXT_PUBLIC_TRIGGER_HASHTAG`). There is no automatic/random incident spawning and the memory store starts with **no incidents**: the map only shows citizen reports and hashtag mentions.
 
-## Server-side simulation lifecycle
-
-`lib/services/simulation-service.ts` → `runSimulationTick()` runs lazily (throttled, 5s/process) from `GET /api/incidentes`, `/api/analytics` and `/api/public/incidentes`:
-
-- Keeps up to `CONFIG.SIMULATION.MAX_ACTIVE_SIMULATED` (12) simulated incidents active, spawning one every 15s from `RESPAWN_ZONES` (`fuente_detalles.auto_spawned=true`, no fake Arkiv key). Spawning is always on in memory mode; in Supabase mode only with `SIMULATION_AUTOSPAWN=true`.
-- Each simulated incident gets a randomized `auto_resolve_at` (`auto_resolve_minutes` ±40%; fallback `updated_at` cutoff). When expired it moves to History as `atendido` with `pending_confirmation=true` (yellow PENDING badge). The operator clicks **Confirm Resolution** in the detail modal → `POST /api/incidentes/arkiv-dispatch` clears the flag and sets `confirmed_at`.
-- Auto-spawned incidents do not consume `CONFIG.INCIDENTS.MAX_ACTIVE` (real report capacity) nor the dev-panel feed cap. Only `simulated: true` rows are ever auto-resolved.
-- With the in-memory store on serverless hosting each instance has its own state, so active/history can differ between requests; use Supabase for a consistent deployed demo.
+- The "Live AI Agent" panel (`components/dashboard/ai-activity-log.tsx`) keeps a purely visual feed (`initialActivities` + `backgroundMessages` every 8s, signal counter) — it never creates incidents. Real incidents are added to it as alerts.
+- Dev-only maintenance: `lib/services/simulation-service.ts` → `resolveExpiredSimulated()` (via `POST /api/incidentes/auto-resolve`, called by `useAutoResolve` in development) moves `simulated: true` rows (dev-panel posts) older than `auto_resolve_minutes` to History with `pending_confirmation=true` (yellow PENDING badge). **Confirm Resolution** in the detail modal → `POST /api/incidentes/arkiv-dispatch` clears it.
 
 - Single pipeline: `lib/services/social-incident-service.ts` → `ingestSocialPost()` (hashtag filter → dedup by post id → LLM/heuristic analysis → gazetteer geocoding → corroborate or create).
 - Entry points: `POST /api/social/mention` (webhook, supports `?dryRun=true`) and `SocialMediaAgent.runScan()` (`POST /api/agent`).
