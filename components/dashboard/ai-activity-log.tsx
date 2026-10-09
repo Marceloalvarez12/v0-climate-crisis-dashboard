@@ -15,6 +15,7 @@ import { toast } from "sonner"
 
 import type { ActivityItem } from "./ai-activity-log/types"
 import type { DbIncident } from "@/lib/types"
+import { initialActivities, backgroundMessages } from "./ai-activity-log/data"
 import { ActivityIcon, activityIconColor, SeverityBadge } from "./ai-activity-log/activity-helpers"
 import { ReasoningPanel, ConfidenceBadge } from "./ai-activity-log/reasoning-panel"
 import { AlertActions, ConfirmActionDialog } from "./ai-activity-log/alert-actions"
@@ -60,7 +61,7 @@ function incidentToActivity(incident: DbIncident): ActivityItem {
 // ---------------------------------------------------------------------------
 
 export function AIActivityLog() {
-  const [activities,          setActivities]         = useState<ActivityItem[]>([])
+  const [activities,          setActivities]         = useState<ActivityItem[]>(initialActivities)
   const { data: activeIncidents } = useSWR<DbIncident[]>("/api/incidentes?estado=activo", fetcher, { refreshInterval: 5000 })
   const [confirmDialog,       setConfirmDialog]       = useState<{ open: boolean; type: "deploy" | "notify"; activity: ActivityItem | null }>({ open: false, type: "deploy", activity: null })
   const [processedAlerts,     setProcessedAlerts]     = useState<Set<string>>(new Set())
@@ -69,6 +70,7 @@ export function AIActivityLog() {
 
   const scrollRef          = useRef<HTMLDivElement>(null)
   const seenIncidentsRef   = useRef<Set<string>>(new Set())
+  const messageIndexRef    = useRef(0)
 
   const addActivity = useCallback((template: Omit<ActivityItem, "id" | "timestamp">) => {
     setActivities((prev) => [...prev.slice(-20), makeActivity(template)])
@@ -92,6 +94,16 @@ export function AIActivityLog() {
     for (const incident of incoming) seenIncidentsRef.current.add(incident.id)
     if (incoming.length) setActivities(prev => [...prev, ...incoming.map(incidentToActivity)].slice(-20))
   }, [activeIncidents])
+
+  // ── Loop de mensajes de fondo (monitoring, extraction, etc.) ─────────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const template = backgroundMessages[messageIndexRef.current % backgroundMessages.length]
+      addActivity(template)
+      messageIndexRef.current += 1
+    }, 8000)
+    return () => clearInterval(interval)
+  }, [addActivity])
 
   // ── Auto-scroll ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -160,7 +172,7 @@ export function AIActivityLog() {
           <div className="h-2 w-2 rounded-full bg-success" />
           <div className="absolute inset-0 h-2 w-2 rounded-full bg-success animate-pulse-ring" />
         </div>
-        <h2 className="text-sm font-semibold text-foreground">Reportes recibidos</h2>
+        <h2 className="text-sm font-semibold text-foreground">Live AI Agent</h2>
 
         <div className="ml-auto flex items-center gap-1.5">
           <Badge variant="outline" title="Trigger hashtag being monitored" className="text-[9px] h-5 px-1.5 border-sky-500/40 text-sky-300 gap-0.5 font-mono">
