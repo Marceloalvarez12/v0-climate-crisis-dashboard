@@ -11,7 +11,7 @@
 
 export type IncidentType     = "flood" | "fire" | "storm" | "looting" | "violence" | "accident" | "general"
 export type IncidentSeverity = "critical" | "high" | "medium" | "low"
-export type IncidentSource   = "social" | "sensor" | "camera"
+export type IncidentSource   = "social" | "sensor" | "camera" | "citizen"
 
 export interface IncidentSourceDetails {
   // Social
@@ -19,6 +19,16 @@ export interface IncidentSourceDetails {
   username?:       string
   content?:        string
   imageUrl?:       string
+  platform_id?:    string
+  author_url?:     string
+  post_id?:        string
+  posted_at?:      string
+  hashtag?:        string
+  hashtags?:       string[]
+  reports_count?:  number
+  corroborations?: Array<{ post_id: string; platform: string; author: string; content: string; at: string }>
+  analyzer?:       "llm" | "heuristic"
+  simulated?:      boolean
   // Sensor
   sensorId?:       string
   temperature?:    number
@@ -28,6 +38,38 @@ export interface IncidentSourceDetails {
   // Camera
   cameraId?:       string
   cameraLocation?: string
+  // Blockchain / AI Analysis
+  arkiv_entity_key?: string
+  ai_analysis?: {
+    summary?: string
+    reasoning?: string
+    suggestedActions?: string[]
+    confidence?: number
+    relatedPostIds?: string[]
+    arkiv_entity_key?: string
+  }
+  // ZK Citizen Report
+  zk_proof?: Record<string, unknown>
+  zk_public_signals?: string[]
+  zk_input?: Record<string, string>
+  stellar_audit?: Record<string, unknown>
+  descripcion?: string
+}
+
+export interface ZkCitizenReport {
+  lat: number
+  lng: number
+  tipo: IncidentType
+  severidad: IncidentSeverity
+  ubicacion: string
+  personasAfectadas: number
+  descripcion?: string
+  contacto?: string
+  zoneHash?: number
+  minLat?: number
+  maxLat?: number
+  minLng?: number
+  maxLng?: number
 }
 
 export interface Incident {
@@ -40,6 +82,8 @@ export interface Incident {
   timestamp:      Date
   source:         IncidentSource
   sourceDetails:  IncidentSourceDetails
+  estado?:        string
+  arkiv_key?:     string
 }
 
 // ---------------------------------------------------------------------------
@@ -70,8 +114,16 @@ export interface DbIncident {
   fuente:           string
   fuente_detalles:  Record<string, unknown>
   estado:           string
+  arkiv_key?:       string
+  arkiv_entity_key?: string
   created_at:       string
   updated_at:       string
+}
+
+export function isNonReportIncident(incident: Pick<DbIncident, "fuente" | "fuente_detalles">): boolean {
+  return (incident.fuente === "sensor" &&
+    (incident.fuente_detalles?.source_api === "usgs" || incident.fuente_detalles?.source_api === "eonet")) ||
+    (process.env.NODE_ENV !== "development" && incident.fuente_detalles?.simulated === true)
 }
 
 export interface DbResource {
@@ -81,5 +133,29 @@ export interface DbResource {
   estado:    string
   ubicacion: string
   incidente_id: string | null
+  cantidad?:          number
+  cantidad_disponible?: number
   updated_at: string
+}
+
+// ---------------------------------------------------------------------------
+// Arkiv Blockchain Types
+// ---------------------------------------------------------------------------
+
+export interface EmergencyIncident {
+  id: string
+  tipo: 'flood' | 'fire' | 'medical' | 'general'
+  severidad: 'critical' | 'high' | 'medium' | 'low'
+  ubicacion: string
+  afectados: number
+  timestamp: string
+}
+
+export interface ArkivDispatchResponse {
+  success: boolean
+  onChain?: boolean
+  isSimulated?: boolean
+  entityKey?: string
+  stellarAudit?: Record<string, unknown>
+  error?: string
 }

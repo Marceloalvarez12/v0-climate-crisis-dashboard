@@ -19,6 +19,9 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import useSWR from "swr"
+import { fetcher } from "@/lib/api"
+import { generateGeneralReport } from "@/lib/pdf-generator"
 import {
   Dialog,
   DialogContent,
@@ -39,7 +42,7 @@ interface BroadcastChannel {
 
 const defaultMessage = `EMERGENCY ALERT - Civil Defense Tucumán
 
-The population of Centro Histórico, San Pablo and Barrio Sur is hereby informed:
+The population of Historic Center, San Pablo and Barrio Sur is hereby informed:
 
 - Active flooding in the area
 - Preventive evacuation recommended
@@ -47,12 +50,17 @@ The population of Centro Histórico, San Pablo and Barrio Sur is hereby informed
 
 Meeting points:
 - Estadio Monumental (Yerba Buena)
-- Plaza Urquiza (Centro)
+- Plaza Urquiza (Center)
 
 Emergency line: 103
 More info: @DefensaCivilTuc`
 
 export function BroadcastPanel() {
+  const { data: incidents } = useSWR("/api/incidentes", fetcher)
+  const { data: historicalIncidents } = useSWR("/api/incidentes?estado=atendido", fetcher)
+  const { data: analytics } = useSWR("/api/analytics", fetcher)
+  const { data: recursos } = useSWR("/api/recursos", fetcher)
+
   const [channels, setChannels] = useState<BroadcastChannel[]>([
     { 
       id: "whatsapp", 
@@ -102,12 +110,21 @@ export function BroadcastPanel() {
   const confirmSend = async () => {
     if (!selectedChannel) return
 
+    if (process.env.NODE_ENV !== "development") {
+      toast.error("Canal de difusión no configurado", {
+        description: "Conectá un proveedor de mensajería antes de enviar comunicaciones reales.",
+      })
+      setShowMessageDialog(false)
+      setSelectedChannel(null)
+      return
+    }
+
     setChannels(prev => prev.map(ch => 
       ch.id === selectedChannel.id ? { ...ch, status: "sending" as const } : ch
     ))
     setShowMessageDialog(false)
 
-    // Simular envio
+    // The development panel intentionally simulates delivery; production requires a configured provider.
     await new Promise(resolve => setTimeout(resolve, 2000))
 
     setChannels(prev => prev.map(ch => 
@@ -130,26 +147,29 @@ export function BroadcastPanel() {
     setSelectedChannel(null)
   }
 
-  const handleGeneratePdf = async () => {
-    setGeneratingPdf(true)
+  const handleGeneratePdf = () => {
     setShowPdfDialog(true)
-
-    // Simular generacion de PDF
-    await new Promise(resolve => setTimeout(resolve, 2500))
-    
-    setGeneratingPdf(false)
   }
-
-  const handleDownloadPdf = () => {
-    toast.success("PDF report downloaded", {
-      description: "Emergency_Report_Tucuman_2026.pdf",
-    })
-    setShowPdfDialog(false)
+  
+  const handleDownloadPdf = async () => {
+    setGeneratingPdf(true)
+    try {
+      generateGeneralReport(incidents || [], historicalIncidents || [], recursos || [], analytics || {})
+      toast.success("Operational report downloaded", {
+        description: `Operational_Report_Tucuman_${new Date().toISOString().slice(0, 10)}.pdf`,
+      })
+    } catch (err) {
+      console.error("Error generating PDF:", err)
+      toast.error("Error generating PDF report")
+    } finally {
+      setGeneratingPdf(false)
+      setShowPdfDialog(false)
+    }
   }
 
   const handleRefreshMap = () => {
-    toast.success("Heat map updated", {
-      description: "New sensor data integrated",
+    toast.info("El mapa se actualiza con datos en tiempo real", {
+      description: "No hay un proveedor de sensores configurado para una actualización manual.",
     })
   }
 
@@ -210,7 +230,7 @@ export function BroadcastPanel() {
                 ) : (
                   <>
                     <Send className="h-3 w-3 mr-1" />
-                    Enviar
+                    Send
                   </>
                 )}
               </Button>
@@ -226,7 +246,7 @@ export function BroadcastPanel() {
               onClick={handleGeneratePdf}
             >
               <FileText className="h-3.5 w-3.5 text-red-400" />
-              Generate PDF Report for Authorities
+              Download Operational Report (PDF)
             </Button>
             <Button
               variant="outline"
@@ -286,22 +306,22 @@ export function BroadcastPanel() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-red-400" />
-              Emergency Report
+              Operational Report
             </DialogTitle>
           </DialogHeader>
           
           {generatingPdf ? (
             <div className="py-8 flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Generating PDF report...</p>
-              <p className="text-xs text-muted-foreground">Compiling data from 10 active incidents</p>
+              <p className="text-sm text-muted-foreground">Generating operational report...</p>
+              <p className="text-xs text-muted-foreground">Compiling incidents, resources and Arkiv hashes</p>
             </div>
           ) : (
             <div className="space-y-3">
               <div className="p-3 rounded-lg bg-muted/50 border border-border">
-                <p className="text-xs font-medium">Emergency_Report_Tucuman_2026.pdf</p>
+                <p className="text-xs font-medium">Operational_Report_Tucuman_{new Date().toISOString().slice(0, 10)}.pdf</p>
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  Includes: Incident map, deployed resources, event timeline, statistics and AI Agent recommendations.
+                  Includes: Incident detection time, deployed resources with dispatch time, Arkiv blockchain hashes and operational summary.
                 </p>
               </div>
               <div className="flex gap-2">
@@ -317,6 +337,7 @@ export function BroadcastPanel() {
           )}
         </DialogContent>
       </Dialog>
+
     </>
   )
 }

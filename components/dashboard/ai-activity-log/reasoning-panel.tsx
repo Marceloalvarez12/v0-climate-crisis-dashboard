@@ -1,13 +1,12 @@
 "use client"
 
-import { useState } from "react"
-import { Brain, Sparkles, Zap, CheckCircle2, Loader2, Satellite, ChevronDown, ChevronUp, Target } from "lucide-react"
+import { Brain, Sparkles, Zap, CheckCircle2, Loader2, Satellite, ChevronDown, ChevronUp, Target, ShieldCheck, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { ActivityItem } from "./types"
 
 // ---------------------------------------------------------------------------
-// Panel expandible de razonamiento IA
+// Expandable AI reasoning panel
 // ---------------------------------------------------------------------------
 
 interface ReasoningPanelProps {
@@ -72,7 +71,7 @@ export function ReasoningPanel({
             ))}
           </div>
 
-          {/* Validate with Satellite — sólo si la confianza es < 98 */}
+          {/* Validate with Satellite — only if confidence is < 98 */}
           {activity.confidence && activity.confidence < 98 && (
             <div className="mt-2.5 pt-2 border-t border-purple-500/20">
               <Button
@@ -85,7 +84,7 @@ export function ReasoningPanel({
                 {validatingSatellite === activity.id ? (
                   <>
                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    Consultando Sentinel-2...
+                    Querying Sentinel-2...
                   </>
                 ) : (
                   <>
@@ -96,6 +95,24 @@ export function ReasoningPanel({
               </Button>
             </div>
           )}
+
+          {/* On-Chain Audit Badge */}
+          {activity.arkivKey && (
+            <div className="mt-2.5 pt-2 border-t border-purple-500/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <Badge variant="outline" className="text-[9px] h-5 border-emerald-500/50 bg-emerald-500/10 text-emerald-400 gap-1 self-start">
+                <ShieldCheck className="h-3 w-3" />
+                AI Report Certified On-Chain
+              </Badge>
+              <a
+                href={`https://explorer.braga.hoodi.arkiv.network/entity/${activity.arkivKey}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[9px] text-purple-400 hover:text-purple-300 hover:underline flex items-center gap-1 self-start sm:self-auto"
+              >
+                Verify on Braga <ExternalLink className="h-2.5 w-2.5" />
+              </a>
+            </div>
+          )}
         </div>
       )}
     </>
@@ -103,7 +120,7 @@ export function ReasoningPanel({
 }
 
 // ---------------------------------------------------------------------------
-// Badge de confianza IA
+// AI confidence badge
 // ---------------------------------------------------------------------------
 
 export function ConfidenceBadge({ value }: { value: number }) {

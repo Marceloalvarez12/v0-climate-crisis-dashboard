@@ -6,19 +6,13 @@
  */
 
 import type { DbIncident, DbResource } from "@/lib/types"
+import type { MentionOutcome } from "@/lib/agents/types"
 
-const API_SECRET = process.env.NEXT_PUBLIC_API_SECRET ?? ""
-
-const authHeaders = () => ({
-  "Content-Type": "application/json",
-  ...(API_SECRET ? { "x-api-secret": API_SECRET } : {}),
-})
+const authHeaders = () => ({ "Content-Type": "application/json" })
 
 // SWR fetcher genérico
 export const fetcher = (url: string) =>
-  fetch(url, {
-    headers: API_SECRET ? { "x-api-secret": API_SECRET } : {},
-  }).then((res) => {
+  fetch(url).then((res) => {
     if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
     return res.json()
   })
@@ -48,13 +42,63 @@ export async function createIncidente(body: Record<string, unknown>) {
 }
 
 // ---------------------------------------------------------------------------
+// Menciones en redes sociales (#AlertaTucuman)
+// ---------------------------------------------------------------------------
+
+export async function postSocialMention(payload: {
+  postId?:    string
+  platform:   string
+  author:     string
+  authorUrl?: string
+  text:       string
+  imageUrl?:  string
+  location?:  string
+  simulated?: boolean
+}) {
+  const res = await fetch("/api/social/mention", {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
+  return res.json() as Promise<MentionOutcome>
+}
+
+// ---------------------------------------------------------------------------
+// ZK Citizen Reports
+// ---------------------------------------------------------------------------
+
+export async function createZkCitizenReport(payload: {
+  lat: number
+  lng: number
+  tipo: string
+  severidad: string
+  ubicacion: string
+  personasAfectadas: number
+  descripcion?: string
+}) {
+  const res = await fetch("/api/incidentes/zk-report", {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      ...payload,
+      zoneHash: 12345,
+      minLat: -27,
+      maxLat: -26.5,
+      minLng: -65.5,
+      maxLng: -65,
+    }),
+  })
+  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
+  return res.json() as Promise<{ incident: DbIncident; verified: boolean; contractId?: string; explorerUrl?: string }>
+}
+
+// ---------------------------------------------------------------------------
 // Recursos
 // ---------------------------------------------------------------------------
 
 export async function fetchRecursos(): Promise<DbResource[]> {
-  const res = await fetch("/api/recursos", {
-    headers: API_SECRET ? { "x-api-secret": API_SECRET } : {},
-  })
+  const res = await fetch("/api/recursos")
   if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
   return res.json()
 }

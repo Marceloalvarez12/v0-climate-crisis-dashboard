@@ -1,13 +1,19 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Bell, Settings, Zap, Radio } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { AlertTriangle, ShieldCheck, ExternalLink } from "lucide-react"
+import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
+import Link from "next/link"
+import type { Incident } from "@/lib/types"
 
-export function DashboardHeader() {
+interface DashboardHeaderProps {
+  incidents?: Incident[]
+  onSelectIncident?: (incident: Incident) => void
+}
+
+export function DashboardHeader({ incidents = [] }: DashboardHeaderProps) {
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
-  const [alertCount, setAlertCount] = useState(3)
 
   useEffect(() => {
     setCurrentTime(new Date())
@@ -18,59 +24,71 @@ export function DashboardHeader() {
     return () => clearInterval(interval)
   }, [])
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (Math.random() > 0.7) {
-        setAlertCount(prev => Math.min(prev + 1, 9))
-      }
-    }, 10000)
-
-    return () => clearInterval(interval)
-  }, [])
+  // Real count: critical + high incidents (no fake random accumulation)
+  const criticalCount = incidents.filter(
+    (i) => i.severity === "critical" || i.severity === "high",
+  ).length
 
   return (
-    <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
-      <div className="flex items-center gap-2 min-w-0">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-          <Zap className="h-4 w-4 text-primary" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="truncate text-sm font-bold text-foreground sm:text-base">Climate Crisis Center</h1>
-          <p className="hidden text-[10px] text-muted-foreground sm:block">AI Agent Monitoring System</p>
-        </div>
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur-md">
+      {/* Left: brand */}
+      <div className="flex items-center gap-2.5 min-w-0">
+        <Link href="/" aria-label="Zntinel, centro de control">
+          <Image src="/zntinel-logo-optimized.png" alt="Zntinel" width={135} height={83} className="h-11 w-auto object-contain" priority />
+        </Link>
+        <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:block">Centro de control · Tucumán</span>
       </div>
 
+      {/* Right: actions + status */}
       <div className="flex items-center gap-2">
-        <div className="hidden items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 sm:flex">
-          <Radio className="h-3 w-3 text-success animate-pulse" />
-          <span className="text-xs text-muted-foreground">System Active</span>
-        </div>
+        {/* Critical incidents chip — real data, clickable filter target */}
+        {criticalCount > 0 && (
+          <Badge
+            variant="outline"
+            className="hidden h-7 items-center gap-1.5 border-red-500/30 bg-red-500/10 px-2.5 font-mono text-[10px] font-semibold text-red-400 md:flex"
+          >
+            <AlertTriangle className="h-3 w-3" />
+            {criticalCount} CRITICAL
+          </Badge>
+        )}
 
+        {/* Links unified: same shape, differentiated by accent color only */}
+        <Link
+          href="/reportar"
+          target="_blank"
+          className="flex h-7 items-center gap-1.5 rounded-md border border-indigo-500/25 bg-indigo-500/10 px-2.5 text-[11px] font-semibold text-indigo-300 transition-colors hover:bg-indigo-500/20"
+        >
+          <ShieldCheck className="h-3 w-3" />
+          ZK Report
+          <ExternalLink className="h-2.5 w-2.5 opacity-50" />
+        </Link>
+
+        <Link
+          href="/auditoria"
+          target="_blank"
+          className="flex h-7 items-center gap-1.5 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2.5 text-[11px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/20"
+        >
+          <ShieldCheck className="h-3 w-3" />
+          Audit
+          <ExternalLink className="h-2.5 w-2.5 opacity-50" />
+        </Link>
+
+        <Link href="/admin" className="hidden text-xs text-zinc-400 hover:text-white md:block">Admin</Link>
+        <Link href="/mapa" target="_blank" className="hidden text-xs text-zinc-400 hover:text-white md:block">Mapa público</Link>
+
+        {/* Live clock — telemetry feel */}
         {currentTime && (
-          <div className="hidden rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 font-mono text-xs text-foreground md:block">
-            {currentTime.toLocaleString("en-US", {
+          <div className="hidden h-7 items-center gap-1.5 rounded-md border border-border bg-secondary/40 px-2.5 font-mono text-[10px] tabular-nums text-foreground/80 lg:flex">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 animate-pulse" />
+            {currentTime.toLocaleString("en-GB", {
               day: "2-digit",
               month: "2-digit",
-              year: "numeric",
               hour: "2-digit",
               minute: "2-digit",
               second: "2-digit",
-            })}
+            })} UTC-3
           </div>
         )}
-
-        <Button variant="ghost" size="icon" className="relative h-8 w-8">
-          <Bell className="h-4 w-4" />
-          {alertCount > 0 && (
-            <Badge className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center bg-primary p-0 text-[10px]">
-              {alertCount}
-            </Badge>
-          )}
-        </Button>
-
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Settings className="h-4 w-4" />
-        </Button>
       </div>
     </header>
   )

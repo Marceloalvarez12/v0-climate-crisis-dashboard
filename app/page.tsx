@@ -29,7 +29,8 @@ export default function CrisisDashboard() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        mutate("/api/incidentes")
+        mutate("/api/incidentes?estado=activo")
+        mutate("/api/incidentes?estado=atendido")
         mutate("/api/recursos")
         mutate("/api/analytics")
       }
@@ -45,7 +46,7 @@ export default function CrisisDashboard() {
         <DevPanel />
       </Suspense>
 
-      <DashboardHeader />
+      <DashboardHeader incidents={[]} />
 
       {/* ── DESKTOP layout (lg+) ── */}
       <div className="hidden lg:flex flex-1 overflow-hidden">

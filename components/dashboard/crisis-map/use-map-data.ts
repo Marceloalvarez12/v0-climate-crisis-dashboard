@@ -3,10 +3,10 @@
 import { useMemo } from "react"
 import useSWR from "swr"
 import { fetcher } from "@/lib/api"
-import type { Incident, DbIncident } from "@/lib/types"
+import type { Incident, DbIncident, DbResource } from "@/lib/types"
 
 const SWR_CONFIG = {
-  refreshInterval: 0,
+  refreshInterval: 3000,
   revalidateOnFocus: false,
   revalidateOnReconnect: true,
   dedupingInterval: 2000,
@@ -25,14 +25,16 @@ export function dbToIncident(inc: DbIncident): Incident {
     timestamp:      new Date(inc.created_at),
     source:         inc.fuente as Incident["source"],
     sourceDetails:  inc.fuente_detalles || {},
+    estado:         inc.estado,
+    arkiv_key:      typeof inc.fuente_detalles?.arkiv_entity_key === "string" ? inc.fuente_detalles.arkiv_entity_key : undefined,
   }
 }
 
-/** Hook de incidentes activos con polling cada 3 s */
-export function useIncidents() {
-  const { data, error, mutate } = useSWR<DbIncident[]>("/api/incidentes", fetcher, {
+/** Hook de incidentes activos/atendidos con polling cada 3 s */
+export function useIncidents(estado: "activo" | "atendido" = "activo") {
+  const { data, error, mutate } = useSWR<DbIncident[]>(`/api/incidentes?estado=${estado}`, fetcher, {
     ...SWR_CONFIG,
-    refreshInterval: 0,
+    refreshInterval: 3000,
   })
 
   const incidents: Incident[] = useMemo(() => {
@@ -45,5 +47,5 @@ export function useIncidents() {
 
 /** Hook de recursos con polling cada 3 s - hook compartido para CrisisMap y ResourcesPanel */
 export function useResources() {
-  return useSWR("/api/recursos", fetcher, SWR_CONFIG)
+  return useSWR<DbResource[]>("/api/recursos", fetcher, SWR_CONFIG)
 }

@@ -70,13 +70,35 @@ const STORM_IMAGES = [
   "https://images.unsplash.com/photo-1559128010-7c1ad6e1b6a5?w=600",
 ]
 
-const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1547683905-f686c993aae5?w=600"
+const VIOLENCE_IMAGES = [
+  "https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600",
+  "https://images.unsplash.com/photo-1505664194779-8bebcb35da64?w=600",
+  "https://images.unsplash.com/photo-1619890831007-a15ecdcd9745?w=600",
+]
+
+const LOOTING_IMAGES = [
+  "https://images.unsplash.com/photo-1582139329536-e7284fece509?w=600",
+  "https://images.unsplash.com/photo-1590102421139-3074769fc7e9?w=600",
+]
+
+const ACCIDENT_IMAGES = [
+  "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=600",
+  "https://images.unsplash.com/photo-1518364538800-6bcb3f25da49?w=600",
+]
+
+const GENERAL_IMAGES = [
+  "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=600",
+  "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=600",
+]
 
 function pickImage(type: IncidentTipo): string {
   const pool = type === "flood" ? FLOOD_IMAGES
     : type === "fire" ? FIRE_IMAGES
     : type === "storm" ? STORM_IMAGES
-    : [DEFAULT_IMAGE]
+    : type === "violence" ? VIOLENCE_IMAGES
+    : type === "looting" ? LOOTING_IMAGES
+    : type === "accident" ? ACCIDENT_IMAGES
+    : GENERAL_IMAGES
   return pool[Math.floor(Math.random() * pool.length)]
 }
 
@@ -246,6 +268,21 @@ export const CAMERA_REPORTS: CameraReport[] = [
   },
 ]
 
+export interface CitizenReport {
+  tipo: IncidentTipo
+  severidad: IncidentSeveridad
+  zona: { lat: number; lng: number; nombre: string }
+  descripcion?: string
+}
+
+export const CITIZEN_REPORTS: CitizenReport[] = [
+  { tipo: "flood", severidad: "high", zona: { lat: -26.8241, lng: -65.2226, nombre: "Av. Aconquija y Muñecas" }, descripcion: "Calle inundada, agua llega a los tobillos" },
+  { tipo: "fire", severidad: "critical", zona: { lat: -26.8299, lng: -65.2178, nombre: "Av. Sarmiento 1234" }, descripcion: "Humo saliendo de un garage, posible incendio" },
+  { tipo: "storm", severidad: "high", zona: { lat: -26.8156, lng: -65.2099, nombre: "Av. Mate de Luna y Lamadrid" }, descripcion: "Poste de luz caido, transito cortado" },
+  { tipo: "accident", severidad: "medium", zona: { lat: -26.8355, lng: -65.2022, nombre: "Av. 24 de Septiembre y Congreso" }, descripcion: "Choque entre auto y moto" },
+  { tipo: "general", severidad: "low", zona: { lat: -26.8212, lng: -65.2145, nombre: "Parque Avellaneda" }, descripcion: "Gente varada bajo la lluvia" },
+]
+
 // ---------------------------------------------------------------------------
 // Zonas y helpers para incidentes generados dinamicamente (respawn)
 // ---------------------------------------------------------------------------
@@ -302,12 +339,25 @@ export function buildRespawnIncident(base?: { tipo?: string; fuente?: string; zo
 
   const personas_afectadas = estimateAffected(tipo, severidad)
 
+  const simulatedHash = `0x${Array.from({length: 64}, () => Math.floor(Math.random() * 16).toString(16)).join("")}`
+
   const fuente_detalles: Record<string, unknown> =
     fuente === "social"
       ? { platform: "X (Twitter)", username: "@alerta_tucuman", content: generateSocialText(tipo, zona), imageUrl: pickImage(tipo) }
       : fuente === "sensor"
       ? { sensorId: `WS-${String(Math.floor(Math.random() * 999)).padStart(3, "0")}`, temperature: 18 + Math.floor(Math.random() * 14), humidity: 70 + Math.floor(Math.random() * 28), windSpeed: 20 + Math.floor(Math.random() * 65), pressure: 1005 + Math.floor(Math.random() * 18) }
       : { cameraId: `CAM-${String(Math.floor(Math.random() * 999)).padStart(3, "0")}`, cameraLocation: zona, imageUrl: pickImage(tipo) }
+
+  // Inject mock AI blockchain audit keys to respawned incidents
+  fuente_detalles.arkiv_entity_key = simulatedHash
+  fuente_detalles.simulated = true
+  fuente_detalles.ai_analysis = {
+    reasoning: `Análisis automático del incidente de ${tipo} en la zona de ${zona}. Coordenadas validadas por satélite.`,
+    suggestedActions: ["Desplegar unidades de respuesta inmediata", "Notificar a Defensa Civil"],
+    confidence: 80 + Math.floor(Math.random() * 20),
+    relatedPostIds: [`post-${Math.floor(Math.random() * 1000)}`],
+    arkiv_entity_key: simulatedHash,
+  }
 
   return {
     tipo,
@@ -340,12 +390,11 @@ export const STATIC_RESPONSE_TIME_MIN = 18
  * Compartidos por use-resource-lifecycle.ts y use-simulation-loop.ts
  * para garantizar consistencia entre despacho manual y simulacion.
  *
- * Flujo: available → dispatched (20s) → busy (20s) → available
- * Calibrados para un simulador tipo "demo en vivo": lo suficiente para
- * ver la animación sin aburrir al usuario.
+ * Flujo: available -> dispatched (2 min) -> busy (3 min) -> available
+ * Tiempos realistas para operaciones de respuesta de emergencia.
  */
-export const RESOURCE_DISPATCHED_TO_BUSY_MS  = 20_000
-export const RESOURCE_BUSY_TO_AVAILABLE_MS   = 20_000
+export const RESOURCE_DISPATCHED_TO_BUSY_MS  = 120_000
+export const RESOURCE_BUSY_TO_AVAILABLE_MS   = 180_000
 
-/** Intervalo entre spawns de incidentes en la simulacion automatica */
-export const SIMULATION_SPAWN_INTERVAL_MS = 90_000
+/** Intervalo entre posts del feed social simulado (dev panel). No todos generan incidente. */
+export const SIMULATION_SPAWN_INTERVAL_MS = 30_000

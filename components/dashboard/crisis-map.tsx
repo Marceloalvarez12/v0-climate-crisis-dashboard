@@ -2,32 +2,46 @@
 
 import { useState, useEffect, useMemo } from "react"
 import dynamic from "next/dynamic"
-import { MapPin, Layers } from "lucide-react"
+import { MapPin, Layers, Eye } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { mutate } from "swr"
 import { dispatchResourceWithLifecycle, restoreResourceTimersOnMount } from "@/hooks/use-resource-lifecycle"
-import { buildRespawnIncident } from "@/lib/mock-data"
-import { patchIncidente, createIncidente } from "@/lib/api"
+import { patchIncidente } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "sonner"
-import type { Incident, IncidentSource, DbIncident } from "@/lib/types"
+import type { Incident, IncidentSource, IncidentType } from "@/lib/types"
+import { dispatchSelectedResources } from "@/lib/resource-dispatch"
 import { useIncidents, useResources } from "./crisis-map/use-map-data"
 import { IncidentIcon, SourceIcon, severityColorClass, sourceLabel, incidentTypeLabel } from "./crisis-map/incident-helpers"
-import { createLeafletIcon, LEAFLET_DARK_STYLES } from "./crisis-map/leaflet-icon"
 import { IncidentDetailModal, DeployModal } from "./crisis-map/map-modals"
+import { IncidentDispatchCard } from "./incident-dispatch-card"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 
 // ---------------------------------------------------------------------------
 // Lazy-load de componentes Leaflet (sólo cliente)
 // ---------------------------------------------------------------------------
 
-const MapContainer = dynamic(() => import("react-leaflet").then((m) => m.MapContainer), { ssr: false })
-const TileLayer    = dynamic(() => import("react-leaflet").then((m) => m.TileLayer),    { ssr: false })
-const Marker       = dynamic(() => import("react-leaflet").then((m) => m.Marker),       { ssr: false })
+// Single dynamic import of the complete map component — fixes the bug where
+// individual dynamic imports broke React reconciliation and prevented new
+// markers from appearing without a page reload.
+const MapInner = dynamic(
+  () => import("./crisis-map/map-inner").then((m) => m.MapInner),
+  { ssr: false }
+)
 
-const MAP_CENTER: [number, number] = [-26.8241, -65.2226]
-const SOURCE_TYPES: IncidentSource[] = ["social", "sensor", "camera"]
+const SOURCE_TYPES: IncidentSource[] = ["social", "sensor", "camera", "citizen"]
+const INCIDENT_TYPES: Array<{ value: IncidentType; label: string }> = [
+  { value: "flood", label: "Flood" },
+  { value: "fire", label: "Fire" },
+  { value: "storm", label: "Storm" },
+  { value: "looting", label: "Looting" },
+  { value: "violence", label: "Violence" },
+  { value: "accident", label: "Accident" },
+  { value: "general", label: "General" },
+]
 
 const SEVERITY_LEGENDS = [
   { label: "Critical", color: "bg-primary" },
@@ -45,13 +59,17 @@ export function CrisisMap() {
   const [leafletCssLoaded, setLeafletCssLoaded] = useState(false)
   const [selectedIncident,   setSelectedIncident]   = useState<Incident | null>(null)
   const [showDeployModal,    setShowDeployModal]     = useState(false)
-  const [activeLayers,       setActiveLayers]       = useState<IncidentSource[]>(SOURCE_TYPES)
+  const [showBlockchainModal, setShowBlockchainModal] = useState(false)
+  const [viewMode,           setViewMode]           = useState<"activo" | "atendido">("activo")
+  const [historyType,        setHistoryType]        = useState<IncidentType | "all">("all")
+  const [activeLayers,       setActiveLayers]       = useState<IncidentSource[]>(["social", "sensor", "camera", "citizen"])
+  const [tileStyle, setTileStyle] = useState<("satellite" | "street" | "topo")>("street")
   const [deployingResources, setDeployingResources] = useState(false)
   const [deploySuccess,      setDeploySuccess]      = useState(false)
   const [selectedCounts,     setSelectedCounts]     = useState<Record<string, number>>({})
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const { incidents: dbIncidents, mutate: mutateIncidents } = useIncidents()
+  const { incidents: dbIncidents } = useIncidents(viewMode)
   const { data: dbRecursos, mutate: mutateRecursos }        = useResources()
 
   // All incidents come from the database (real + respawned)
@@ -70,16 +88,32 @@ export function CrisisMap() {
 
   useEffect(() => {
     setIsClient(true)
-    const link = document.createElement("link")
-    link.rel = "stylesheet"
-    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    document.head.appendChild(link)
-    setLeafletCssLoaded(true)
+
+    // Injectar CSS de Leaflet (CSP permite https://unpkg.com via connect-src)
+    let cancelled = false
+    fetch("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css")
+      .then((r) => r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then((css) => {
+        if (cancelled) return
+        const style = document.createElement("style")
+        style.dataset.leaflet = "true"
+        style.textContent = css
+        document.head.appendChild(style)
+        setLeafletCssLoaded(true)
+      })
+      .catch((err) => {
+        console.error("[CrisisMap] Failed to load Leaflet CSS:", err)
+        // En Vercel/prod puede haber CSP estricto. Mostrar el mapa de todas formas
+        // (Leaflet puede funcionar sin su CSS, sólo se ve menos bonito)
+        setLeafletCssLoaded(true)
+      })
 
     restoreResourceTimersOnMount().catch((err) => console.error("[CrisisMap] Error restoring resource timers:", err))
 
     return () => {
-      document.head.removeChild(link)
+      cancelled = true
+      const style = document.querySelector("style[data-leaflet]")
+      if (style) style.remove()
     }
   }, [])
 
@@ -90,7 +124,28 @@ export function CrisisMap() {
     )
   }
 
-  const filteredIncidents = incidents.filter((i) => activeLayers.includes(i.source))
+  const filteredIncidents = useMemo(
+    () => incidents.filter((i) =>
+      activeLayers.includes(i.source) && (historyType === "all" || i.type === historyType)
+    ),
+    [incidents, activeLayers, historyType]
+  )
+
+  const sourceCounts = useMemo(() => {
+    const counts: Record<IncidentSource, number> = { social: 0, sensor: 0, camera: 0, citizen: 0 }
+    for (const i of incidents) {
+      if (i.source in counts) counts[i.source]++
+    }
+    return counts
+  }, [incidents])
+
+  const severityCounts = useMemo(() => {
+    const counts: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0 }
+    for (const i of filteredIncidents) {
+      if (i.severity in counts) counts[i.severity]++
+    }
+    return counts
+  }, [filteredIncidents])
 
   // ── Deploy handlers ───────────────────────────────────────────────────────
   const handleOpenDeploy = () => {
@@ -114,72 +169,61 @@ export function CrisisMap() {
     })
   }
 
+  const handleConfirmDeploymentTransition = () => {
+    const totalSelected = Object.values(selectedCounts).reduce((a, b) => a + b, 0)
+    if (totalSelected === 0) {
+      toast.error("Seleccioná al menos un recurso para despachar")
+      return
+    }
+    setShowDeployModal(false)
+    setShowBlockchainModal(true)
+  }
+
+  const handleMarkerClick = (incident: Incident) => {
+    const scrollY = window.scrollY
+    setSelectedIncident(incident)
+    // Radix focus management can scroll the map's trigger into view when the detail dialog opens.
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollY, behavior: "instant" })
+      setTimeout(() => window.scrollTo({ top: scrollY, behavior: "instant" }), 0)
+    })
+  }
+
+  const handleCloseConfirmDispatch = () => {
+    setShowBlockchainModal(false)
+    setSelectedIncident(null)
+    setSelectedCounts({})
+  }
+
   const handleDeployResources = async () => {
     const totalSelected = Object.values(selectedCounts).reduce((a, b) => a + b, 0)
-    if (totalSelected === 0) { toast.error("Select at least one resource to deploy"); return }
+    if (totalSelected === 0) {
+      throw new Error("Seleccioná al menos un recurso para despachar")
+    }
 
-    const incidenteId    = selectedIncident?.id
-    const incidenteTipo  = selectedIncident?.type
-    const incidenteFuente = selectedIncident?.source
-
-    // IDs a despachar (calculados antes de cualquier async)
+    const incidenteId = selectedIncident?.id
     const idsToDispatch = resourceGroups.flatMap((g) =>
       g.availableIds.slice(0, selectedCounts[g.tipo] ?? 0)
     )
 
+    if (idsToDispatch.length !== totalSelected) throw new Error("Cambió la disponibilidad de recursos. Revisá la selección.")
     setDeployingResources(true)
-
-    // Optimistic update en cache
-    if (dbRecursos) {
-      mutateRecursos(
-        dbRecursos.map((r: DbIncident & { estado: string }) => idsToDispatch.includes(r.id) ? { ...r, estado: "dispatched" } : r),
-        false,
-      )
+    try {
+      await dispatchSelectedResources(incidenteId, idsToDispatch, {
+        dispatch: (incidentId, resourceId) => dispatchResourceWithLifecycle(incidentId, resourceId),
+        markAttended: (incidentId) => patchIncidente(incidentId, { estado: "atendido" }),
+      })
+    } finally {
+      setDeployingResources(false)
+      await Promise.allSettled([mutateRecursos(), mutate("/api/incidentes?estado=activo"), mutate("/api/incidentes?estado=atendido"), mutate("/api/analytics")])
     }
-
-    // Dispatch resources immediately
-    if (incidenteId) {
-      // Patch incident to attended state
-      await patchIncidente(incidenteId, { estado: "atendido" }).catch((err) => console.error("[CrisisMap] Error updating incident:", err))
-      mutateIncidents()
-
-      // Despachar recursos con ciclo de vida
-      await Promise.all(
-        idsToDispatch.map((id) => dispatchResourceWithLifecycle(incidenteId, id, () => mutateRecursos()).catch((err) => console.error("[CrisisMap] Error dispatching resource:", err)))
-      )
-      await mutateRecursos()
-    }
-
-    setDeployingResources(false)
-    setDeploySuccess(true)
-
-    // Respawn 90s después
-    if (incidenteId) {
-      const incidenteTipo  = selectedIncident?.type
-      const incidenteFuente = selectedIncident?.source
-      setTimeout(async () => {
-        const respawn = buildRespawnIncident({ tipo: incidenteTipo, fuente: incidenteFuente })
-        await createIncidente(respawn).catch((err) => console.error("[CrisisMap] Error creating respawn incident:", err))
-      }, 90_000)
-    }
-
-    toast.success(`Resources deployed to ${selectedIncident?.location}`, {
-      description: `${idsToDispatch.length} unit(s) on their way`,
-    })
-
-    setTimeout(() => {
-      setShowDeployModal(false)
-      setDeploySuccess(false)
-      setSelectedCounts({})
-      mutateRecursos()
-    }, 2000)
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-border bg-card md:relative">
+    <div className="relative flex h-full w-full flex-col overflow-visible rounded-lg border border-border bg-card">
       {/* ── Map header ─────────────────────────────────────────────── */}
-      <div className="absolute left-0 right-0 top-0 z-[1000] flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-border bg-card/95 px-3 py-2 backdrop-blur-sm">
+      <div className="sticky top-0 z-[1000] flex min-h-12 w-full shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-border bg-card px-3 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
           <h2 className="truncate text-xs font-semibold text-foreground sm:text-sm">
@@ -188,6 +232,32 @@ export function CrisisMap() {
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {/* Vistas del mapa: siempre visibles para cambiar rápidamente de cartografía */}
+          <div className="flex items-center rounded-md border border-border bg-secondary/40 p-0.5" role="group" aria-label="Vistas del mapa">
+            {([
+              { id: "street", label: "Oscuro", desc: "Mapa táctico" },
+              { id: "satellite", label: "Satélite", desc: "Imagen aérea" },
+              { id: "topo", label: "Topo", desc: "Relieve" },
+            ] as const).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                title={opt.desc}
+                aria-pressed={tileStyle === opt.id}
+                onClick={() => setTileStyle(opt.id)}
+                className={cn(
+                  "flex items-center gap-1 rounded px-1.5 py-1 text-[10px] transition-colors sm:px-2",
+                  tileStyle === opt.id
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                )}
+              >
+                <Eye className="h-3 w-3" />
+                <span>{opt.label}</span>
+              </button>
+            ))}
+          </div>
+
           {/* Layer filter */}
           <Popover>
             <PopoverTrigger asChild>
@@ -211,7 +281,7 @@ export function CrisisMap() {
                         <span className="text-xs">{sourceLabel(layer)}</span>
                       </div>
                       <Badge variant="outline" className="ml-auto text-[10px] h-5">
-                        {incidents.filter((i) => i.source === layer).length}
+                        {sourceCounts[layer]}
                       </Badge>
                     </label>
                   ))}
@@ -235,7 +305,7 @@ export function CrisisMap() {
                 variant="outline"
                 className={cn("hidden text-[10px] sm:inline-flex", colorMap[sev])}
               >
-                {filteredIncidents.filter((i) => i.severity === sev).length} {labelMap[sev]}
+                {severityCounts[sev]} {labelMap[sev]}
               </Badge>
             )
           })}
@@ -244,66 +314,127 @@ export function CrisisMap() {
 
       {/* ── Incident list panel ────────────────────────────────────── */}
       <div className="relative z-10 mt-0 w-full rounded-none border-b border-border bg-card/95 backdrop-blur-sm shadow-none md:absolute md:right-3 md:top-14 md:z-[1000] md:w-72 md:max-h-[420px] md:rounded-lg md:border md:shadow-xl">
-        <div className="flex items-center justify-between border-b border-border bg-card px-3 py-2 rounded-t-lg">
-          <p className="text-xs font-semibold text-foreground">Active Incidents ({filteredIncidents.length})</p>
-          <Badge variant="outline" className="text-[9px] border-primary/50 text-primary animate-pulse">Live</Badge>
-        </div>
-        <div className="overflow-y-auto max-h-48 p-2 space-y-1.5 custom-scrollbar md:max-h-[370px]">
-          {filteredIncidents.map((incident) => (
+        <div className="flex flex-col border-b border-border bg-card rounded-t-lg">
+          <div className="flex border-b border-border/60">
             <button
-              key={incident.id}
-              onClick={() => setSelectedIncident(incident)}
+              onClick={() => setViewMode("activo")}
               className={cn(
-                "w-full text-left rounded-lg border p-2 transition-all hover:bg-secondary/50 hover:scale-[1.01]",
-                incident.severity === "critical" ? "border-primary/50 bg-primary/5" :
-                incident.severity === "high"     ? "border-accent/50 bg-accent/5"   : "border-border",
+                "flex-1 py-2 text-[10px] font-semibold transition-all border-b-2 text-center cursor-pointer",
+                viewMode === "activo"
+                  ? "border-primary text-primary bg-primary/5"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/20"
               )}
             >
-              <div className="flex items-start gap-2">
-                <div className={cn("rounded-full p-1.5 flex items-center justify-center shrink-0", severityColorClass(incident.severity))}>
-                  <IncidentIcon type={incident.type} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground truncate">{incident.location}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="outline" className="text-[9px] h-4 px-1">
-                      {incidentTypeLabel(incident.type)}
-                    </Badge>
-                    <span className="text-[9px] text-muted-foreground">{incident.affectedPeople} affected</span>
+              Active ({viewMode === "activo" ? filteredIncidents.length : 0})
+            </button>
+            <button
+              onClick={() => setViewMode("atendido")}
+              className={cn(
+                "flex-1 py-2 text-[10px] font-semibold transition-all border-b-2 text-center cursor-pointer",
+                viewMode === "atendido"
+                  ? "border-accent text-accent bg-accent/5"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/20"
+              )}
+            >
+              History ({viewMode === "atendido" ? filteredIncidents.length : 0})
+            </button>
+          </div>
+          <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-secondary/10">
+            <p className="text-[9px] font-medium text-muted-foreground">
+              {viewMode === "activo" ? "Real-Time Monitoring" : "On-Chain Audit Trail"}
+            </p>
+            {viewMode === "atendido" && (
+              <label className="group flex items-center gap-1.5 rounded-md border border-accent/25 bg-accent/5 px-2 py-1 text-[9px] text-accent shadow-[0_0_14px_rgba(255,51,74,0.08)] transition-colors hover:border-accent/50 hover:bg-accent/10">
+                <Eye className="size-3 shrink-0 opacity-80" aria-hidden="true" />
+                <span className="sr-only">Filter history by incident type</span>
+                <span className="hidden text-[8px] font-semibold uppercase tracking-[0.12em] text-muted-foreground sm:inline">Type</span>
+                <select
+                  value={historyType}
+                  onChange={(event) => setHistoryType(event.target.value as IncidentType | "all")}
+                  className="h-5 max-w-[108px] cursor-pointer appearance-none bg-transparent pr-4 text-[9px] font-semibold text-foreground outline-none [color-scheme:dark] [background-image:linear-gradient(45deg,transparent_50%,currentColor_50%),linear-gradient(135deg,currentColor_50%,transparent_50%)] [background-position:calc(100%-7px)_8px,calc(100%-3px)_8px] [background-size:4px_4px,4px_4px] [background-repeat:no-repeat] focus:text-accent [&>option]:bg-[#080b0d] [&>option]:text-foreground"
+                  aria-label="Filter history by incident type"
+                >
+                  <option value="all">All types</option>
+                  {INCIDENT_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {viewMode === "activo" ? (
+              <Badge variant="outline" className="text-[8px] h-4 border-primary/50 text-primary animate-pulse px-1.5">LIVE</Badge>
+            ) : (
+              <Badge variant="outline" className="text-[8px] h-4 border-emerald-500/50 text-emerald-400 gap-1 px-1.5 font-mono">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                ON-CHAIN
+              </Badge>
+            )}
+          </div>
+        </div>
+        <div className="overflow-y-auto max-h-48 p-2 space-y-1.5 custom-scrollbar md:max-h-[350px]">
+          {filteredIncidents.length === 0 ? (
+            <p className="text-[10px] text-muted-foreground text-center py-4">No incidents to display</p>
+          ) : (
+            filteredIncidents.map((incident) => (
+              <button
+                key={incident.id}
+                onClick={() => setSelectedIncident(incident)}
+                className={cn(
+                  "w-full text-left rounded-lg border p-2 transition-all hover:bg-secondary/50 hover:scale-[1.01] cursor-pointer",
+                  viewMode === "activo"
+                    ? (incident.severity === "critical" ? "border-primary/50 bg-primary/5" :
+                       incident.severity === "high"     ? "border-accent/50 bg-accent/5"   : "border-border")
+                    : (incident.estado === "activo"
+                        ? "border-yellow-500/30 bg-yellow-500/5 hover:border-yellow-500/50 hover:bg-yellow-500/10"
+                        : "border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40")
+                )}
+              >
+                <div className="flex items-start gap-2">
+                  <div className={cn("rounded-full p-1.5 flex items-center justify-center shrink-0", 
+                    viewMode === "activo" ? severityColorClass(incident.severity) : (incident.estado === "activo" ? "bg-yellow-500/10 text-yellow-400" : "bg-emerald-500/10 text-emerald-400")
+                  )}>
+                    <IncidentIcon type={incident.type} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="text-xs font-medium text-foreground truncate">{incident.location}</p>
+                      {viewMode === "atendido" && (
+                        incident.estado === "activo" ? (
+                          <Badge variant="outline" className="text-[7px] h-3 px-1 border-yellow-500/40 text-yellow-400 font-mono shrink-0 animate-pulse">
+                            PENDING
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[7px] h-3 px-1 border-emerald-500/30 text-emerald-400 font-mono shrink-0">
+                            ON-CHAIN
+                          </Badge>
+                        )
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="text-[9px] h-4 px-1">
+                        {incidentTypeLabel(incident.type)}
+                      </Badge>
+                      <span className="text-[9px] text-muted-foreground">{incident.affectedPeople} affected</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            ))
+          )}
         </div>
       </div>
 
       {/* ── Leaflet Map ─────────────────────────────────────────────── */}
       {isClient && leafletCssLoaded ? (
-        <div className="h-[400px] w-full shrink-0 pt-10 md:h-full md:flex-1">
-          <style>{LEAFLET_DARK_STYLES}</style>
-          <style>{LEAFLET_DARK_STYLES}</style>
-          <MapContainer center={MAP_CENTER} zoom={13} scrollWheelZoom style={{ height: "100%", width: "100%" }}>
-            <TileLayer
-              attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            />
-            {filteredIncidents.map((incident) => {
-              const icon = createLeafletIcon(incident.severity, incident.type, incident.source)
-              if (!icon) return null
-              return (
-                <Marker
-                  key={incident.id}
-                  position={[incident.coordinates.lat, incident.coordinates.lng]}
-                  icon={icon}
-                  eventHandlers={{ click: () => setSelectedIncident(incident) }}
-                />
-              )
-            })}
-          </MapContainer>
+        <div className="relative isolate h-[min(70vh,680px)] min-h-[420px] w-full shrink-0 overscroll-contain md:h-[min(70vh,680px)] md:flex-none">
+          <MapInner
+            incidents={filteredIncidents}
+            onMarkerClick={handleMarkerClick}
+            tileStyle={tileStyle}
+          />
         </div>
       ) : (
-        <div className="flex h-[400px] w-full shrink-0 items-center justify-center bg-secondary/20 md:h-full md:flex-1">
+        <div className="flex h-[min(70vh,680px)] min-h-[420px] w-full shrink-0 items-center justify-center bg-secondary/20 md:h-[min(70vh,680px)] md:flex-none">
           <div className="flex flex-col items-center gap-2">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             <p className="text-sm text-muted-foreground">Loading map...</p>
@@ -326,8 +457,8 @@ export function CrisisMap() {
 
       {/* ── Modales ─────────────────────────────────────────────────── */}
       <IncidentDetailModal
+        isOpen={!!selectedIncident && !showDeployModal && !showBlockchainModal}
         incident={selectedIncident}
-        showDeployModal={showDeployModal}
         onClose={() => setSelectedIncident(null)}
         onOpenDeploy={handleOpenDeploy}
       />
@@ -341,9 +472,36 @@ export function CrisisMap() {
         deployingResources={deployingResources}
         deploySuccess={deploySuccess}
         onClose={handleCloseDeploy}
-        onDeploy={handleDeployResources}
+        onDeploy={handleConfirmDeploymentTransition}
         onAdjustCount={adjustCount}
       />
+
+      <Dialog open={showBlockchainModal} onOpenChange={handleCloseConfirmDispatch}>
+        <DialogContent className="max-w-md p-0 bg-transparent border-none z-[9999]">
+          <DialogTitle className="sr-only">Deploy Resources</DialogTitle>
+          {selectedIncident && (
+            <IncidentDispatchCard
+              incident={{
+                id: selectedIncident.id,
+                tipo: selectedIncident.type === "flood" || selectedIncident.type === "fire" ? selectedIncident.type : "general",
+                severidad: selectedIncident.severity as "critical" | "high" | "medium" | "low",
+                ubicacion: selectedIncident.location,
+                afectados: selectedIncident.affectedPeople,
+                timestamp: selectedIncident.timestamp ? new Date(selectedIncident.timestamp).toISOString() : new Date().toISOString(),
+                arkivKey: selectedIncident.arkiv_key,
+              }}
+              selectedCounts={selectedCounts}
+              onConfirmDispatch={handleDeployResources}
+              onDispatchSuccess={() => {
+                mutate("/api/incidentes?estado=activo")
+                mutate("/api/incidentes?estado=atendido")
+                mutate("/api/analytics")
+              }}
+              onDismiss={handleCloseConfirmDispatch}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

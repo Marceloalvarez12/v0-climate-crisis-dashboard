@@ -1,67 +1,60 @@
-/**
- * app/api/agent/route.ts
- *
- * Endpoint for executing the social media monitoring agent.
- *
- * GET  /api/agent  → Agent status and available connectors
- * POST /api/agent  → Runs a complete scan and returns the result
- */
-
-import { NextResponse } from "next/server"
-import { getAgentStatus } from "@/lib/mock-db"
-
-// ---------------------------------------------------------------------------
-// GET — agent status
-// ---------------------------------------------------------------------------
+import { SocialMediaAgent } from "@/lib/agents/social-media-agent"
+import { LlmAnalyzer } from "@/lib/agents/llm-analyzer"
+import { TRIGGER_HASHTAG } from "@/lib/agents/hashtag"
+import { apiSuccess, apiError } from "@/lib/services/api-response"
+import { getSystemConfig } from "@/lib/services/config-service"
 
 export async function GET() {
   try {
-    const status = getAgentStatus()
+    const agent = new SocialMediaAgent()
+    const connectors = agent.getConnectorStatus()
+    const activeCount = connectors.filter(c => c.isConfigured).length
+    const usingOpenRouter = LlmAnalyzer.isConfigured()
 
-    return NextResponse.json({
+    return apiSuccess({
       status:          "online",
-      model:           "gemini-2.0-flash",
-      connectors:      [
-        { name: "Mock", isConfigured: true, lastScan: new Date().toISOString() }
-      ],
-      activeConnectors: 1,
+      model:           usingOpenRouter ? (process.env.OPENROUTER_MODEL || "openrouter") : "gemini-2.0-flash",
+      provider:        usingOpenRouter ? "openrouter" : "google",
+      connectors:      connectors.map(c => ({
+        name:          c.platform.toUpperCase(),
+        isConfigured:  c.isConfigured,
+        lastScan:      new Date().toISOString()
+      })),
+      activeConnectors: activeCount,
+      triggerHashtag:  TRIGGER_HASHTAG,
       geminiConfigured: !!process.env.GOOGLE_AI_API_KEY,
+      openrouterConfigured: usingOpenRouter,
       timestamp:       new Date().toISOString(),
     })
   } catch (err) {
-    return NextResponse.json(
-      { status: "error", error: String(err) },
-      { status: 500 }
-    )
+    const message = err instanceof Error ? err.message : String(err)
+    return apiError(message)
   }
 }
 
-// ---------------------------------------------------------------------------
-// POST — execute scan
-// ---------------------------------------------------------------------------
-
 export async function POST() {
   try {
-    console.log("[API/agent] Starting scan...")
-
-    // Mock scan result
-    const result = {
-      postsCollected: Math.floor(Math.random() * 10) + 1,
-      incidentsFound: [],
-      timestamp: new Date().toISOString(),
+    // Kill switch del admin (config_sistema.agent_mode). Si la tabla no
+    // existe o no hay config, el agente sigue operativo (fail-open).
+    const mode = await getSystemConfig<{ autonomous?: boolean }>("agent_mode")
+    if (mode?.autonomous !== true) {
+      return apiError("Agente deshabilitado o configuración no disponible", 503)
     }
 
+    const usingOpenRouter = LlmAnalyzer.isConfigured()
+    console.log(`[API/agent] Starting live scan with ${usingOpenRouter ? "OpenRouter" : "Gemini 2.0 Flash"}...`)
+    const agent = new SocialMediaAgent()
+    const result = await agent.runScan()
+
     console.log(
-      `[API/agent] Scan completed: ${result.postsCollected} posts, ` +
-      `${result.incidentsFound.length} incidents detected`
+      `[API/agent] Live scan completed: ${result.postsCollected} posts, ` +
+      `${result.postsMatched} with ${result.hashtag}, ${result.incidentsFound.length} incidents detected`
     )
 
-    return NextResponse.json(result)
+    return apiSuccess(result)
   } catch (err) {
-    console.error("[API/agent] Error in scan:", err)
-    return NextResponse.json(
-      { error: String(err) },
-      { status: 500 }
-    )
+    console.error("[API/agent] Error in live scan:", err)
+    const message = err instanceof Error ? err.message : String(err)
+    return apiError(message)
   }
 }

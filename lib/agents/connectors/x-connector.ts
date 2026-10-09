@@ -10,7 +10,7 @@
  *   2. Obtener Bearer Token con permisos de lectura de tweets
  *   3. Agregar al .env.local:
  *        X_BEARER_TOKEN=AAAAAAAAAAAAAAAAAAAAAxxxxx...
- *   4. Descomentar este archivo y reemplazar el MockConnector en el agente
+ *   4. Setear X_BEARER_TOKEN y el agente lo usará automáticamente
  *
  * Documentación: https://developer.x.com/en/docs/twitter-api/tweets/search/api-reference/get-tweets-search-recent
  * ─────────────────────────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ export class XConnector extends SocialConnector {
     return false // desactivado hasta tener credenciales
   }
 
-  async fetchPosts(options: ConnectorOptions): Promise<SocialPost[]> {
+  async fetchPosts(_options: ConnectorOptions): Promise<SocialPost[]> {
     if (!this.isConfigured()) {
       throw new Error("X connector no configurado: falta X_BEARER_TOKEN en .env.local")
     }

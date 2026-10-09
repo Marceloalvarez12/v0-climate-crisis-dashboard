@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo } from "react"
-import { Users, Clock, MapPinned, Twitter, Send, Phone, CheckCircle2 } from "lucide-react"
+import { useMemo, useState, useEffect } from "react"
+import { Users, Clock, MapPinned, Twitter, Facebook, Instagram, Hash, Repeat2, Send, CheckCircle2, Truck, ShieldAlert, ShieldCheck, Loader2, ExternalLink, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -13,6 +13,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { generateIncidentPdf } from "@/lib/pdf-generator"
 import {
   IncidentIcon,
   SourceIcon,
@@ -22,47 +23,219 @@ import {
   incidentSeverityLabel,
 } from "./incident-helpers"
 import { RecursoIcon, tipoRecursoLabel } from "./resource-helpers"
+import { IncidentVerifyPanel } from "./incident-verify-panel"
 import type { Incident, DbResource } from "@/lib/types"
+
+// ---------------------------------------------------------------------------
+// Componente de Auditoría y Sello de Verificación On-Chain (Arkiv Network)
+// ---------------------------------------------------------------------------
+
+interface OnChainVerifierProps {
+  arkivKey: string
+}
+
+function OnChainVerifier({ arkivKey }: OnChainVerifierProps) {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [data, setData] = useState<{
+    creator: string
+    expiresAtBlock: string | null
+    payload: Record<string, unknown>
+    isSimulated?: boolean
+  } | null>(null)
+
+  useEffect(() => {
+    let active = true
+    const verify = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch(`/api/incidentes/arkiv-verify/${arkivKey}`)
+        const json = await res.json()
+        if (!active) return
+        if (json.success) {
+          setData({
+            creator: json.creator,
+            expiresAtBlock: json.expiresAtBlock,
+            payload: json.payload,
+            isSimulated: json.isSimulated,
+          })
+        } else {
+          setError(json.error || "Could not retrieve information from the blockchain.")
+        }
+      } catch {
+        if (!active) return
+        setError("Network error while trying to verify the on-chain status.")
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    verify()
+    return () => {
+      active = false
+    }
+  }, [arkivKey])
+
+  if (loading) {
+    return (
+      <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 flex flex-col items-center justify-center gap-2 animate-pulse">
+        <Loader2 className="h-6 w-6 text-emerald-400 animate-spin" />
+        <p className="text-xs text-emerald-400 font-medium">Verifying cryptographic signature on Braga Testnet...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4 flex flex-col gap-2">
+        <div className="flex items-center gap-2 text-red-400">
+          <ShieldAlert className="h-5 w-5" />
+          <span className="text-xs font-semibold">On-Chain Audit Error</span>
+        </div>
+        <p className="text-xs text-muted-foreground">{error}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3 relative overflow-hidden">
+      {/* Background Glow */}
+      <div className="absolute top-0 right-0 -mr-8 -mt-8 h-24 w-24 rounded-full bg-emerald-500/10 blur-xl pointer-events-none" />
+
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0" />
+          <div>
+            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Cryptographic Verification Successful</span>
+            <p className="text-[10px] text-muted-foreground">Status audited and sealed immutably</p>
+          </div>
+        </div>
+        <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30">
+          Braga Network
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-[11px] border-t border-emerald-500/10">
+        <div className="space-y-1">
+          <p className="text-[9px] text-muted-foreground uppercase">Dispatcher (Public Key)</p>
+          <p className="font-mono text-foreground truncate select-all" title={data?.creator}>
+            {data?.creator}
+          </p>
+        </div>
+        <div className="space-y-1">
+          <p className="text-[9px] text-muted-foreground uppercase">Entity Key</p>
+          <p className="font-mono text-foreground truncate select-all" title={arkivKey}>
+            {arkivKey}
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-1 text-[11px]">
+        <p className="text-[9px] text-muted-foreground uppercase">Payload Registered on Block</p>
+        <pre className="font-mono text-[10px] text-emerald-300 bg-black/40 p-2.5 rounded border border-emerald-500/15 overflow-x-auto max-h-32 custom-scrollbar">
+          {JSON.stringify(data?.payload, null, 2)}
+        </pre>
+      </div>
+
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1.5 border-t border-emerald-500/10">
+        <span>Expires at block: <strong className="font-mono text-foreground">{data?.expiresAtBlock || 'Infinite'}</strong></span>
+        {data?.isSimulated ? (
+          <span className="text-yellow-500 font-semibold bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20 text-[9px]">
+            Simulated (Local)
+          </span>
+        ) : (
+          <a
+            href={`https://explorer.braga.hoodi.arkiv.network/entity/${arkivKey}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300 transition-colors"
+          >
+            View in Explorer
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
+      </div>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Modal de detalle del incidente
 // ---------------------------------------------------------------------------
 
 interface IncidentDetailModalProps {
+  isOpen:          boolean
   incident:        Incident | null
-  showDeployModal: boolean
   onClose:         () => void
   onOpenDeploy:    () => void
 }
 
 export function IncidentDetailModal({
+  isOpen,
   incident,
-  showDeployModal,
   onClose,
   onOpenDeploy,
 }: IncidentDetailModalProps) {
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  const handleDownloadReport = async (inc: Incident) => {
+    setIsGenerating(true)
+    try {
+      const pdfData = {
+        id: inc.id,
+        tipo: inc.type,
+        severidad: inc.severity,
+        ubicacion: inc.location,
+        afectados: inc.affectedPeople,
+        timestamp: inc.timestamp ? new Date(inc.timestamp).toISOString() : new Date().toISOString(),
+        resumenIA: inc.sourceDetails?.ai_analysis?.reasoning || inc.sourceDetails?.content || "Analysis not available",
+      }
+      const aiKey = inc.sourceDetails?.ai_analysis?.arkiv_entity_key || inc.sourceDetails?.arkiv_entity_key
+      await generateIncidentPdf(pdfData, aiKey, inc.arkiv_key)
+    } catch (err) {
+      console.error("Error generating incident PDF:", err)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   return (
-    <Dialog open={!!incident && !showDeployModal} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto z-[9999]">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 z-[9999]">
         {incident && (
           <>
-            <DialogHeader>
+            {/* Fixed header */}
+            <DialogHeader className="shrink-0 px-6 pt-6 pb-3">
               <DialogTitle className="flex items-center gap-3">
                 <div className={cn("rounded-full p-2", severityColorClass(incident.severity))}>
                   <IncidentIcon type={incident.type} />
                 </div>
                 <div>
                   <span className="text-base">{incident.location}</span>
-                  <p className="text-xs font-normal text-muted-foreground mt-0.5">
-                    {incidentTypeLabel(incident.type)} — Severity {incidentSeverityLabel(incident.severity)}
-                  </p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {incidentTypeLabel(incident.type)} — Severity {incidentSeverityLabel(incident.severity)}
+                    </span>
+                    {incident.estado === "atendido" && (
+                      <Badge className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25 text-[9px] px-1.5 py-0 border border-emerald-500/30">
+                        Attended & Audited
+                      </Badge>
+                    )}
+                    {incident.estado === "activo" && (
+                      <Badge className="bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500/20 text-[9px] px-1.5 py-0 border border-yellow-500/30 animate-pulse">
+                        Pending Validation
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4">
+            {/* Scrollable body */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6 space-y-4">
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <StatCard icon={<Users className="h-4 w-4 mx-auto mb-1 text-primary" />} label="Affected">
                   {incident.affectedPeople.toLocaleString()}
                 </StatCard>
@@ -90,17 +263,67 @@ export function IncidentDetailModal({
                 <SourceDetail incident={incident} />
               </div>
 
-              {/* Actions */}
-              <div className="flex gap-2">
-                <Button className="flex-1" variant="default" onClick={onOpenDeploy}>
-                  <Send className="h-4 w-4 mr-2" />
-                  Deploy Resources
-                </Button>
-                <Button className="flex-1" variant="outline">
-                  <Phone className="h-4 w-4 mr-2" />
-                  Contact Authorities
-                </Button>
-              </div>
+              {/* Verify: coords exactas + cámaras públicas OSM cercanas */}
+              <IncidentVerifyPanel incident={incident} />
+
+              {/* On-Chain Verification / Dispatch Action */}
+              {incident.estado === "atendido" ? (
+                <div className="space-y-3">
+                  {incident.arkiv_key ? (
+                    <OnChainVerifier arkivKey={incident.arkiv_key} />
+                  ) : (
+                    <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 space-y-2">
+                      <div className="flex items-center gap-2 text-yellow-400">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-xs font-semibold">On-chain audit pending</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        The incident is attended but the cryptographic seal on Arkiv/Stellar
+                        has not been recorded yet (the network may be congested). Refresh
+                        this window in a few seconds to see the hash.
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center justify-center gap-2 py-5 cursor-pointer"
+                      onClick={() => handleDownloadReport(incident)}
+                      disabled={isGenerating}
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-4 w-4" />
+                          PDF Report
+                        </>
+                      )}
+                    </Button>
+                    {incident.arkiv_key && (
+                      <Button
+                        variant="outline"
+                        className="flex-1 border-emerald-500/30 bg-emerald-500/5 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 font-semibold flex items-center justify-center gap-2 py-5 cursor-pointer"
+                        asChild
+                      >
+                        <a href={`/auditoria?key=${incident.arkiv_key}`} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-4 w-4" />
+                          Verify Portal
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 cursor-pointer" onClick={onOpenDeploy}>
+                    <Truck className="h-5 w-5 mr-2" />
+                    {incident.source === "social" ? "Confirm Incident" : "Resource Deployment"}
+                  </Button>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -120,27 +343,76 @@ function StatCard({ icon, label, children, small }: { icon: React.ReactNode; lab
   )
 }
 
+const SOCIAL_PLATFORM_STYLE: Record<string, { icon: typeof Twitter; tint: string }> = {
+  facebook:  { icon: Facebook,  tint: "bg-blue-600/20 text-blue-500" },
+  instagram: { icon: Instagram, tint: "bg-pink-500/20 text-pink-400" },
+  twitter:   { icon: Twitter,   tint: "bg-sky-500/20 text-sky-300" },
+}
+
 // Detalle según la fuente del incidente
 function SourceDetail({ incident }: { incident: Incident }) {
   const { source, sourceDetails: sd } = incident
 
   if (source === "social") {
+    const { icon: PlatformIcon, tint } = SOCIAL_PLATFORM_STYLE[sd.platform_id ?? ""] ?? SOCIAL_PLATFORM_STYLE.twitter
+    const reports = sd.reports_count ?? 1
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-            <Twitter className="h-4 w-4 text-blue-400" />
+          <div className={cn("h-8 w-8 rounded-full flex items-center justify-center", tint)}>
+            <PlatformIcon className="h-4 w-4" />
           </div>
-          <span className="text-sm font-medium text-blue-400">{sd.username}</span>
+          {sd.author_url ? (
+            <a href={sd.author_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-400 hover:underline">
+              {sd.username}
+            </a>
+          ) : (
+            <span className="text-sm font-medium text-blue-400">{sd.username}</span>
+          )}
+          {sd.hashtag && (
+            <Badge variant="outline" className="ml-auto gap-0.5 border-sky-500/40 bg-sky-500/10 font-mono text-[10px] text-sky-300">
+              <Hash className="h-3 w-3" />
+              {sd.hashtag.replace(/^#/, "")}
+            </Badge>
+          )}
         </div>
         <p className="text-sm text-foreground bg-secondary/50 rounded-lg p-3 italic">
           &quot;{sd.content}&quot;
         </p>
+        {sd.ai_analysis?.summary && sd.ai_analysis.summary !== sd.content && (
+          <p className="text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">AI summary:</span> {sd.ai_analysis.summary}
+          </p>
+        )}
+        {(reports > 1 || sd.analyzer) && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {reports > 1 && (
+              <Badge variant="outline" className="gap-1 border-sky-500/40 text-[10px] text-sky-300">
+                <Repeat2 className="h-3 w-3" />
+                {reports} reports corroborate this incident
+              </Badge>
+            )}
+            {sd.analyzer && (
+              <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                {sd.analyzer === "llm" ? "Classified by LLM" : "Classified by rules"}
+              </Badge>
+            )}
+          </div>
+        )}
+        {sd.corroborations && sd.corroborations.length > 0 && (
+          <ul className="space-y-1 border-l-2 border-sky-500/30 pl-3">
+            {sd.corroborations.slice(-3).map((c) => (
+              <li key={c.post_id} className="text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground">{c.author}</span> · {c.content}
+              </li>
+            ))}
+          </ul>
+        )}
         {sd.imageUrl && (
-          <div className="relative aspect-video rounded-lg overflow-hidden">
-            <img src={sd.imageUrl} alt="Imagen del incidente" className="w-full h-full object-cover" />
-            <div className="absolute bottom-2 right-2">
-              <Badge className="bg-black/70 text-white text-[10px]">Image attached to tweet</Badge>
+          <div className="relative h-[140px] w-full rounded-lg overflow-hidden bg-zinc-950 border border-border/40">
+            <img src={sd.imageUrl} alt="Incident image" className="absolute inset-0 w-full h-full object-contain" />
+            <div className="absolute bottom-2 right-2 z-10">
+              <Badge className="bg-black/70 text-white text-[10px]">Image attached to post</Badge>
             </div>
           </div>
         )}
@@ -177,15 +449,15 @@ function SourceDetail({ incident }: { incident: Incident }) {
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">Location: {sd.cameraLocation}</p>
       {sd.imageUrl && (
-        <div className="relative aspect-video rounded-lg overflow-hidden">
-          <img src={sd.imageUrl} alt="Captura de cámara" className="w-full h-full object-cover" />
-          <div className="absolute top-2 left-2">
+        <div className="relative h-[140px] w-full rounded-lg overflow-hidden bg-zinc-950 border border-border/40">
+          <img src={sd.imageUrl} alt="Camera capture" className="absolute inset-0 w-full h-full object-contain" />
+          <div className="absolute top-2 left-2 z-10">
             <Badge className="bg-red-500/90 text-white text-[10px] animate-pulse">LIVE</Badge>
           </div>
-          <div className="absolute bottom-2 right-2">
+          <div className="absolute bottom-2 right-2 z-10">
             <Badge className="bg-black/70 text-white text-[10px]">{sd.cameraId}</Badge>
           </div>
-          <div className="absolute bottom-2 left-2">
+          <div className="absolute bottom-2 left-2 z-10">
             <Badge className="bg-black/70 text-white text-[10px]">
               {new Date().toLocaleTimeString("en-US")}
             </Badge>

@@ -8,7 +8,7 @@
 // Post normalizado (salida de cualquier conector)
 // ---------------------------------------------------------------------------
 
-export type SocialPlatform = "twitter" | "facebook" | "instagram" | "tiktok" | "mock"
+export type SocialPlatform = "twitter" | "facebook" | "instagram" | "tiktok" | "mock" | "usgs" | "eonet"
 
 export interface SocialPost {
   id:         string
@@ -22,13 +22,22 @@ export interface SocialPost {
   geoLng?:    number
   postedAt:   Date
   rawData?:   unknown          // payload original de la API (para debugging)
+  simulated?: boolean          // true si proviene del feed simulado (demo)
+  /**
+   * true si proviene de una fuente autoritativa (USGS, NASA EONET…).
+   * Saltea el filtro de hashtag y el análisis IA — el conector
+   * provee su propio `preAnalysis` determinístico.
+   */
+  trusted?:   boolean
+  /** Análisis provisto por fuentes autoritativas (sólo cuando `trusted`) */
+  preAnalysis?: GeminiAnalysis
 }
 
 // ---------------------------------------------------------------------------
 // Análisis de Gemini sobre un conjunto de posts
 // ---------------------------------------------------------------------------
 
-export type AnalyzedIncidentType     = "flood" | "fire" | "storm" | "earthquake" | "accident" | "none"
+export type AnalyzedIncidentType     = "flood" | "fire" | "storm" | "earthquake" | "accident" | "looting" | "violence" | "general" | "none"
 export type AnalyzedIncidentSeverity = "critical" | "high" | "medium" | "low"
 
 export interface GeminiAnalysis {
@@ -43,6 +52,7 @@ export interface GeminiAnalysis {
   reasoning:          string             // cadena de razonamiento de Gemini
   relatedPostIds:     string[]           // ids de los posts que sustentan el análisis
   suggestedActions:   string[]           // acciones recomendadas
+  arkivKey?:          string
 }
 
 // ---------------------------------------------------------------------------
@@ -57,5 +67,33 @@ export interface AgentScanResult {
   postsAnalyzed: number
   incidentsFound: GeminiAnalysis[]
   platform:      SocialPlatform
+  hashtag:       string
+  postsMatched:  number             // posts que contenían el hashtag disparador
+  outcomes:      MentionOutcome[]
   error?:        string
+}
+
+// ---------------------------------------------------------------------------
+// Resultado de procesar una mención individual (webhook o scan)
+// ---------------------------------------------------------------------------
+
+export type MentionStatus =
+  | "ignored"       // no contiene el hashtag disparador
+  | "rejected"      // contiene el hashtag pero la IA determinó que no es una emergencia
+  | "created"       // se creó un incidente nuevo
+  | "corroborated"  // reforzó un incidente activo existente en la misma ubicación
+  | "duplicate"     // el post ya había sido procesado
+  | "skipped"       // límite de incidentes activos alcanzado
+
+export interface MentionOutcome {
+  status:      MentionStatus
+  postId:      string
+  platform:    SocialPlatform
+  author:      string
+  hashtag:     string
+  analyzer?:   "llm" | "heuristic" | "api"
+  analysis?:   GeminiAnalysis
+  incidentId?: string
+  location?:   string
+  reason?:     string
 }

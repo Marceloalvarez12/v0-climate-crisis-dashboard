@@ -1,8 +1,8 @@
-import { Droplets, Flame, Wind, AlertTriangle, Twitter, Thermometer, Camera, Store, Siren, Car } from "lucide-react"
+import { Droplets, Flame, Wind, AlertTriangle, Hash, Thermometer, Camera, Store, Siren, Car } from "lucide-react"
 import type { IncidentType, IncidentSource } from "@/lib/types"
 
 // ---------------------------------------------------------------------------
-// Icono según tipo de incidente
+// Icon by incident type
 // ---------------------------------------------------------------------------
 
 export function IncidentIcon({ type }: { type: IncidentType }) {
@@ -18,7 +18,7 @@ export function IncidentIcon({ type }: { type: IncidentType }) {
 }
 
 // ---------------------------------------------------------------------------
-// Clase CSS de color según severidad
+// CSS color class by severity
 // ---------------------------------------------------------------------------
 
 export function severityColorClass(severity: string): string {
@@ -31,7 +31,7 @@ export function severityColorClass(severity: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Color hexadecimal según severidad (para el marcador Leaflet)
+// Hex color by severity (for Leaflet marker)
 // ---------------------------------------------------------------------------
 
 export function severityHex(severity: string): string {
@@ -44,14 +44,15 @@ export function severityHex(severity: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Icono / etiqueta de fuente
+// Source icon / label
 // ---------------------------------------------------------------------------
 
 export function SourceIcon({ source }: { source: IncidentSource }) {
   switch (source) {
-    case "social":  return <Twitter     className="h-3 w-3" />
+    case "social":  return <Hash        className="h-3 w-3" />
     case "sensor":  return <Thermometer className="h-3 w-3" />
     case "camera":  return <Camera      className="h-3 w-3" />
+    case "citizen": return <AlertTriangle className="h-3 w-3" />
   }
 }
 
@@ -60,11 +61,12 @@ export function sourceLabel(source: IncidentSource): string {
     case "social":  return "Social Media"
     case "sensor":  return "Sensors"
     case "camera":  return "Cameras"
+    case "citizen": return "Citizen"
   }
 }
 
 // ---------------------------------------------------------------------------
-// Tipo → etiqueta en español
+// Type -> English label
 // ---------------------------------------------------------------------------
 
 export function incidentTypeLabel(type: IncidentType): string {

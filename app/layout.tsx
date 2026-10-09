@@ -1,14 +1,11 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { Toaster } from 'sonner'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
-
 export const metadata: Metadata = {
-  title: 'Climate Crisis Center - AI Agent',
-  description: 'Professional climate crisis management dashboard with real-time AI Agent monitoring',
+  title: 'Zntinel · Centro de crisis de Tucumán',
+  description: 'Mapa ciudadano y centro de control de emergencias en Tucumán',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -38,8 +35,10 @@ export default function RootLayout({
     <html lang="en" className="dark bg-background">
       <body className="font-sans antialiased">
         {children}
+        <Toaster position="bottom-right" />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   )
 }
+
