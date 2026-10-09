@@ -46,7 +46,7 @@ export default function CrisisDashboard() {
         <DevPanel />
       </Suspense>
 
-      <DashboardHeader incidents={[]} />
+      <DashboardHeader />
 
       {/* ── DESKTOP layout (lg+) ── */}
       <div className="hidden lg:flex flex-1 overflow-hidden">

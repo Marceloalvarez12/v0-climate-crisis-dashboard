@@ -28,29 +28,20 @@ interface AlertActionsProps {
 
 export function AlertActions({ activity, onDeploy, onNotify, onDismiss }: AlertActionsProps) {
   return (
-    <div className="flex items-center gap-1.5 mt-2">
-      <Button
-        size="sm"
-        variant="default"
-        className="h-6 text-[10px] px-2 gap-1"
-        onClick={() => onDeploy(activity)}
-      >
+    <div className="mt-2 flex items-center gap-1.5">
+      <Button size="sm" className="h-6 gap-1 px-2 text-[10px]" onClick={() => onDeploy(activity)}>
         <Rocket className="h-3 w-3" />
-        Deploy
+        Despachar
       </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-6 text-[10px] px-2 gap-1"
-        onClick={() => onNotify(activity)}
-      >
+      <Button size="sm" variant="outline" className="h-6 gap-1 px-2 text-[10px]" onClick={() => onNotify(activity)}>
         <Bell className="h-3 w-3" />
-        Notify
+        Notificar
       </Button>
       <Button
         size="sm"
         variant="ghost"
-        className="h-6 w-6 p-0 ml-auto"
+        className="ml-auto h-6 w-6 p-0 text-muted-foreground"
+        title="Descartar"
         onClick={() => onDismiss(activity.id)}
       >
         <X className="h-3 w-3" />
@@ -84,12 +75,12 @@ export function ConfirmActionDialog({ state, onChange, onConfirm }: ConfirmActio
             {state.type === "deploy" ? (
               <>
                 <Rocket className="h-5 w-5 text-primary" />
-                Confirm Resource Deployment
+                Confirmar despacho de recursos
               </>
             ) : (
               <>
                 <Bell className="h-5 w-5 text-accent" />
-                Confirm Authority Notification
+                Confirmar notificación a autoridades
               </>
             )}
           </AlertDialogTitle>
@@ -97,29 +88,29 @@ export function ConfirmActionDialog({ state, onChange, onConfirm }: ConfirmActio
             <div className="space-y-3">
               {state.type === "deploy" ? (
                 <>
-                  <p>You are about to deploy emergency units to:</p>
+                  <p>Vas a despachar unidades de emergencia a:</p>
                   <p className="font-semibold text-foreground">{state.activity?.location}</p>
                 </>
               ) : (
                 <>
-                  <p>Notify the following authorities:</p>
-                  <ul className="text-sm space-y-1">
-                    <li>- Civil Defense of Tucumán</li>
-                    <li>- Fire Department</li>
-                    <li>- Tucumán Police</li>
+                  <p>Se notificará a:</p>
+                  <ul className="space-y-1 text-sm">
+                    <li>- Defensa Civil de Tucumán</li>
+                    <li>- Bomberos de la Provincia</li>
+                    <li>- Policía de Tucumán</li>
                   </ul>
-                  <p className="font-semibold text-foreground">Location: {state.activity?.location}</p>
+                  <p className="font-semibold text-foreground">Ubicación: {state.activity?.location}</p>
                 </>
               )}
 
               {state.activity?.confidence && (
-                <div className="p-3 rounded-lg bg-muted/50 border border-border">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <div className="rounded-lg border border-border bg-muted/50 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Brain className="h-3 w-3" />
-                      AI Confidence Level
+                      Confianza del modelo
                     </span>
-                    <span className="text-sm font-bold text-purple-400">{state.activity.confidence}%</span>
+                    <span className="text-sm font-bold text-violet-400">{state.activity.confidence}%</span>
                   </div>
                   <Progress value={state.activity.confidence} className="h-2" />
                 </div>
@@ -128,9 +119,9 @@ export function ConfirmActionDialog({ state, onChange, onConfirm }: ConfirmActio
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm}>
-            {state.type === "deploy" ? "Confirm Deployment" : "Confirm Notification"}
+            {state.type === "deploy" ? "Confirmar despacho" : "Confirmar notificación"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

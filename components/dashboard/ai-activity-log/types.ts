@@ -10,6 +10,8 @@ export interface ActivityItem {
   type:        "extraction" | "analysis" | "alert" | "database" | "monitoring" | "complete" | "reasoning"
   message:     string
   timestamp:   Date
+  /** Etiqueta corta de la fuente (Redes, Modelo, SMN…) */
+  source?:     string
   isNew?:      boolean
   actionable?: boolean
   location?:   string

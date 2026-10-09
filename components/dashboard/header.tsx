@@ -1,92 +1,79 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AlertTriangle, ShieldCheck, ExternalLink } from "lucide-react"
+import useSWR from "swr"
+import { AlertTriangle, ShieldCheck, ExternalLink, Map, FileWarning } from "lucide-react"
 import Image from "next/image"
-import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-import type { Incident } from "@/lib/types"
+import { fetcher } from "@/lib/api"
 
-interface DashboardHeaderProps {
-  incidents?: Incident[]
-  onSelectIncident?: (incident: Incident) => void
-}
+const NAV_LINKS = [
+  { href: "/reportar",  label: "Reporte ciudadano", icon: FileWarning },
+  { href: "/mapa",      label: "Mapa público",      icon: Map },
+  { href: "/auditoria", label: "Auditoría",         icon: ShieldCheck },
+]
 
-export function DashboardHeader({ incidents = [] }: DashboardHeaderProps) {
+export function DashboardHeader() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
+  const { data: analytics } = useSWR<{ criticalCount: number; highCount: number }>("/api/analytics", fetcher, { refreshInterval: 10_000 })
 
   useEffect(() => {
     setCurrentTime(new Date())
-    const interval = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
-
+    const interval = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(interval)
   }, [])
 
-  // Real count: critical + high incidents (no fake random accumulation)
-  const criticalCount = incidents.filter(
-    (i) => i.severity === "critical" || i.severity === "high",
-  ).length
+  const criticalCount = (analytics?.criticalCount ?? 0) + (analytics?.highCount ?? 0)
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur-md">
       {/* Left: brand */}
-      <div className="flex items-center gap-2.5 min-w-0">
+      <div className="flex min-w-0 items-center gap-3">
         <Link href="/" aria-label="Zntinel, centro de control">
-          <Image src="/zntinel-logo-optimized.png" alt="Zntinel" width={135} height={83} className="h-11 w-auto object-contain" priority />
+          <Image src="/zntinel-logo-optimized.png" alt="Zntinel" width={135} height={83} className="h-10 w-auto object-contain" priority />
         </Link>
-        <span className="hidden text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:block">Centro de control · Tucumán</span>
+        <div className="hidden h-6 w-px bg-border sm:block" />
+        <div className="hidden leading-tight sm:block">
+          <p className="text-[12px] font-semibold tracking-tight text-foreground">Centro de control</p>
+          <p className="text-[10px] text-muted-foreground">San Miguel de Tucumán</p>
+        </div>
       </div>
 
-      {/* Right: actions + status */}
+      {/* Right: status + navigation */}
       <div className="flex items-center gap-2">
-        {/* Critical incidents chip — real data, clickable filter target */}
         {criticalCount > 0 && (
-          <Badge
-            variant="outline"
-            className="hidden h-7 items-center gap-1.5 border-red-500/30 bg-red-500/10 px-2.5 font-mono text-[10px] font-semibold text-red-400 md:flex"
-          >
+          <span className="hidden h-7 items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 font-mono text-[10px] font-semibold text-red-400 md:flex">
             <AlertTriangle className="h-3 w-3" />
-            {criticalCount} CRITICAL
-          </Badge>
+            {criticalCount} PRIORITARIOS
+          </span>
         )}
 
-        {/* Links unified: same shape, differentiated by accent color only */}
-        <Link
-          href="/reportar"
-          target="_blank"
-          className="flex h-7 items-center gap-1.5 rounded-md border border-indigo-500/25 bg-indigo-500/10 px-2.5 text-[11px] font-semibold text-indigo-300 transition-colors hover:bg-indigo-500/20"
-        >
-          <ShieldCheck className="h-3 w-3" />
-          ZK Report
-          <ExternalLink className="h-2.5 w-2.5 opacity-50" />
-        </Link>
+        <nav className="hidden items-center rounded-md border border-border bg-secondary/30 p-0.5 md:flex">
+          {NAV_LINKS.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              target="_blank"
+              className="group flex h-6 items-center gap-1.5 rounded px-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <Icon className="h-3 w-3" />
+              {label}
+              <ExternalLink className="h-2.5 w-2.5 opacity-0 transition-opacity group-hover:opacity-50" />
+            </Link>
+          ))}
+        </nav>
 
-        <Link
-          href="/auditoria"
-          target="_blank"
-          className="flex h-7 items-center gap-1.5 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2.5 text-[11px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/20"
-        >
-          <ShieldCheck className="h-3 w-3" />
-          Audit
-          <ExternalLink className="h-2.5 w-2.5 opacity-50" />
-        </Link>
-
-        <Link href="/admin" className="hidden text-xs text-zinc-400 hover:text-white md:block">Admin</Link>
-        <Link href="/mapa" target="_blank" className="hidden text-xs text-zinc-400 hover:text-white md:block">Mapa público</Link>
-
-        {/* Live clock — telemetry feel */}
         {currentTime && (
-          <div className="hidden h-7 items-center gap-1.5 rounded-md border border-border bg-secondary/40 px-2.5 font-mono text-[10px] tabular-nums text-foreground/80 lg:flex">
+          <div className="hidden h-7 items-center gap-1.5 rounded-md border border-border bg-secondary/30 px-2.5 font-mono text-[10px] tabular-nums text-foreground/80 lg:flex">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 animate-pulse" />
-            {currentTime.toLocaleString("en-GB", {
+            {currentTime.toLocaleString("es-AR", {
               day: "2-digit",
               month: "2-digit",
               hour: "2-digit",
               minute: "2-digit",
               second: "2-digit",
-            })} UTC-3
+              hour12: false,
+            })}
           </div>
         )}
       </div>
