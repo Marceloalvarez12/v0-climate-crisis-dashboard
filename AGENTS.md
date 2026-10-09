@@ -25,7 +25,7 @@ npm run lint     # ESLint check
 
 ## Dev Mode
 
-In local development only, append `?dev=true` to enable the simulation control panel (bottom-left corner). It has a social post composer (Facebook/Instagram/X), injects citizen ZK reports, and toggles the simulated social feed. The panel is unavailable in production and simulated social mentions are rejected outside development.
+In local development only, append `?dev=true` to enable the simulation control panel (bottom-left corner). It has a social post composer (Facebook/Instagram/X), injects citizen ZK reports, and toggles the simulated social feed. The panel is unavailable in production and simulated social mentions are rejected outside development. Existing `simulated: true` incidents ARE shown in every environment (production included); `isNonReportIncident` only hides USGS/EONET rows.
 
 ## Social Hashtag Trigger
 

@@ -340,7 +340,7 @@ export default function ReportarPage() {
             Volver al mapa
           </a>
           <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-zinc-300">
-            <Image src="/zntinel-logo-optimized.png" alt="Zntinel" width={105} height={64} className="h-10 w-auto object-contain" priority />
+            <Image src="/zntinel-logo-trimmed.png" alt="Zntinel" width={382} height={141} className="h-10 w-auto object-contain" priority />
             <span className="hidden font-normal text-zinc-500 sm:inline">/ PORTAL CIUDADANO</span>
           </div>
         </div>

@@ -30,7 +30,7 @@ export function DashboardHeader() {
       {/* Left: brand */}
       <div className="flex min-w-0 items-center gap-3">
         <Link href="/" aria-label="Zntinel, centro de control">
-          <Image src="/zntinel-logo-optimized.png" alt="Zntinel" width={135} height={83} className="h-10 w-auto object-contain" priority />
+          <Image src="/zntinel-logo-trimmed.png" alt="Zntinel" width={382} height={141} className="h-11 w-auto object-contain" priority />
         </Link>
         <div className="hidden h-6 w-px bg-border sm:block" />
         <div className="hidden leading-tight sm:block">

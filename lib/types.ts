@@ -121,9 +121,8 @@ export interface DbIncident {
 }
 
 export function isNonReportIncident(incident: Pick<DbIncident, "fuente" | "fuente_detalles">): boolean {
-  return (incident.fuente === "sensor" &&
-    (incident.fuente_detalles?.source_api === "usgs" || incident.fuente_detalles?.source_api === "eonet")) ||
-    (process.env.NODE_ENV !== "development" && incident.fuente_detalles?.simulated === true)
+  return incident.fuente === "sensor" &&
+    (incident.fuente_detalles?.source_api === "usgs" || incident.fuente_detalles?.source_api === "eonet")
 }
 
 export interface DbResource {
