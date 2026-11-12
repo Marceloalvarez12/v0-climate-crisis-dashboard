@@ -240,7 +240,7 @@ export function IncidentDetailModal({
                   <span className="text-base">{incident.location}</span>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs font-normal text-muted-foreground">
-                      {incidentTypeLabel(incident.type)} — Severity {incidentSeverityLabel(incident.severity)}
+                      {incidentTypeLabel(incident.type)} — Severidad {incidentSeverityLabel(incident.severity)}
                     </span>
                     {pendingConfirmation && (
                       <Badge className="bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500/20 text-[9px] px-1.5 py-0 border border-yellow-500/30 animate-pulse">
@@ -249,7 +249,7 @@ export function IncidentDetailModal({
                     )}
                     {incident.estado === "atendido" && !pendingConfirmation && (
                       <Badge className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25 text-[9px] px-1.5 py-0 border border-emerald-500/30">
-                        Attended & Audited
+                        Atendido
                       </Badge>
                     )}
                     {incident.estado === "activo" && (

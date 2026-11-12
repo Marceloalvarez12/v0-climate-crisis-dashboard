@@ -56,6 +56,7 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
       format: "jsonv2",
     })
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`, {
+      signal: AbortSignal.timeout(5000),
       headers: {
         "User-Agent": "Zntinel-Dashboard/1.0 (crisis reporting)",
         "Accept-Language": "es",
@@ -112,6 +113,7 @@ export function LocationPickerMap({ initial, onChange, height = 260 }: LocationP
     initial?.lng ?? CENTER[1],
   ])
   const [resolving, setResolving] = useState(false)
+  const requestRef = useRef(0)
 
   // Notificar al padre el valor inicial
   useEffect(() => {
@@ -122,9 +124,12 @@ export function LocationPickerMap({ initial, onChange, height = 260 }: LocationP
   }, [])
 
   async function updateAt(lat: number, lng: number) {
+    const request = ++requestRef.current
     setPosition([lat, lng])
     setResolving(true)
+    onChange({ lat, lng, nombre: "Ubicación elegida en el mapa" })
     const nombre = await reverseGeocode(lat, lng)
+    if (request !== requestRef.current) return
     setResolving(false)
     onChange({ lat, lng, nombre })
   }

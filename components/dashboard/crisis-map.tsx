@@ -44,10 +44,10 @@ const INCIDENT_TYPES: Array<{ value: IncidentType; label: string }> = [
 ]
 
 const SEVERITY_LEGENDS = [
-  { label: "Critical", color: "bg-primary" },
-  { label: "High",     color: "bg-accent" },
-  { label: "Medium",   color: "bg-yellow-500" },
-  { label: "Low",      color: "bg-success" },
+  { label: "Crítica", color: "bg-primary" },
+  { label: "Alta",     color: "bg-accent" },
+  { label: "Media",   color: "bg-yellow-500" },
+  { label: "Baja",      color: "bg-success" },
 ]
 
 // ---------------------------------------------------------------------------
@@ -221,13 +221,13 @@ export function CrisisMap() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="relative flex h-full w-full flex-col overflow-visible rounded-lg lg:overflow-hidden border border-border bg-card">
+    <div className="relative flex h-full w-full flex-col overflow-visible rounded-lg lg:overflow-hidden border border-[#30373c] bg-[#0f1417] shadow-[0_8px_24px_rgba(0,0,0,.16)]">
       {/* ── Map header ─────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-[1000] flex min-h-12 w-full shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-border bg-card px-3 py-2">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      <div className="sticky top-0 z-[1000] flex min-h-12 w-full shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-[#30373c] bg-[#12171a] px-3 py-2">
+        <div className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:flex-1">
           <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
           <h2 className="truncate text-xs font-semibold text-foreground sm:text-sm">
-            San Miguel de Tucumán — Incident Map
+            Mapa de incidentes
           </h2>
         </div>
 
@@ -263,7 +263,7 @@ export function CrisisMap() {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="h-6 gap-1 border-border px-2 text-[10px]">
                 <Layers className="h-3 w-3" />
-                Layers ({activeLayers.length})
+                Capas ({activeLayers.length})
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-56 p-3" align="end">
@@ -298,12 +298,12 @@ export function CrisisMap() {
               medium:   "border-yellow-500/50 bg-yellow-500/10 text-yellow-400",
               low:      "border-success/50 bg-success/10 text-success",
             }
-            const labelMap = { critical: "Critical", high: "High", medium: "Medium", low: "Low" }
+            const labelMap = { critical: "Crítica", high: "Alta", medium: "Media", low: "Baja" }
             return (
               <Badge
                 key={sev}
                 variant="outline"
-                className={cn("hidden text-[10px] sm:inline-flex", colorMap[sev])}
+                className={cn("hidden text-[10px] 2xl:inline-flex", colorMap[sev])}
               >
                 {severityCounts[sev]} {labelMap[sev]}
               </Badge>
@@ -325,7 +325,7 @@ export function CrisisMap() {
                   : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/20"
               )}
             >
-              Active ({viewMode === "activo" ? filteredIncidents.length : 0})
+              Activos ({viewMode === "activo" ? filteredIncidents.length : 0})
             </button>
             <button
               onClick={() => setViewMode("atendido")}
@@ -336,12 +336,12 @@ export function CrisisMap() {
                   : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/20"
               )}
             >
-              History ({viewMode === "atendido" ? filteredIncidents.length : 0})
+              Historial ({viewMode === "atendido" ? filteredIncidents.length : 0})
             </button>
           </div>
           <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-secondary/10">
             <p className="text-[9px] font-medium text-muted-foreground">
-              {viewMode === "activo" ? "Real-Time Monitoring" : "On-Chain Audit Trail"}
+              {viewMode === "activo" ? "Monitoreo simulado" : "Incidentes atendidos"}
             </p>
             {viewMode === "atendido" && (
               <label className="group flex items-center gap-1.5 rounded-md border border-accent/25 bg-accent/5 px-2 py-1 text-[9px] text-accent shadow-[0_0_14px_rgba(255,51,74,0.08)] transition-colors hover:border-accent/50 hover:bg-accent/10">
@@ -366,14 +366,14 @@ export function CrisisMap() {
             ) : (
               <Badge variant="outline" className="text-[8px] h-4 border-emerald-500/50 text-emerald-400 gap-1 px-1.5 font-mono">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                ON-CHAIN
+                HISTORIAL
               </Badge>
             )}
           </div>
         </div>
         <div className="overflow-y-auto max-h-48 p-2 space-y-1.5 custom-scrollbar md:max-h-[350px]">
           {filteredIncidents.length === 0 ? (
-            <p className="text-[10px] text-muted-foreground text-center py-4">No incidents to display</p>
+            <p className="text-[10px] text-muted-foreground text-center py-4">No hay incidentes para mostrar</p>
           ) : (
             filteredIncidents.map((incident) => (
               <button
@@ -405,7 +405,7 @@ export function CrisisMap() {
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-[7px] h-3 px-1 border-emerald-500/30 text-emerald-400 font-mono shrink-0">
-                            ON-CHAIN
+                            ATENDIDO
                           </Badge>
                         )
                       )}
@@ -414,7 +414,7 @@ export function CrisisMap() {
                       <Badge variant="outline" className="text-[9px] h-4 px-1">
                         {incidentTypeLabel(incident.type)}
                       </Badge>
-                      <span className="text-[9px] text-muted-foreground">{incident.affectedPeople} affected</span>
+                      <span className="text-[9px] text-muted-foreground">{incident.affectedPeople} afectados</span>
                     </div>
                   </div>
                 </div>
@@ -437,14 +437,14 @@ export function CrisisMap() {
         <div className="flex h-[min(70vh,680px)] min-h-[420px] w-full shrink-0 items-center justify-center bg-secondary/20 md:h-[min(70vh,680px)] md:flex-none lg:h-auto lg:min-h-0 lg:flex-1 lg:shrink">
           <div className="flex flex-col items-center gap-2">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="text-sm text-muted-foreground">Loading map...</p>
+            <p className="text-sm text-muted-foreground">Cargando mapa...</p>
           </div>
         </div>
       )}
 
       {/* ── Legend ──────────────────────────────────────────────────── */}
       <div className="absolute bottom-3 left-3 z-[1000] hidden rounded-md border border-border bg-card/95 p-2 backdrop-blur-sm md:block">
-        <p className="mb-1.5 text-[10px] font-medium text-muted-foreground">Severity</p>
+        <p className="mb-1.5 text-[10px] font-medium text-muted-foreground">Severidad</p>
         <div className="flex flex-col gap-1">
           {SEVERITY_LEGENDS.map(({ label, color }) => (
             <div key={label} className="flex items-center gap-1.5">

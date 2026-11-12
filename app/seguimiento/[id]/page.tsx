@@ -6,7 +6,8 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, ArrowLeft, ShieldCheck, ShieldAlert, Clock, MapPin, ExternalLink, Radio, CheckCircle2, Copy } from "lucide-react"
+import { Loader2, ShieldCheck, ShieldAlert, Clock, MapPin, ExternalLink, CheckCircle2, Copy } from "lucide-react"
+import { PageHeader } from "@/components/shared/page-header"
 import { toast } from "sonner"
 import type { DbIncident } from "@/lib/types"
 
@@ -36,8 +37,9 @@ export default function SeguimientoPage() {
   const params = useParams()
   const id = params.id as string
 
-  const [incident, setIncident] = useState<DbIncident | null>(null)
+  const [incident, setIncident] = useState<(DbIncident & { atencion?: "pendiente" | "en_camino" | "en_atencion" | "atendido" }) | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [copiedId, setCopiedId] = useState(false)
 
   useEffect(() => {
@@ -49,14 +51,16 @@ export default function SeguimientoPage() {
         if (!res.ok) {
           if (res.status === 404) {
             setIncident(null)
+            setLoadError(false)
             return
           }
           throw new Error("Error al consultar el reporte")
         }
         const json = await res.json()
         setIncident(json)
+        setLoadError(false)
       } catch {
-        toast.error("No se pudo cargar el seguimiento")
+        setLoadError(true)
       } finally {
         setLoading(false)
       }
@@ -80,13 +84,9 @@ export default function SeguimientoPage() {
     return (
       <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-zinc-400 px-4 text-center gap-4">
         <ShieldAlert className="h-12 w-12 text-red-400" />
-        <h1 className="text-xl font-bold text-white">Reporte no encontrado</h1>
-        <p className="text-sm max-w-md">El ID de seguimiento no corresponde a ningún incidente registrado.</p>
-        <Link href="/reportar">
-          <Button variant="outline" className="border-zinc-700 text-zinc-300 hover:text-white">
-            Volver a reportar
-          </Button>
-        </Link>
+        <h1 className="text-xl font-bold text-white">{loadError ? "No se pudo cargar el seguimiento" : "Reporte no encontrado"}</h1>
+        <p className="text-sm max-w-md">{loadError ? "Revisá la conexión y volvé a intentarlo." : "El código de seguimiento no corresponde a ningún incidente registrado."}</p>
+        {loadError ? <Button variant="outline" onClick={() => window.location.reload()}>Reintentar</Button> : <Button variant="outline" asChild><Link href="/reportar">Volver a reportar</Link></Button>}
       </div>
     )
   }
@@ -133,29 +133,21 @@ export default function SeguimientoPage() {
   const statusSteps = [
     { label: "Reporte recibido", done: true },
     { label: "Verificación ZK", done: !!audit.stellarZk?.verified },
-    { label: "En atención", done: incident.estado !== "activo" },
-    { label: "Despacho auditado", done: !!audit.arkivDispatch },
+    { label: "Recurso asignado", done: ["en_camino", "en_atencion", "atendido"].includes(incident.atencion ?? "") },
+    { label: "Atención finalizada", done: incident.estado === "atendido" },
   ]
+  const typeLabels: Record<string, string> = { flood: "Inundación", fire: "Incendio", storm: "Tormenta", accident: "Accidente", looting: "Saqueo", violence: "Violencia", general: "Otra emergencia" }
+  const severityLabels: Record<string, string> = { critical: "Crítica", high: "Alta", medium: "Media", low: "Baja" }
+  const statusLabels: Record<string, string> = { pendiente: "Esperando asignación", en_camino: "Recurso en camino", en_atencion: "En atención", atendido: "Atendido" }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-900 via-neutral-950 to-black text-foreground antialiased">
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
-      <header className="relative border-b border-zinc-800/80 bg-zinc-950/60 backdrop-blur-md px-4 py-4 md:px-6">
-        <div className="mx-auto max-w-4xl flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-xs font-semibold text-zinc-400 hover:text-white transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Volver al Centro de Control</span>
-            <span className="sm:hidden">Inicio</span>
-          </Link>
-          <div className="flex items-center gap-1.5 font-mono text-[10px] text-zinc-500">
-            <Radio className="h-3 w-3 text-emerald-400 animate-pulse" />
-            SEGUIMIENTO EN VIVO
-          </div>
-        </div>
-      </header>
+      <PageHeader title="Seguimiento ciudadano" backHref="/mapa" backLabel="Volver al mapa" />
 
       <main className="relative mx-auto max-w-3xl px-4 py-8 md:px-6 md:py-10">
+        {loadError && <p role="alert" className="mb-4 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-200">No se pudo actualizar el estado. Mostramos la última información disponible y volveremos a intentar.</p>}
         <div className="text-center space-y-3 mb-8">
           <Badge className="bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/15 border-indigo-500/20 text-xs px-3 py-1 font-mono uppercase tracking-wider">
             Reporte Ciudadano ZK
@@ -175,8 +167,7 @@ export default function SeguimientoPage() {
             </button>
           </div>
           <p className="text-[10px] text-zinc-500 max-w-md mx-auto">
-            Guardá este ID y el hash de Stellar más abajo: son tu comprobante para auditar el reporte
-            y ver si fue contestado por el centro de control.
+            Guardá este código para consultar la evolución de tu reporte.
           </p>
         </div>
 
@@ -221,12 +212,12 @@ export default function SeguimientoPage() {
             <div className="grid grid-cols-2 gap-4 text-xs">
               <div>
                 <p className="text-zinc-500 uppercase tracking-wider text-[10px]">Tipo</p>
-                <p className="text-zinc-200 font-semibold capitalize">{incident.tipo}</p>
+                <p className="text-zinc-200 font-semibold">{typeLabels[incident.tipo] ?? incident.tipo}</p>
               </div>
               <div>
                 <p className="text-zinc-500 uppercase tracking-wider text-[10px]">Severidad</p>
                 <Badge className={`text-[10px] ${severityColor[incident.severidad] || severityColor.medium}`}>
-                  {incident.severidad.toUpperCase()}
+                  {severityLabels[incident.severidad] ?? incident.severidad}
                 </Badge>
               </div>
               <div>
@@ -235,7 +226,7 @@ export default function SeguimientoPage() {
               </div>
               <div>
                 <p className="text-zinc-500 uppercase tracking-wider text-[10px]">Estado</p>
-                <p className="text-zinc-200 font-semibold capitalize">{incident.estado}</p>
+                <p className="text-zinc-200 font-semibold">{statusLabels[incident.atencion ?? "pendiente"]}</p>
               </div>
             </div>
           </CardContent>
@@ -255,7 +246,7 @@ export default function SeguimientoPage() {
                 <>
                   <p className="text-zinc-300">
                     {audit.stellarZk.verified
-                      ? "Proof Groth16 verificado. La ubicación del reportante está dentro de la zona de riesgo oficial."
+                      ? "La prueba Groth16 confirma que la ubicación está dentro de la zona habilitada para esta demostración."
                       : "Verificación pendiente o fallida."}
                   </p>
                   {!audit.stellarZk.onChain ? (
@@ -337,10 +328,7 @@ export default function SeguimientoPage() {
         <div className="mt-8 text-center">
           <p className="text-[10px] text-zinc-500">
             Esta página se actualiza automáticamente cada 10 segundos.
-            Con el ID y el hash podés auditar tu reporte en{" "}
-            <Link href={`/auditoria?key=${incident.id}`} className="text-emerald-500 hover:text-emerald-400">
-              Auditoría
-            </Link>.
+            {audit.arkivDispatch?.entityKey && <> Consultá el registro confirmado en <Link href={`/auditoria?key=${encodeURIComponent(audit.arkivDispatch.entityKey)}`} className="text-emerald-500 hover:text-emerald-400">Auditoría Arkiv</Link>.</>}
           </p>
         </div>
       </main>

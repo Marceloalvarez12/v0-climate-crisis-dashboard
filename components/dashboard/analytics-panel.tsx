@@ -64,26 +64,26 @@ export function AnalyticsPanel() {
   const trendValue = !d
     ? "—"
     : d.incidentsTrend === null
-      ? "Stable"
+      ? "Sin datos"
       : d.incidentsTrend > 0
         ? `+${d.incidentsTrend}%`
         : d.incidentsTrend < 0
           ? `${d.incidentsTrend}%`
-          : "Stable"
+          : "Estable"
 
   const metrics: Metric[] = [
     {
       id: "risk",
-      label: "Risk Level",
+      label: "Nivel de riesgo",
       // Show LOW when active but no critical/high, show — when no data yet
-      value: !d || d.activeIncidentCount === 0 ? "NO INCIDENTS" : d.riskLevel,
+      value: !d || d.activeIncidentCount === 0 ? "SIN INCIDENTES" : ({ LOW: "BAJO", "LOW-MEDIUM": "BAJO–MEDIO", MEDIUM: "MEDIO", HIGH: "ALTO", CRITICAL: "CRÍTICO" } as Record<string, string>)[d.riskLevel] ?? d.riskLevel,
       icon: <AlertTriangle className="h-4 w-4" />,
       color: riskColor,
       progress: d?.activeIncidentCount === 0 ? 0 : d?.riskProgress,
     },
     {
       id: "affected",
-      label: "Affected People",
+      label: "Personas afectadas",
       value: d ? d.affectedNow.toLocaleString("en-US") : "—",
       // Only show change badge if it's non-zero (real comparison exists)
       change: d?.affectedChange !== 0 ? d?.affectedChange : undefined,
@@ -92,15 +92,15 @@ export function AnalyticsPanel() {
     },
     {
       id: "response",
-      label: "Response Time",
+      label: "Tiempo de respuesta",
       value: responseValue,
       icon: <Clock className="h-4 w-4" />,
       color: d?.avgResponseMin != null ? "success" : "muted",
-      sublabel: "avg. last 50 incidents",
+      sublabel: "promedio últimos 50 incidentes",
     },
     {
       id: "incidents",
-      label: "Active Incidents",
+      label: "Incidentes activos",
       value: d?.activeIncidentCount ?? "—",
       change: d?.incidentsTrend != null && d.incidentsTrend !== 0 ? d.incidentsTrend : undefined,
       icon: <Activity className="h-4 w-4" />,
@@ -109,32 +109,32 @@ export function AnalyticsPanel() {
       sublabel: d && d.activeIncidentCount > 0
         ? [
             d.criticalCount > 0  ? `${d.criticalCount} crit` : null,
-            d.highCount > 0      ? `${d.highCount} high` : null,
+            d.highCount > 0      ? `${d.highCount} alta` : null,
             d.mediumCount > 0    ? `${d.mediumCount} med` : null,
-            d.lowCount > 0       ? `${d.lowCount} low` : null,
-            d.citizenCount > 0   ? `${d.citizenCount} citizen` : null,
+            d.lowCount > 0       ? `${d.lowCount} baja` : null,
+            d.citizenCount > 0   ? `${d.citizenCount} ciudadano` : null,
           ].filter(Boolean).join(" · ") || undefined
         : undefined,
     },
     {
       id: "citizen",
-      label: "Citizen Reports",
+      label: "Reportes ciudadanos",
       value: d?.citizenCount ?? "—",
       icon: <RadioTower className="h-4 w-4" />,
       color: d && d.citizenCount > 0 ? "accent" : "muted",
     },
     {
       id: "resources",
-      label: "Deployed Resources",
+      label: "Recursos desplegados",
       value: d ? `${d.deployedResources}/${d.totalResources}` : "—",
       icon: <Shield className="h-4 w-4" />,
       color: d && d.deployedResources > 0 ? "accent" : "muted",
       progress: d?.resourceProgress,
-      sublabel: d && d.enCamino > 0 ? `${d.enCamino} en route` : undefined,
+      sublabel: d && d.enCamino > 0 ? `${d.enCamino} en camino` : undefined,
     },
     {
       id: "trend",
-      label: "24h Trend",
+      label: "Tendencia 24 h",
       value: trendValue,
       icon: d?.incidentsTrend != null && d.incidentsTrend < 0
         ? <TrendingDown className="h-4 w-4" />
@@ -172,12 +172,12 @@ export function AnalyticsPanel() {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-4 py-2">
-        <h2 className="text-sm font-semibold text-foreground">Real-Time Analytics</h2>
+    <div className="rounded-lg border border-[#30373c] bg-[#0f1417] shadow-[0_8px_24px_rgba(0,0,0,.12)]">
+      <div className="flex items-center justify-between border-b border-[#30373c] px-4 py-2">
+        <h2 className="text-sm font-semibold text-foreground">Indicadores de la simulación</h2>
         <div className="flex items-center gap-1.5">
           <div className={cn("h-1.5 w-1.5 rounded-full", d ? "bg-success animate-pulse" : "bg-muted-foreground")} />
-          <span className="text-[10px] text-muted-foreground">{d ? "Live" : "Loading..."}</span>
+          <span className="text-[10px] text-muted-foreground">{d ? "Actualizado" : "Cargando..."}</span>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
@@ -185,7 +185,7 @@ export function AnalyticsPanel() {
           <div
             key={metric.id}
             className={cn(
-              "rounded-lg border p-3 transition-all hover:scale-[1.02]",
+              "min-w-0 rounded-md border p-2.5 transition-colors hover:brightness-125",
               getColorClasses(metric.color)
             )}
           >
@@ -204,8 +204,8 @@ export function AnalyticsPanel() {
               )}
             </div>
             <div className="mt-2">
-              <p className="text-lg font-bold leading-none tabular-nums">{metric.value}</p>
-              <p className="mt-1 text-[10px] opacity-70">{metric.label}</p>
+              <p className="break-words text-base font-bold leading-tight tabular-nums">{metric.value}</p>
+              <p className="mt-1 text-[10px] leading-tight opacity-80">{metric.label}</p>
               {"sublabel" in metric && metric.sublabel && (
                 <p className="mt-0.5 text-[9px] opacity-50">{metric.sublabel}</p>
               )}

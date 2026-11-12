@@ -7,8 +7,7 @@ import { ResourcesPanel } from "@/components/dashboard/resources-panel"
 import { CrisisMap } from "@/components/dashboard/crisis-map"
 import { AnalyticsPanel } from "@/components/dashboard/analytics-panel"
 import { BroadcastPanel } from "@/components/dashboard/broadcast-panel"
-import { DevPanel } from "@/components/dashboard/dev-panel"
-import { Suspense } from "react"
+import { SimulationControls, SimulationTimeline } from "@/components/dashboard/simulation-controls"
 import { Map, Bot, Shield, BarChart2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { mutate } from "swr"
@@ -16,10 +15,10 @@ import { mutate } from "swr"
 type MobileTab = "map" | "agent" | "resources" | "analytics"
 
 const MOBILE_TABS: { id: MobileTab; label: string; icon: React.ReactNode }[] = [
-  { id: "map",       label: "Map",       icon: <Map className="h-5 w-5" /> },
-  { id: "agent",     label: "AI Agent",  icon: <Bot className="h-5 w-5" /> },
-  { id: "resources", label: "Resources", icon: <Shield className="h-5 w-5" /> },
-  { id: "analytics", label: "Analytics", icon: <BarChart2 className="h-5 w-5" /> },
+  { id: "map",       label: "Mapa",       icon: <Map className="h-5 w-5" /> },
+  { id: "agent",     label: "Actividad",  icon: <Bot className="h-5 w-5" /> },
+  { id: "resources", label: "Recursos", icon: <Shield className="h-5 w-5" /> },
+  { id: "analytics", label: "Indicadores", icon: <BarChart2 className="h-5 w-5" /> },
 ]
 
 export default function CrisisDashboard() {
@@ -41,22 +40,19 @@ export default function CrisisDashboard() {
   }, [])
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-background">
-      <Suspense fallback={null}>
-        <DevPanel />
-      </Suspense>
-
+    <div className="flex h-[100dvh] flex-col bg-[#080b0d]">
       <DashboardHeader />
+      <SimulationControls />
 
       {/* ── DESKTOP layout (lg+) ── */}
       <div className="hidden lg:flex flex-1 overflow-hidden">
-        {/* Left sidebar — AI Activity */}
-        <aside className="w-72 shrink-0 border-r border-border p-3 overflow-hidden">
+        {/* Agent monitoring */}
+        <aside className="w-72 shrink-0 overflow-hidden border-r border-[#252b30] p-3 xl:w-80">
           <AIActivityLog />
         </aside>
 
         {/* Center — Map + Analytics */}
-        <main className="flex flex-1 flex-col gap-3 overflow-hidden p-3">
+        <main className="flex min-w-0 flex-1 flex-col gap-3 overflow-hidden p-3">
           <div className="flex-1 min-h-0">
             <CrisisMap />
           </div>
@@ -66,8 +62,9 @@ export default function CrisisDashboard() {
         </main>
 
         {/* Right sidebar — Resources + Broadcast */}
-        <aside className="hidden w-80 shrink-0 border-l border-border p-3 xl:block overflow-y-auto">
+        <aside className="hidden w-72 shrink-0 border-l border-[#252b30] p-3 lg:block xl:w-80 overflow-y-auto">
           <div className="space-y-3">
+            <SimulationTimeline />
             <ResourcesPanel />
             <BroadcastPanel />
           </div>
@@ -86,10 +83,11 @@ export default function CrisisDashboard() {
           )}
 
           {activeTab === "agent" && (
-            <div className="h-full p-3">
-              <div className="h-[calc(100dvh-8rem)] rounded-lg overflow-hidden">
+            <div className="h-full space-y-3 p-3">
+              <div className="h-[min(70dvh,38rem)] min-h-[24rem]">
                 <AIActivityLog />
               </div>
+              <SimulationTimeline />
             </div>
           )}
 

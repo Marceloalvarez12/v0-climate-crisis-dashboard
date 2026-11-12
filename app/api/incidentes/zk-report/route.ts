@@ -123,6 +123,15 @@ export async function POST(request: NextRequest): Promise<Response> {
       },
     })
 
+    // The citizen form is also a direct entry point to the demo.
+    // A temporary monitoring failure must never invalidate a saved report.
+    try {
+      const { demoStatus } = await import("@/lib/services/demo-simulation")
+      await demoStatus()
+    } catch (error) {
+      console.error("[ZK Report] Monitor unavailable:", error)
+    }
+
     // ── Enviar hash + link de auditoría por email ──
     // El mail es conveniencia: si falla, el reporte ya existe y el front
     // muestra el hash de todas formas. Esperamos hasta 5s para poder
@@ -136,7 +145,7 @@ export async function POST(request: NextRequest): Promise<Response> {
           incidentId: incident.id,
           txHash: auditWithDispatch.txHash,
           onChain: auditWithDispatch.onChain,
-          auditUrl: auditWithDispatch.txHash ? `${origin}/auditoria?key=${auditWithDispatch.txHash}` : undefined,
+          auditUrl: auditWithDispatch.onChain ? auditWithDispatch.explorerUrl : undefined,
           trackingUrl: `${origin}/seguimiento/${incident.id}`,
           tipo: params.tipo,
           severidad: params.severidad,

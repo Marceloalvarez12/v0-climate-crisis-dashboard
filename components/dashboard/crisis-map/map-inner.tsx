@@ -39,7 +39,7 @@ const TILE_CONFIGS: Record<TileStyle, TileConfig> = {
       // pines de incidentes. Equivalente dark-matter sin watermark.
       url: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
       attribution: "Tiles © Esri — Esri, GARMIN, FAO, NOAA, USGS",
-      filter: "brightness(0.48) contrast(1.2) saturate(0.8)",
+      filter: "brightness(0.6) contrast(1.1) saturate(0.9)",
       maxZoom: 16,
     },
   topo: {
@@ -105,7 +105,7 @@ export function MapInner({ incidents, onMarkerClick, tileStyle = "street", focus
   }, [tileStyle, config.url, config.attribution, config.filter])
 
   const containerStyle = `${LEAFLET_DARK_STYLES}
-    ${activeFilter ? `.leaflet-container { filter: ${activeFilter}; }` : ""}
+    ${activeFilter ? `.leaflet-tile-pane { filter: ${activeFilter}; }` : ""}
     .incident-map-popup .leaflet-popup-content-wrapper,
     .incident-map-popup .leaflet-popup-tip {
       background: #080b0d;

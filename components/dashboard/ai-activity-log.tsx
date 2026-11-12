@@ -6,7 +6,6 @@ import { Bot, CheckCircle2, Hash } from "lucide-react"
 import useSWR from "swr"
 import { cn } from "@/lib/utils"
 import { dispatchResourceWithLifecycle } from "@/hooks/use-resource-lifecycle"
-import { useAutoResolve } from "@/hooks/use-auto-resolve"
 import { patchIncidente, fetcher } from "@/lib/api"
 import { TRIGGER_HASHTAG } from "@/lib/agents/hashtag"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -66,6 +65,8 @@ const formatTime = (date: Date) =>
 export function AIActivityLog() {
   const [activities,          setActivities]         = useState<ActivityItem[]>(initialActivities)
   const { data: activeIncidents } = useSWR<DbIncident[]>("/api/incidentes?estado=activo", fetcher, { refreshInterval: 5000 })
+  const { data: simulation } = useSWR<{ running: boolean; assignments: Array<{ incidentId: string }> }>("/api/simulacion", fetcher, { refreshInterval: 2000 })
+  const isRunning = simulation?.running === true
   const [confirmDialog,       setConfirmDialog]       = useState<{ open: boolean; type: "deploy" | "notify"; activity: ActivityItem | null }>({ open: false, type: "deploy", activity: null })
   const [processedAlerts,     setProcessedAlerts]     = useState<Set<string>>(new Set())
   const [expandedReasoning,   setExpandedReasoning]   = useState<Set<string>>(new Set())
@@ -81,15 +82,6 @@ export function AIActivityLog() {
     setActivities((prev) => [...prev.slice(-20), makeActivity(template)])
   }, [])
 
-  // ── Auto-resolve incidentes viejos + auto-reset recursos atascados ───────
-  useAutoResolve({
-    onResolved: (locations) => {
-      locations.forEach((loc) => {
-        addActivity({ type: "complete", source: "Sistema", message: `Incidente en ${loc} cerrado automáticamente (5 min sin atención)` })
-      })
-    },
-  })
-
   const { mutate } = useSWRConfig()
 
   // ── Actividad de reportes reales ──────────────────────────────────────────
@@ -102,22 +94,24 @@ export function AIActivityLog() {
 
   // ── Loop de mensajes de fondo (monitoring, extraction, etc.) ─────────────
   useEffect(() => {
+    if (!isRunning) return
     const interval = setInterval(() => {
       const template = backgroundMessages[messageIndexRef.current % backgroundMessages.length]
       addActivity(template)
       messageIndexRef.current += 1
-    }, 8000)
+    }, 1000)
     return () => clearInterval(interval)
-  }, [addActivity])
+  }, [addActivity, isRunning])
 
   // ── Telemetría del agente (contador de señales + tarea actual) ───────────
   useEffect(() => {
+    if (!isRunning) return
     const interval = setInterval(() => {
       setSignalCount((n) => n + Math.floor(Math.random() * 6) + 1)
       setTaskIndex((i) => (i + 1) % agentTasks.length)
-    }, 3000)
+    }, 1000)
     return () => clearInterval(interval)
-  }, [])
+  }, [isRunning])
 
   // ── Auto-scroll ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -130,7 +124,7 @@ export function AIActivityLog() {
     return values.length ? Math.round(values.reduce((s, v) => s + v, 0) / values.length) : 0
   }, [activities])
 
-  const pendingAlerts = activities.filter(a => a.type === "alert" && a.actionable && !processedAlerts.has(a.id)).length
+  const pendingAlerts = activities.filter(a => a.type === "alert" && a.actionable && !processedAlerts.has(a.id) && activeIncidents?.some(i => i.id === a.incidentId) && !simulation?.assignments.some(assignment => assignment.incidentId === a.incidentId)).length
 
   // ── Handlers de interacción ───────────────────────────────────────────────
 
@@ -185,20 +179,20 @@ export function AIActivityLog() {
   const lastId = activities[activities.length - 1]?.id
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card">
+    <div className="flex h-full flex-col overflow-hidden rounded-lg border border-[#30313d] bg-[#0e1115] shadow-[0_8px_24px_rgba(0,0,0,.14)]">
       {/* Header */}
-      <div className="shrink-0 border-b border-border bg-gradient-to-b from-violet-500/[0.07] to-transparent px-3.5 pt-3 pb-2.5">
+      <div className="shrink-0 border-b border-[#30313d] bg-[#15141c] px-3.5 pt-3 pb-2.5">
         <div className="flex items-center gap-2.5">
           <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-violet-500/30 bg-violet-500/10">
             <Bot className="h-4 w-4 text-violet-300" />
             <span className="absolute -right-0.5 -bottom-0.5 flex h-2.5 w-2.5">
-              <span className="absolute inset-0 rounded-full bg-emerald-400 animate-pulse-ring" />
-              <span className="relative h-2.5 w-2.5 rounded-full border-2 border-card bg-emerald-400" />
+              {isRunning && <span className="absolute inset-0 rounded-full bg-emerald-400 animate-pulse-ring" />}
+              <span className={cn("relative h-2.5 w-2.5 rounded-full border-2 border-card", isRunning ? "bg-emerald-400" : "bg-slate-500")} />
             </span>
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-[13px] font-semibold leading-tight tracking-tight text-foreground">Agente IA</h2>
-            <p className="truncate text-[10px] text-muted-foreground">Monitoreo autónomo · Gran Tucumán</p>
+            <p className="text-[10px] leading-tight text-slate-300">Monitoreo simulado · Gran Tucumán</p>
           </div>
           <span className="inline-flex h-5 shrink-0 items-center gap-0.5 rounded-md border border-sky-500/30 bg-sky-500/10 px-1.5 font-mono text-[9px] text-sky-300" title="Hashtag monitoreado">
             <Hash className="h-2.5 w-2.5" />
@@ -212,32 +206,33 @@ export function AIActivityLog() {
           <Metric label="Fuentes" value="7" />
           <Metric label="Confianza" value={avgConfidence ? `${avgConfidence}%` : "—"} />
         </div>
+        <p className="mt-1.5 text-[10px] text-muted-foreground">Actividad y métricas ilustrativas; no son búsquedas reales.</p>
 
         {/* Tarea actual */}
         <div className="mt-2.5">
           <div className="flex items-center justify-between text-[10px]">
             <span key={taskIndex} className="truncate text-foreground/80 animate-in fade-in duration-500">
-              {agentTasks[taskIndex]}…
+              {isRunning ? `${agentTasks[taskIndex]}…` : "Conectando con el monitoreo"}
             </span>
             {pendingAlerts > 0 && (
               <span className="ml-2 shrink-0 font-mono text-red-400">{pendingAlerts} pendiente{pendingAlerts === 1 ? "" : "s"}</span>
             )}
           </div>
           <div className="relative mt-1.5 h-[3px] overflow-hidden rounded-full bg-violet-500/10">
-            <div className="absolute inset-y-0 w-1/3 rounded-full bg-gradient-to-r from-transparent via-violet-400 to-transparent animate-agent-scan" />
+            {isRunning && <div className="absolute inset-y-0 w-1/3 rounded-full bg-gradient-to-r from-transparent via-violet-400 to-transparent animate-agent-scan" />}
           </div>
         </div>
       </div>
 
       {/* Timeline */}
       <div className="min-h-0 flex-1 overflow-hidden">
-        <ScrollArea className="h-full custom-scrollbar" ref={scrollRef}>
+        <ScrollArea className="agent-scroll h-full custom-scrollbar" ref={scrollRef}>
           <div className="relative px-3 py-3">
             <div className="absolute top-3 bottom-3 left-[23px] w-px bg-gradient-to-b from-transparent via-border to-border" />
             <ul className="space-y-1">
               {activities.map((activity) => {
                 const isProcessed     = processedAlerts.has(activity.id)
-                const showActions     = activity.actionable && activity.type === "alert" && !isProcessed
+                const showActions     = activity.actionable && activity.type === "alert" && !isProcessed && !isRunning && activeIncidents?.some(i => i.id === activity.incidentId) && !simulation?.assignments.some(assignment => assignment.incidentId === activity.incidentId)
                 const isReasoningOpen = expandedReasoning.has(activity.id)
                 const style           = activityTypeStyle(activity.type)
 
@@ -262,7 +257,7 @@ export function AIActivityLog() {
                         </span>
                       </div>
 
-                      <p className="mt-0.5 text-[11.5px] leading-snug text-foreground/90">{activity.message}</p>
+                      <p className="mt-0.5 break-words text-[11.5px] leading-relaxed text-slate-100">{activity.message}</p>
 
                       {(activity.severity || activity.confidence) && (
                         <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -314,10 +309,10 @@ export function AIActivityLog() {
       <div className="flex shrink-0 items-center gap-2 border-t border-border px-3.5 py-2 text-[10px] text-muted-foreground">
         <span className="flex gap-0.5">
           {[0, 150, 300].map((delay) => (
-            <span key={delay} className="h-1 w-1 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: `${delay}ms` }} />
+            <span key={delay} className={cn("h-1 w-1 rounded-full bg-violet-400", isRunning && "animate-bounce")} style={{ animationDelay: `${delay}ms` }} />
           ))}
         </span>
-        Analizando en tiempo real
+        {isRunning ? "Actividad simulada en curso" : "Conectando con el sistema"}
         <span className="ml-auto font-mono text-muted-foreground/60">zntinel-reasoner</span>
       </div>
 

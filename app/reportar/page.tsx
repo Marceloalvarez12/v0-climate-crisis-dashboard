@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
-import Image from "next/image"
-import { ShieldCheck, Loader2, ArrowLeft, AlertTriangle, MapPin, Crosshair, Copy, Check, ExternalLink, Search, Navigation, FileText } from "lucide-react"
+import { ShieldCheck, Loader2, AlertTriangle, MapPin, Crosshair, Copy, Check, ExternalLink, Search, Navigation, FileText } from "lucide-react"
+import { PageHeader } from "@/components/shared/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -100,25 +100,20 @@ export default function ReportarPage() {
   } | null>(null)
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    if (!reportResult) return
-    const timer = setTimeout(() => router.replace(`/mapa?reporte=${encodeURIComponent(reportResult.incidentId)}`), 4000)
-    return () => clearTimeout(timer)
-  }, [reportResult, router])
-
   // ── Success screen: mostrar el hash ANTES de ir al seguimiento ──
   if (reportResult) {
     return (
       <div className="relative min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-900 via-neutral-950 to-black text-foreground antialiased">
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
-        <main className="relative mx-auto max-w-lg px-4 py-24 md:px-6">
+        <PageHeader title="Reporte ciudadano" backHref="/mapa" backLabel="Volver al mapa" />
+        <main className="relative mx-auto max-w-lg px-4 py-12 md:px-6">
           <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/15 p-8 text-center shadow-2xl shadow-emerald-950/10">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/20">
               <ShieldCheck className="h-7 w-7 text-emerald-400" />
             </div>
             <h1 className="text-xl font-bold text-white">Reporte recibido</h1>
             <p className="mt-1 text-xs text-emerald-300">
-              Tu reporte ya está en el mapa. Volverás automáticamente en unos segundos; guardá este comprobante para seguirlo.
+              Tu reporte fue recibido. Guardá el código de seguimiento para consultarlo cuando quieras.
             </p>
             {reportResult.mailStatus && (
               <p className="mt-2 text-[11px] text-zinc-400">
@@ -148,7 +143,7 @@ export default function ReportarPage() {
             </div>
 
             {/* ZK proof hash — siempre visible, aunque sea el tracking como fallback */}
-            <div className="mt-4 space-y-1.5 text-left">
+            {reportResult.txHash && <div className="mt-4 space-y-1.5 text-left">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400/70">
                 Comprobante digital
               </p>
@@ -172,12 +167,8 @@ export default function ReportarPage() {
                   {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
                 </button>
               </div>
-              {!reportResult.txHash && (
-                <p className="text-[9px] text-zinc-500">
-                  Guardá el código de seguimiento para consultar el estado de tu reporte.
-                </p>
-              )}
-            </div>
+            </div>}
+            {!reportResult.txHash && <p className="mt-4 text-xs text-zinc-400">La ubicación fue verificada localmente; no se registró una transacción en Stellar.</p>}
 
             {/* Links */}
             <div className="mt-5 flex flex-col gap-2">
@@ -192,16 +183,6 @@ export default function ReportarPage() {
                   Ver comprobante en Stellar
                 </a>
               )}
-              {/* Portal de auditoría de Braga — verifica el estado del reporte en cualquier momento */}
-              <a
-                href={`/auditoria?key=${reportResult.txHash || reportResult.incidentId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-xs font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20"
-              >
-                <ShieldCheck className="h-3.5 w-3.5" />
-                Consultar auditoría del reporte →
-              </a>
               <button
                 onClick={() => router.replace(`/mapa?reporte=${encodeURIComponent(reportResult.incidentId)}`)}
                 className="flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-950/30 transition-colors hover:bg-emerald-500"
@@ -279,7 +260,7 @@ export default function ReportarPage() {
       lng: Number(location.lng.toFixed(4)),
       tipo: form.get("tipo") as IncidentType,
       severidad: form.get("severidad") as IncidentSeverity,
-      ubicacion: location.nombre,
+      ubicacion: location.nombre.slice(0, 200),
       personasAfectadas: parseInt(form.get("personasAfectadas") as string) || 0,
       descripcion: (form.get("descripcion") as string) || undefined,
       contacto: ((form.get("contacto") as string) || "").trim() || undefined,
@@ -333,18 +314,7 @@ export default function ReportarPage() {
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
 
       {/* Header */}
-      <header className="relative border-b border-zinc-800/80 bg-zinc-950/60 backdrop-blur-md px-6 py-4">
-        <div className="mx-auto max-w-4xl flex items-center justify-between">
-          <a href="/mapa" className="flex items-center gap-2 text-xs font-semibold text-zinc-400 hover:text-white transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-            Volver al mapa
-          </a>
-          <div className="flex items-center gap-2 text-xs font-semibold tracking-wide text-zinc-300">
-            <Image src="/zntinel-logo-trimmed.png" alt="Zntinel" width={382} height={141} className="h-10 w-auto object-contain" priority />
-            <span className="hidden font-normal text-zinc-500 sm:inline">/ PORTAL CIUDADANO</span>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="Reporte ciudadano" backHref="/mapa" backLabel="Volver al mapa" />
 
       <main className="relative mx-auto max-w-3xl px-4 py-8 md:px-6 md:py-12">
         {/* Title section */}
@@ -359,6 +329,7 @@ export default function ReportarPage() {
             Indicá el lugar y describí la emergencia. Al enviarla volverás al mapa para verla en vivo.
             Tu dirección exacta no se mostrará en la vista pública.
           </p>
+          <p className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">Esto es una simulación: el reporte no convoca servicios de emergencia reales.</p>
         </div>
 
         {/* Form card */}

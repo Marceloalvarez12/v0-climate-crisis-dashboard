@@ -1,6 +1,6 @@
 # Climate Crisis Dashboard — Tucumán
 
-> **Build de simulación sin login.** Esta versión corre completa sin credenciales: todas las páginas y APIs son públicas y los datos viven en un store en memoria con seed (5 incidentes + 11 recursos + config del agente + perfiles demo). Si se definen `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` en `.env.local`, la misma app usa Supabase real — la selección es automática en `lib/db.ts`.
+> **Simulador sin login.** La demo usa 11 recursos de ejemplo y, sin credenciales, guarda los datos en memoria hasta que se reinicia el servidor. Con `NEXT_PUBLIC_SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` usa la base configurada: debe ser la base dedicada al simulador. Las páginas y APIs son públicas.
 
 Dashboard inteligente de gestión de emergencias climáticas en tiempo real para **San Miguel de Tucumán**, Argentina.
 
@@ -22,19 +22,17 @@ Durante una catástrofe climática las líneas de emergencia colapsan, los repor
 
 ## 🚀 Demo principal
 
-Para ver el dashboard operativo con herramientas de prueba **solo en desarrollo**:
+Instalá las dependencias con `npm ci`, ejecutá `npm run dev` y abrí:
 
 ```
-http://localhost:3000?dev=true
+http://localhost:3000
 ```
 
-El parámetro `?dev=true` activa el panel de simulación en la esquina inferior izquierda, desde donde podés:
+Al abrir el dashboard, el monitoreo comienza automáticamente: crea alertas en lugares variados y asigna un recurso apropiado si hay disponibilidad. El ciclo simula 15 segundos de viaje, 20 de atención y 10 de regreso. La bitácora muestra cada paso y el mapa se actualiza automáticamente. **Generar incidente** agrega un caso manualmente; **Reiniciar** libera recursos asignados por el motor y elimina solo sus alertas, conservando los reportes ciudadanos, y el monitoreo sigue funcionando. Las acciones manuales también se incorporan al ciclo.
 
-- Publicar posts de Facebook / Instagram / X con `#AlertaTucuman` que disparan incidentes.
-- Inyectar reportes ciudadanos ZK manualmente.
-- Iniciar/detener el feed social simulado.
-- Limpiar incidentes simulados.
-- Despachar recursos y ver cómo se registran en Arkiv.
+La página `/reportar` permite probar el circuito ciudadano sin login; al enviarse un reporte, la simulación puede asignarle un recurso. La clasificación de las alertas automáticas se simula con reglas y no afirma ejecutar IA ni crear una transacción blockchain.
+
+El motor corre en el proceso del servidor. En Supabase guarda el estado en `config_sistema` y lo retoma cuando vuelve a recibir una solicitud tras un reinicio; requiere un proceso persistente y una sola instancia para avanzar de manera continua. En memoria todo se reinicia al detener el servidor. No es un servicio de emergencias real.
 
 ---
 
@@ -77,12 +75,12 @@ Redes sociales / sensores / cámaras
 
 ### 1.b Incidentes disparados por hashtag en redes sociales (`#AlertaTucuman`)
 
-Los incidentes de fuente `social` **ya no se generan al azar**: nacen únicamente de posts de Facebook, Instagram o X que contienen el hashtag disparador.
+Además de los incidentes ficticios creados automáticamente por el simulador, el webhook puede recibir publicaciones con el hashtag disparador.
 
 ```
 Post en Facebook / Instagram / X
         ↓
-POST /api/social/mention  ◄── feed simulado, dev panel, Zapier/Make/n8n, scraper…
+POST /api/social/mention  ◄── Zapier/Make/n8n, scraper u otro conector…
         ↓
 ¿Contiene #AlertaTucuman?  ── no ──► ignored
         ↓ sí
@@ -99,7 +97,7 @@ created → Supabase → Realtime → aparece en el mapa ("Pending Validation")
 
 - El hashtag es tolerante a mayúsculas y tildes (`#alertatucumán` también dispara) y se configura con `NEXT_PUBLIC_TRIGGER_HASHTAG`.
 - El tipo, severidad, ubicación y afectados **se extraen del texto del post**, no son aleatorios.
-- El webhook recibe reportes sociales reales y usa `lib/services/social-incident-service.ts`. `/api/agent` sólo escanea conectores sociales configurados cuando se invoca explícitamente; el dashboard ya no lanza escaneos ni crea incidentes al abrirse.
+- El webhook usa `lib/services/social-incident-service.ts`. `/api/agent` sólo escanea conectores configurados cuando se invoca explícitamente; el dashboard crea incidentes ficticios mediante el motor de simulación y no busca publicaciones externas por su cuenta.
 - Sin `OPENROUTER_API_KEY` ni `GOOGLE_AI_API_KEY` funciona igual con el analizador por reglas (`lib/agents/heuristic-analyzer.ts`).
 
 **Webhook** (público en esta build; opcionalmente acepta `x-api-secret`):
@@ -114,9 +112,9 @@ Campos: `platform` (`facebook|instagram|twitter|tiktok`), `author`, `text` oblig
 
 > Meta no permite buscar posts públicos por hashtag en Facebook, e Instagram sólo lo permite a cuentas Business con límites. Por eso la integración real recomendada es reenviar menciones a este webhook desde una herramienta externa (Zapier, Make, n8n o un scraper autorizado).
 
-**Origen de incidentes:** solamente reportes ciudadanos enviados a `/reportar` y posts recibidos por `/api/social/mention` con `#AlertaTucuman` (o conectores sociales explícitamente configurados e invocados). USGS y NASA EONET ya no son fuentes automáticas; los incidentes históricos generados por esos feeds se excluyen del mapa, la actividad y los KPI sin borrarse de Supabase. `/api/incidentes/respawn` responde 410. Los reportes reales no se marcan atendidos automáticamente a los 5 minutos ni se eliminan tras una hora.
+**Origen de incidentes:** ejemplos ficticios del motor, reportes ciudadanos de prueba enviados a `/reportar` y menciones recibidas por `/api/social/mention`. USGS y NASA EONET no son fuentes automáticas; sus incidentes históricos se excluyen del mapa sin borrarse. `/api/incidentes/respawn` responde 410. En esta copia de demostración el motor también atiende automáticamente los reportes ciudadanos.
 
-**Demo local:** `?dev=true` está disponible solo con `npm run dev`; el feed simulado y el compositor no están disponibles en producción, y `/api/social/mention` rechaza `simulated: true` fuera de desarrollo.
+**Demo local:** los controles de simulación están en la parte superior del dashboard. El motor genera ejemplos directamente, sin conectarse a redes sociales reales.
 
 ### 2. Reporte ciudadano anónimo verificable (Stellar ZK)
 
@@ -229,7 +227,7 @@ npm run dev
 Abrir:
 
 ```
-http://localhost:3000?dev=true
+http://localhost:3000
 ```
 
 Para probar reportes ciudadanos ZK:
@@ -287,8 +285,8 @@ http://localhost:3000/mapa
 
 ## 📝 Notas de arquitectura
 
-- **Simulación controlada**: el panel `?dev=true` tiene límite de 5 incidentes activos, auto-resolución a los 2 minutos y limpieza manual para evitar que la base de datos se llene como ocurría con versiones anteriores.
-- **Sin autenticación**: esta build no tiene login; todas las páginas (`/`, `/admin`, `/mapa`, `/reportar`, `/seguimiento`, `/auditoria`) y APIs son públicas. `proxy.ts` solo aplica rate limit y límite de tamaño de body.
+- **Simulación controlada**: el motor limita la cantidad de incidentes activos, asigna recursos por tipo y permite reiniciar los ejemplos conservando los reportes ciudadanos.
+- **Sin autenticación**: esta build no tiene login ni pantalla de administración de usuarios; `/admin` vuelve al dashboard. Las páginas y APIs de la demostración son públicas. `proxy.ts` solo aplica rate limit y límite de tamaño de body.
 - **Fuentes del sistema**: se reemplazaron las fuentes Google por fuentes del sistema para evitar fallas de build offline.
 
 ---

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Next.js 16 (App Router) + TypeScript dashboard for climate emergency management in San Miguel de Tucumán. Simulated-data build: runs **without login** and with a **dual data layer** — Supabase (PostgreSQL) when credentials exist, in-memory store seeded with simulated data otherwise. Includes the public citizen report flow (/reportar, /mapa, /seguimiento) and the admin panel.
+Next.js 16 (App Router) + TypeScript dashboard for climate emergency management in San Miguel de Tucumán. This is a separate simulator without login: it uses a dedicated Supabase database when configured, or an in-memory store otherwise. Includes public citizen reporting, map, tracking and audit pages. `/admin` redirects to the dashboard.
 
 ## Data layer (dual mode) — `lib/db.ts`
 
@@ -23,20 +23,20 @@ npm run start    # Start production server
 npm run lint     # ESLint check
 ```
 
-## Dev Mode
+## Automatic demonstration
 
-In local development only, append `?dev=true` to enable the simulation control panel (bottom-left corner). It has a social post composer (Facebook/Instagram/X), injects citizen ZK reports, and toggles the simulated social feed. The panel is unavailable in production and simulated social mentions are rejected outside development. Existing `simulated: true` incidents ARE shown in every environment (production included); `isNonReportIncident` only hides USGS/EONET rows.
+`lib/services/demo-simulation.ts` starts automatically when the dashboard or public map is opened or a citizen report is submitted. It generates simulated incidents and assigns appropriate resources; resources transition through travel (15s), work (20s), and return (10s). Citizen reports also participate in this lifecycle. `/api/simulacion` exposes status, manual incident creation and a confirmed reset that preserves citizen reports. The agent activity feed is explicitly illustrative, not evidence of live external searches. The motor requires a persistent single server process; Supabase mode persists its state but must use the database dedicated to this simulator.
 
 ## Social Hashtag Trigger
 
-Social incidents are created ONLY from posts containing the trigger hashtag (`#AlertaTucuman`, override with `NEXT_PUBLIC_TRIGGER_HASHTAG`). There is no automatic/random incident spawning and the memory store starts with **no incidents**: the map only shows citizen reports and hashtag mentions.
+The social webhook creates incidents from posts containing the trigger hashtag (`#AlertaTucuman`, override with `NEXT_PUBLIC_TRIGGER_HASHTAG`). The simulator additionally generates its own fictional social incidents independently of this webhook. The memory store starts empty and is seeded with incidents when monitoring begins.
 
-- The "Live AI Agent" panel (`components/dashboard/ai-activity-log.tsx`) keeps a purely visual feed (`initialActivities` + `backgroundMessages` every 8s, signal counter) — it never creates incidents. Real incidents are added to it as alerts.
-- Dev-only maintenance: `lib/services/simulation-service.ts` → `resolveExpiredSimulated()` (via `POST /api/incidentes/auto-resolve`, called by `useAutoResolve` in development) moves `simulated: true` rows (dev-panel posts) older than `auto_resolve_minutes` to History with `pending_confirmation=true` (yellow PENDING badge). **Confirm Resolution** in the detail modal → `POST /api/incidentes/arkiv-dispatch` clears it.
+- The agent panel (`components/dashboard/ai-activity-log.tsx`) keeps a purely visual feed and counter updated every second while the simulator is running; it never creates incidents. Stored incidents are also added as alerts.
+- Legacy maintenance in `lib/services/simulation-service.ts` excludes incidents managed by the automatic simulator.
 
 - Single pipeline: `lib/services/social-incident-service.ts` → `ingestSocialPost()` (hashtag filter → dedup by post id → LLM/heuristic analysis → gazetteer geocoding → corroborate or create).
 - Entry points: `POST /api/social/mention` (webhook, supports `?dryRun=true`) and `SocialMediaAgent.runScan()` (`POST /api/agent`).
-- `UsgsConnector` and `EonetConnector` are not active sources: incidents require an incoming citizen report or social mention. The dashboard no longer triggers agent scans. Historical USGS/EONET rows remain in Supabase but are excluded from incident reads and analytics with `isNonReportIncident`; do not delete them without approval. `/api/incidentes/respawn` returns 410. Real (non-`simulated`) reports are not auto-resolved or expired by simulation maintenance.
+- `UsgsConnector` and `EonetConnector` are not active sources. The dashboard does not trigger external agent scans. Historical USGS/EONET rows are excluded from incident reads and analytics with `isNonReportIncident`; do not delete them without approval. `/api/incidentes/respawn` returns 410. The demo motor handles citizen reports as well as simulated incidents.
 - Analyzer fallback chain: OpenRouter → Gemini → `lib/agents/heuristic-analyzer.ts` (rule-based, no key needed).
 - Isomorphic helpers (safe in client): `lib/agents/hashtag.ts`, `lib/agents/tucuman-gazetteer.ts`, `lib/social-feed-simulator.ts`.
 - Active social incidents show in the map's Active tab with a "Pending Validation" badge; posts dedup via `fuente_detalles.related_post_ids`.
@@ -56,10 +56,10 @@ All env vars are optional — without any of them the app runs in simulated memo
 
 Arkiv dispatch endpoint falls back to simulated mode if `ARKIV_PRIVATE_KEY` is `'0xREEMPLAZAR_CON_TU_PRIVATE_KEY_AQUI'`.
 
-## Admin & User Management (no login)
+## Access and resources (no login)
 
 - This build has **no authentication**: `/login`, `/recuperar`, `/restablecer`, `/auth/callback` were removed. `lib/auth.ts` stubs `requireStaff()` (demo admin profile) and `auditAdmin()` (store audit log).
-- `/admin` is open, sidebar layout (`?section=`): **control** (agent kill switch → `config_sistema.agent_mode`), **thresholds** (`auto_resolve_minutes`, `confidence_threshold`), **connections** (read-only configured flags), **users** (demo profiles; create operator / roles / suspend are simulated via the store), **resources** (full CRUD via `/api/recursos`). Components live in `components/admin/`.
+- `/admin` redirects to the dashboard; no user-management interface is exposed in this simulator.
 - `/api/recursos`: full CRUD, public. Dispatch uses compare-and-set (`estado=available` required) → `409` on concurrent claims. With Supabase mode, `cantidad`/`cantidad_disponible` require `supabase-migration-recursos-cantidad.sql`.
 - `lib/services/config-service.ts` — `getSystemConfig`/`getConfigNumber`, tolerant reads with 10s cache. Agent/social ingest fail closed when `agent_mode` is absent (memory store seeds it `autonomous=true`).
 - With real Supabase, `replace_operator_resources` and `registrar_auditoria` RPCs come from `supabase-auth-hardening.sql` (kept in the PMV branch, not in this repo).
@@ -132,4 +132,14 @@ Rate limiting is applied via `lib/rate-limit.ts`: Redis REST with atomic Lua cou
 
 ## Testing
 
-`npm test` runs rate limiter tests; `npm run zk:check` generates and verifies real ZK proofs. Manual dashboard testing via `?dev=true` simulation panel.
+`npm test` covers rate limiting and dispatch; `npm run zk:check` generates and verifies real ZK proofs. Test the automatic lifecycle, citizen reporting and public pages in a browser with `npm run dev`.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

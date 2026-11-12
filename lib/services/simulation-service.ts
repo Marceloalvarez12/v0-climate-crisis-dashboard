@@ -13,7 +13,7 @@ export async function resolveExpiredSimulated(): Promise<DbIncident[]> {
   const minutes = await getConfigNumber("auto_resolve_minutes", CONFIG.SIMULATION.DEFAULT_LIFETIME_MINUTES)
   const cutoff = Date.now() - minutes * 60_000
   const active = await db.listIncidents({ estado: "activo" })
-  const expired = active.filter((i) => isSimulatedIncident(i) && Date.parse(i.updated_at) <= cutoff)
+  const expired = active.filter((i) => isSimulatedIncident(i) && i.fuente_detalles?.simulation_engine !== true && Date.parse(i.updated_at) <= cutoff)
 
   const resolvedAt = new Date().toISOString()
   const updated = await Promise.all(expired.map((i) => db.updateIncident(i.id, {

@@ -184,3 +184,15 @@
 .animate-agent-scan {
   animation: agent-scan 1.8s ease-in-out infinite;
 }
+
+/* Radix's measuring wrapper otherwise expands to the longest message. */
+.agent-scroll [data-radix-scroll-area-viewport] > div {
+  display: block !important;
+  min-width: 0 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-agent-scan, .animate-pulse-ring {
+    animation: none;
+  }
+}

@@ -16,6 +16,14 @@ export const dynamic = "force-dynamic"
  */
 export async function GET() {
   try {
+    // Public visitors can open the map without first visiting the dashboard.
+    // Start the automatic monitor for that entry point as well.
+    try {
+      const { demoStatus } = await import("@/lib/services/demo-simulation")
+      await demoStatus()
+    } catch (error) {
+      console.error("[Public incidents] Monitor unavailable:", error)
+    }
     const { getDb } = await import("@/lib/db")
     const db = await getDb()
 
@@ -31,7 +39,7 @@ export async function GET() {
       personas_afectadas: i.personas_afectadas,
       fuente:             i.fuente,
       // Las detecciones sociales aún no validadas se señalan al público
-      pendiente_validacion: i.fuente === "social",
+      pendiente_validacion: i.fuente === "social" && i.fuente_detalles?.demo_validated !== true,
       created_at:         i.created_at,
     }))
 

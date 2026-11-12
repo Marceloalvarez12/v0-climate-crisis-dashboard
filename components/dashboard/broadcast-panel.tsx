@@ -133,7 +133,7 @@ export function BroadcastPanel() {
 
     toast.success(`Message sent via ${selectedChannel.name}`, {
       description: selectedChannel.recipients > 0 
-        ? `${selectedChannel.recipients.toLocaleString()} recipients reached`
+        ? `${selectedChannel.recipients.toLocaleString("es-AR")} recipients reached`
         : "Live broadcast started",
     })
 
@@ -207,7 +207,7 @@ export function BroadcastPanel() {
                   <span className="text-xs font-medium truncate">{channel.name}</span>
                   {channel.recipients > 0 && (
                     <Badge variant="outline" className="text-[9px] h-4 px-1">
-                      {channel.recipients.toLocaleString()}
+                      {channel.recipients.toLocaleString("es-AR")}
                     </Badge>
                   )}
                 </div>
@@ -271,7 +271,7 @@ export function BroadcastPanel() {
             </DialogTitle>
             <DialogDescription>
               {selectedChannel?.recipients && selectedChannel.recipients > 0 
-                ? `This message will reach ${selectedChannel.recipients.toLocaleString()} recipients.`
+                ? `This message will reach ${selectedChannel.recipients.toLocaleString("es-AR")} recipients.`
                 : "This message will be broadcast live."}
             </DialogDescription>
           </DialogHeader>

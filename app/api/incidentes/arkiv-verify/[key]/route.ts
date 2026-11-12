@@ -50,16 +50,16 @@ export async function GET(
 
 function validateKey(key: string): Response | null {
   if (!key || !key.startsWith("0x")) {
-    return apiError("Invalid entity key", 400)
+    return apiError("La clave de entidad debe comenzar con 0x.", 400)
   }
   if (key.length === 42) {
-    return apiError("Wallet address provided (42 chars). Entity key required (66 chars).", 400)
+    return apiError("Ingresaste una dirección de billetera. Se necesita una clave de entidad de 66 caracteres.", 400)
   }
   if (key.length !== 66) {
-    return apiError(`Invalid key length: ${key.length}. Must be 66 characters.`, 400)
+    return apiError(`La clave tiene ${key.length} caracteres; debe tener 66.`, 400)
   }
   if (!/^0x[0-9a-fA-F]{64}$/.test(key)) {
-    return apiError("Invalid hex format. Key must be 0x followed by 64 hexadecimal characters.", 400)
+    return apiError("La clave debe contener 0x seguido de 64 caracteres hexadecimales.", 400)
   }
   return null
 }

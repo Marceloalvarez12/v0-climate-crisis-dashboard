@@ -26,7 +26,7 @@ export function DashboardHeader() {
   const criticalCount = (analytics?.criticalCount ?? 0) + (analytics?.highCount ?? 0)
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur-md">
+    <header className="relative flex h-14 shrink-0 items-center justify-between border-b border-[#252b30] bg-[#0b0e11] px-4 shadow-[0_6px_24px_rgba(0,0,0,.18)]">
       {/* Left: brand */}
       <div className="flex min-w-0 items-center gap-3">
         <Link href="/" aria-label="Zntinel, centro de control">
@@ -34,13 +34,17 @@ export function DashboardHeader() {
         </Link>
         <div className="hidden h-6 w-px bg-border sm:block" />
         <div className="hidden leading-tight sm:block">
-          <p className="text-[12px] font-semibold tracking-tight text-foreground">Centro de control</p>
-          <p className="text-[10px] text-muted-foreground">San Miguel de Tucumán</p>
+          <p className="text-[12px] font-semibold tracking-tight text-white">Centro de control</p>
+          <p className="text-[10px] text-slate-400">San Miguel de Tucumán</p>
         </div>
       </div>
 
       {/* Right: status + navigation */}
       <div className="flex items-center gap-2">
+        <nav aria-label="Accesos públicos" className="flex items-center gap-1.5 md:hidden">
+          <Link href="/mapa" aria-label="Abrir mapa público" title="Mapa público" className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-secondary/30 text-slate-200 transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300"><Map className="h-4 w-4" /></Link>
+          <Link href="/reportar" aria-label="Hacer un reporte ciudadano" title="Reporte ciudadano" className="flex h-10 items-center gap-1.5 rounded-md border border-sky-400/30 bg-sky-400/10 px-3 text-xs font-medium text-sky-100 transition-colors hover:bg-sky-400/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300"><FileWarning className="h-4 w-4" /><span>Reportar</span></Link>
+        </nav>
         {criticalCount > 0 && (
           <span className="hidden h-7 items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 font-mono text-[10px] font-semibold text-red-400 md:flex">
             <AlertTriangle className="h-3 w-3" />

@@ -121,10 +121,10 @@ export default function PublicMapPage() {
       {/* Header público */}
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-800 bg-[#0d1014] px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <Image src="/zntinel-logo-trimmed.png" alt="Zntinel" width={382} height={141} className="h-11 w-auto shrink-0 object-contain" priority />
+          <Link href="/" aria-label="Volver al centro de control" className="shrink-0"><Image src="/zntinel-logo-trimmed.png" alt="Zntinel" width={382} height={141} className="h-9 w-auto object-contain sm:h-11" priority /></Link>
           <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold text-white sm:text-base">Mapa ciudadano · Tucumán</h1>
-            <p className="hidden text-xs text-zinc-400 sm:block">Emergencias reportadas en tiempo real</p>
+            <h1 className="text-sm font-semibold text-white sm:text-base">Mapa ciudadano</h1>
+            <p className="hidden text-xs text-sky-300 sm:block">Simulación · alertas y reportes de prueba</p>
           </div>
         </div>
         <Button asChild size="sm" className="h-9 shrink-0 gap-2 bg-red-600 font-semibold text-white hover:bg-red-700">
@@ -137,18 +137,18 @@ export default function PublicMapPage() {
       </header>
 
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-zinc-800 bg-[#0d1014] px-4 py-2.5 sm:px-6">
-        <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-zinc-400 sm:max-w-xs">
+        <label className="flex h-9 min-w-0 basis-full items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-zinc-400 sm:max-w-xs sm:flex-1 sm:basis-auto">
           <Search className="h-4 w-4 shrink-0" />
           <span className="sr-only">Buscar zona</span>
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar zona..." className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-zinc-500" />
         </label>
         <select aria-label="Filtrar por tipo" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as Incident["type"] | "all")}
-          className="h-9 rounded-lg border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-200 outline-none focus:border-cyan-400">
+          className="h-9 min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-200 outline-none focus:border-cyan-400 sm:flex-none">
           <option value="all">Todos los tipos</option>
           {Object.entries(TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <select aria-label="Filtrar por origen" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value as Incident["source"] | "all")}
-          className="h-9 rounded-lg border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-200 outline-none focus:border-cyan-400">
+          className="h-9 min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-2 text-xs text-zinc-200 outline-none focus:border-cyan-400 sm:flex-none">
           <option value="all">Todos los orígenes</option>
           <option value="citizen">Ciudadanos</option>
           <option value="social">Redes sociales</option>
