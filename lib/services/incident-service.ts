@@ -30,7 +30,7 @@ export class IncidentService {
     return db.findIncidentById(id)
   }
 
-  static async create(incident: Omit<DbIncident, "id" | "created_at" | "updated_at">): Promise<DbIncident> {
+  static async create(incident: Omit<DbIncident, "id" | "created_at" | "updated_at"> & { id?: string }): Promise<DbIncident> {
     const db = await getDb()
     const now = new Date().toISOString()
     return db.insertIncident({
@@ -58,8 +58,4 @@ export class IncidentService {
     await db.deleteIncident(id)
   }
 
-  static async deleteSimulated(estado?: "activo" | "atendido"): Promise<number> {
-    const db = await getDb()
-    return db.deleteSimulatedIncidents(estado)
-  }
 }

@@ -3,18 +3,19 @@ import { IncidentService } from "@/lib/services/incident-service"
 import { apiSuccess, apiError, apiNotFound } from "@/lib/services/api-response"
 import { publicStellarAudit } from "@/lib/public-audit"
 import { getDb } from "@/lib/db"
+import { isNonReportIncident } from "@/lib/types"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return apiNotFound("Reporte")
     const incident = await IncidentService.findById(id)
-    if (!incident) {
+    if (!incident || isNonReportIncident(incident)) {
       return apiNotFound("Incident")
     }
     const audit = publicStellarAudit(incident.fuente_detalles?.stellar_audit)
     const dispatchKey = incident.fuente_detalles?.arkiv_entity_key
-    const resources = await (await getDb()).listResources()
-    const assigned = resources.filter(resource => resource.incidente_id === incident.id)
+    const assigned = await (await getDb()).listIncidentResources(incident.id)
     const atencion = incident.estado === "atendido" ? "atendido" : assigned.some(resource => resource.estado === "busy") ? "en_atencion" : assigned.some(resource => resource.estado === "dispatched") ? "en_camino" : "pendiente"
     return apiSuccess({
       id: incident.id,

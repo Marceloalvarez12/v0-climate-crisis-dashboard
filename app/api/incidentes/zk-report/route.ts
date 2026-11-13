@@ -102,10 +102,11 @@ export async function POST(request: NextRequest): Promise<Response> {
       })
     }
 
-    // Import perezoso: lib/supabase.ts lanza si faltan credenciales, y no
+    // Import perezoso: la base de datos falla si faltan credenciales, y no
     // queremos que eso rompa la validación ni el modo dryRun del reporte.
     const { IncidentService } = await import("@/lib/services/incident-service")
     const incident = await IncidentService.create({
+      id: incidentId,
       tipo: params.tipo,
       severidad: params.severidad,
       ubicacion: params.ubicacion,
@@ -122,15 +123,6 @@ export async function POST(request: NextRequest): Promise<Response> {
         stellar_audit: auditWithDispatch,
       },
     })
-
-    // The citizen form is also a direct entry point to the demo.
-    // A temporary monitoring failure must never invalidate a saved report.
-    try {
-      const { demoStatus } = await import("@/lib/services/demo-simulation")
-      await demoStatus()
-    } catch (error) {
-      console.error("[ZK Report] Monitor unavailable:", error)
-    }
 
     // ── Enviar hash + link de auditoría por email ──
     // El mail es conveniencia: si falla, el reporte ya existe y el front
@@ -191,8 +183,8 @@ async function hasOperatorAccess(request: NextRequest): Promise<boolean> {
     if (left.length === right.length && crypto.timingSafeEqual(left, right)) return true
   }
   try {
-    await requireStaff()
-    return true
+    const { profile } = await requireStaff()
+    return ["admin", "operador"].includes(profile.rol)
   } catch {
     return false
   }

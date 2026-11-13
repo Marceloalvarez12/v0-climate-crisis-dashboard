@@ -17,7 +17,7 @@ export function PageHeader({ title, backHref = "/", backLabel = "Centro de contr
             <Image src="/zntinel-logo-trimmed.png" alt="Zntinel" width={382} height={141} className="h-10 w-auto object-contain" priority />
           </Link>
           <div className="hidden h-7 w-px bg-zinc-800 sm:block" />
-          <div className="min-w-0"><p className="truncate text-sm font-semibold text-zinc-100">{title}</p><p className="text-[11px] text-zinc-500">Entorno de demostración · Tucumán</p></div>
+          <div className="min-w-0"><p className="truncate text-sm font-semibold text-zinc-100">{title}</p><p className="text-[11px] text-zinc-500">Centro de crisis · Tucumán</p></div>
         </div>
         <nav aria-label="Navegación" className="flex items-center gap-2">
           {backHref !== "/mapa" && <Link href="/mapa" className="hidden h-9 items-center gap-1.5 rounded-md border border-zinc-800 px-3 text-xs text-zinc-300 transition-colors hover:bg-zinc-800 sm:inline-flex"><Map className="h-3.5 w-3.5" />Mapa público</Link>}

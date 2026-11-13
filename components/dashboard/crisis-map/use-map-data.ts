@@ -13,7 +13,7 @@ const SWR_CONFIG = {
   keepPreviousData: true,
 }
 
-/** Transforma una fila de Supabase al tipo local `Incident` */
+/** Transforma una fila de PostgreSQL al tipo local `Incident` */
 export function dbToIncident(inc: DbIncident): Incident {
   return {
     id:             inc.id,
@@ -26,7 +26,7 @@ export function dbToIncident(inc: DbIncident): Incident {
     source:         inc.fuente as Incident["source"],
     sourceDetails:  inc.fuente_detalles || {},
     estado:         inc.estado,
-    arkiv_key:      typeof inc.fuente_detalles?.arkiv_entity_key === "string" ? inc.fuente_detalles.arkiv_entity_key : undefined,
+    arkiv_key: inc.fuente_detalles?.arkiv_audit_status === "confirmed" && typeof inc.fuente_detalles?.arkiv_entity_key === "string" && /^0x[0-9a-f]{64}$/i.test(inc.fuente_detalles.arkiv_entity_key) ? inc.fuente_detalles.arkiv_entity_key : undefined,
   }
 }
 
@@ -42,7 +42,7 @@ export function useIncidents(estado: "activo" | "atendido" = "activo") {
     return data.map(dbToIncident)
   }, [data, error])
 
-  return { incidents, mutate }
+  return { incidents, mutate, error }
 }
 
 /** Hook de recursos con polling cada 3 s - hook compartido para CrisisMap y ResourcesPanel */

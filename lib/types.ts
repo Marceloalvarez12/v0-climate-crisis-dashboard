@@ -59,6 +59,7 @@ export interface IncidentSourceDetails {
   zk_input?: Record<string, string>
   stellar_audit?: Record<string, unknown>
   descripcion?: string
+  contacto?: string
 }
 
 export interface ZkCitizenReport {
@@ -126,8 +127,9 @@ export interface DbIncident {
 }
 
 export function isNonReportIncident(incident: Pick<DbIncident, "fuente" | "fuente_detalles">): boolean {
-  return incident.fuente === "sensor" &&
-    (incident.fuente_detalles?.source_api === "usgs" || incident.fuente_detalles?.source_api === "eonet")
+  return incident.fuente_detalles?.simulated === true || incident.fuente_detalles?.simulation_engine === true ||
+    (incident.fuente === "sensor" &&
+    (incident.fuente_detalles?.source_api === "usgs" || incident.fuente_detalles?.source_api === "eonet"))
 }
 
 export function isSimulatedIncident(incident: Pick<DbIncident, "fuente_detalles">): boolean {

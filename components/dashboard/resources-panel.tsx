@@ -1,10 +1,14 @@
 "use client"
 
+import { useState } from "react"
+import { useSWRConfig } from "swr"
+import { toast } from "sonner"
 import { Truck, Users, Plane, Ship, Building2, HeartPulse } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useResources } from "./crisis-map/use-map-data"
+import { useStaffAccess } from "@/hooks/use-staff-access"
 
 interface Resource {
   id: string
@@ -12,6 +16,8 @@ interface Resource {
   type: "ambulance" | "firefighter" | "helicopter" | "boat" | "shelter" | "medical" | "police"
   status: "available" | "dispatched" | "busy"
   location: string
+  quantity: number
+  available: number
 }
 
 const getIcon = (type: Resource["type"]) => {
@@ -59,20 +65,37 @@ const getStatusBadge = (status: Resource["status"]) => {
 }
 
 export function ResourcesPanel() {
+  const { canOperate } = useStaffAccess()
   // Fetch resources from shared hook (unified SWR cache)
-  const { data: dbResources, error } = useResources()
+  const { data: dbResources, error, mutate: refreshResources } = useResources()
+  const { mutate } = useSWRConfig()
+  const [pending, setPending] = useState<string | null>(null)
+  async function updateState(id: string, estado: "busy" | "available") {
+    if (!window.confirm(estado === "busy" ? "¿Confirmás que el recurso llegó y está atendiendo?" : "¿Confirmás que el recurso terminó su servicio y está disponible?")) return
+    setPending(id)
+    try {
+      const response = await fetch("/api/recursos", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, estado }) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "No se pudo actualizar el recurso")
+      toast.success("Estado operativo actualizado")
+      await Promise.all([refreshResources(), mutate("/api/operaciones"), mutate("/api/analytics")])
+    } catch (error) { toast.error(error instanceof Error ? error.message : "No se pudo actualizar el estado") }
+    finally { setPending(null) }
+  }
 
-  const resources: Resource[] = dbResources ? dbResources.map((r: { id: string; tipo: string; nombre: string; estado: string; ubicacion: string }) => ({
+  const resources: Resource[] = dbResources ? dbResources.map(r => ({
     id: r.id,
     name: r.nombre,
     type: r.tipo as Resource["type"],
     status: r.estado as Resource["status"],
-    location: r.ubicacion || "Central Base"
+    location: r.ubicacion || "Base sin especificar",
+    quantity: r.cantidad ?? 1,
+    available: r.estado === "available" ? (r.cantidad_disponible ?? r.cantidad ?? 1) : 0,
   })) : []
 
-  const availableCount = resources.filter(r => r.status === "available").length
-  const enRouteCount = resources.filter(r => r.status === "dispatched").length
-  const busyCount = resources.filter(r => r.status === "busy").length
+  const availableCount = resources.reduce((total, r) => total + r.available, 0)
+  const enRouteCount = resources.filter(r => r.status === "dispatched").reduce((total, r) => total + r.quantity, 0)
+  const busyCount = resources.filter(r => r.status === "busy").reduce((total, r) => total + r.quantity, 0)
 
   if (error) {
     return (
@@ -128,10 +151,12 @@ export function ResourcesPanel() {
                     <div>
                       <p className="text-xs font-medium text-foreground">{resource.name}</p>
                       <p className="text-[10px] text-muted-foreground">{resource.location}</p>
+                      <p className="text-[10px] text-slate-400">{resource.available}/{resource.quantity} unidades disponibles</p>
                     </div>
                   </div>
                   {getStatusBadge(resource.status)}
                 </div>
+                {canOperate && resource.status !== "available" && <div className="mt-2 flex flex-wrap gap-2 border-t border-slate-700/50 pt-2">{resource.status === "dispatched" && <button disabled={pending !== null} onClick={() => void updateState(resource.id, "busy")} className="rounded border border-sky-400/30 px-2 py-1 text-[11px] text-sky-200 disabled:opacity-50">Confirmar llegada</button>}<button disabled={pending !== null} onClick={() => void updateState(resource.id, "available")} className="rounded border border-emerald-400/30 px-2 py-1 text-[11px] text-emerald-200 disabled:opacity-50">Liberar recurso</button></div>}
               </div>
             ))
           )}

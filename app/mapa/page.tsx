@@ -124,7 +124,7 @@ export default function PublicMapPage() {
           <Link href="/" aria-label="Volver al centro de control" className="shrink-0"><Image src="/zntinel-logo-trimmed.png" alt="Zntinel" width={382} height={141} className="h-9 w-auto object-contain sm:h-11" priority /></Link>
           <div className="min-w-0">
             <h1 className="text-sm font-semibold text-white sm:text-base">Mapa ciudadano</h1>
-            <p className="hidden text-xs text-sky-300 sm:block">Simulación · alertas y reportes de prueba</p>
+              <p className="hidden text-xs text-sky-300 sm:block">Alertas y reportes ciudadanos</p>
           </div>
         </div>
         <Button asChild size="sm" className="h-9 shrink-0 gap-2 bg-red-600 font-semibold text-white hover:bg-red-700">

@@ -1,12 +1,11 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import dynamic from "next/dynamic"
 import { MapPin, Layers, Eye } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { mutate } from "swr"
 import { dispatchResourceWithLifecycle, restoreResourceTimersOnMount } from "@/hooks/use-resource-lifecycle"
-import { patchIncidente } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -55,6 +54,8 @@ const SEVERITY_LEGENDS = [
 // ---------------------------------------------------------------------------
 
 export function CrisisMap() {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const openedIncidentRef = useRef<string | null>(null)
   const [isClient, setIsClient] = useState(false)
   const [leafletCssLoaded, setLeafletCssLoaded] = useState(false)
   const [selectedIncident,   setSelectedIncident]   = useState<Incident | null>(null)
@@ -69,11 +70,17 @@ export function CrisisMap() {
   const [selectedCounts,     setSelectedCounts]     = useState<Record<string, number>>({})
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const { incidents: dbIncidents } = useIncidents(viewMode)
+  const { incidents: dbIncidents, error: incidentError, mutate: refreshIncidents } = useIncidents(viewMode)
   const { data: dbRecursos, mutate: mutateRecursos }        = useResources()
 
   // All incidents come from the database (real + respawned)
   const incidents: Incident[] = dbIncidents
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("incidente")
+    if (!id || openedIncidentRef.current === id || !containerRef.current?.getClientRects().length) return
+    const incident = dbIncidents.find(item => item.id === id)
+    if (incident) { openedIncidentRef.current = id; setSelectedIncident(incident) }
+  }, [dbIncidents])
 
   const resourceGroups = useMemo(() => {
     if (!dbRecursos) return []
@@ -211,7 +218,6 @@ export function CrisisMap() {
     try {
       await dispatchSelectedResources(incidenteId, idsToDispatch, {
         dispatch: (incidentId, resourceId) => dispatchResourceWithLifecycle(incidentId, resourceId),
-        markAttended: (incidentId) => patchIncidente(incidentId, { estado: "atendido" }),
       })
     } finally {
       setDeployingResources(false)
@@ -221,7 +227,8 @@ export function CrisisMap() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="relative flex h-full w-full flex-col overflow-visible rounded-lg lg:overflow-hidden border border-[#30373c] bg-[#0f1417] shadow-[0_8px_24px_rgba(0,0,0,.16)]">
+    <div ref={containerRef} className="relative flex h-full w-full flex-col overflow-visible rounded-lg lg:overflow-hidden border border-[#30373c] bg-[#0f1417] shadow-[0_8px_24px_rgba(0,0,0,.16)]">
+      {incidentError && <div role="alert" className="border-b border-red-400/30 bg-red-400/10 p-3 text-xs text-red-200">No se pudieron consultar los incidentes. No se puede confirmar que el mapa esté actualizado.<button onClick={() => void refreshIncidents()} className="ml-2 underline">Reintentar carga del mapa</button></div>}
       {/* ── Map header ─────────────────────────────────────────────── */}
       <div className="sticky top-0 z-[1000] flex min-h-12 w-full shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-[#30373c] bg-[#12171a] px-3 py-2">
         <div className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:flex-1">
@@ -341,7 +348,7 @@ export function CrisisMap() {
           </div>
           <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-secondary/10">
             <p className="text-[9px] font-medium text-muted-foreground">
-              {viewMode === "activo" ? "Monitoreo simulado" : "Incidentes atendidos"}
+              {viewMode === "activo" ? "Incidentes en seguimiento" : "Incidentes atendidos"}
             </p>
             {viewMode === "atendido" && (
               <label className="group flex items-center gap-1.5 rounded-md border border-accent/25 bg-accent/5 px-2 py-1 text-[9px] text-accent shadow-[0_0_14px_rgba(255,51,74,0.08)] transition-colors hover:border-accent/50 hover:bg-accent/10">
@@ -478,12 +485,12 @@ export function CrisisMap() {
 
       <Dialog open={showBlockchainModal} onOpenChange={handleCloseConfirmDispatch}>
         <DialogContent className="max-w-md p-0 bg-transparent border-none z-[9999]">
-          <DialogTitle className="sr-only">Deploy Resources</DialogTitle>
+          <DialogTitle className="sr-only">Confirmar despacho de recursos</DialogTitle>
           {selectedIncident && (
             <IncidentDispatchCard
               incident={{
                 id: selectedIncident.id,
-                tipo: selectedIncident.type === "flood" || selectedIncident.type === "fire" ? selectedIncident.type : "general",
+                tipo: selectedIncident.type,
                 severidad: selectedIncident.severity as "critical" | "high" | "medium" | "low",
                 ubicacion: selectedIncident.location,
                 afectados: selectedIncident.affectedPeople,

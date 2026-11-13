@@ -45,15 +45,15 @@ export function IncidentDispatchCard({
     setError(null)
 
     try {
-      // 1) DB dispatch PRIMERO — Supabase responde en ~200ms, así el operador
+      // 1) DB dispatch PRIMERO — PostgreSQL guarda el estado, así el operador
       //    ve feedback inmediato. Arkiv/Stellar corren después en background.
       if (!onConfirmDispatch) throw new Error("No está configurada la operación de despacho")
       await onConfirmDispatch()
 
       setDeployed(true)
       onDispatchSuccess?.()
-      toast.success("Resources Deployed", {
-        description: `Units sent to ${incident.ubicacion}`,
+      toast.success("Recursos despachados", {
+        description: `Unidades enviadas a ${incident.ubicacion}`,
       })
 
       // 2) Blockchain dispatch en background con timeout corto del cliente.
@@ -84,7 +84,7 @@ export function IncidentDispatchCard({
               setStellarAudit(data.stellarAudit as Record<string, unknown>)
             }
             if (data.onChain === true && blockchainKey) {
-              toast.success("On-Chain Audit Sealed", { description: `Hash: ${blockchainKey.slice(0, 12)}...` })
+              toast.success("Auditoría confirmada en cadena", { description: `Hash: ${blockchainKey.slice(0, 12)}...` })
             } else {
               toast.info("Despacho registrado; auditoría en cadena no confirmada")
             }
@@ -96,7 +96,7 @@ export function IncidentDispatchCard({
           console.warn("[On-chain] skipped or timed out:", bcError)
         })
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error"
+      const errorMessage = err instanceof Error ? err.message : "Error desconocido"
       console.error("Deployment failed:", errorMessage)
       setError(errorMessage)
     } finally {
@@ -115,11 +115,11 @@ export function IncidentDispatchCard({
     flood: "Flood",
     fire: "Fire",
     storm: "Storm",
-    looting: "Looting",
-    violence: "Violence",
-    accident: "Accident",
-    medical: "Medical Emergency",
-    general: "General Emergency",
+    looting: "Saqueo",
+    violence: "Violencia",
+    accident: "Accidente",
+    medical: "Emergencia médica",
+    general: "Emergencia general",
   }[incident.tipo] || incident.tipo
 
   // ── Success view ──
@@ -133,7 +133,7 @@ export function IncidentDispatchCard({
             </div>
           </div>
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-emerald-400">Resources Deployed</h3>
+            <h3 className="text-lg font-bold text-emerald-400">Recursos despachados</h3>
             <p className="text-xs text-emerald-300">
               Response units sent to the emergency zone
             </p>
@@ -141,19 +141,19 @@ export function IncidentDispatchCard({
 
           <div className="p-3 rounded-lg bg-black/40 border border-emerald-800/40 text-xs space-y-1 text-left">
             <p className="text-emerald-500/80">
-              <span className="font-medium text-emerald-400">Destination:</span> {incident.ubicacion}
+              <span className="font-medium text-emerald-400">Destino:</span> {incident.ubicacion}
             </p>
             <p className="text-emerald-500/80">
-              <span className="font-medium text-emerald-400">Type:</span> {typeLabel} — {incident.severidad.toUpperCase()}
+              <span className="font-medium text-emerald-400">Tipo:</span> {typeLabel} — {incident.severidad.toUpperCase()}
             </p>
             <p className="text-emerald-500/80">
-              <span className="font-medium text-emerald-400">Dispatch time:</span> {new Date().toLocaleTimeString("en-US")}
+              <span className="font-medium text-emerald-400">Hora de despacho:</span> {new Date().toLocaleTimeString("es-AR")}
             </p>
           </div>
 
           {selectedCounts && Object.values(selectedCounts).some(v => v > 0) && (
             <div className="p-3 rounded-lg bg-black/40 border border-emerald-800/40 text-xs text-left space-y-1.5">
-              <p className="font-bold text-emerald-400 text-xs">Unit Detail:</p>
+              <p className="font-bold text-emerald-400 text-xs">Detalle de unidades:</p>
               {Object.entries(selectedCounts)
                 .filter(([_, count]) => count > 0)
                 .map(([tipo, count]) => (
@@ -208,7 +208,7 @@ export function IncidentDispatchCard({
             <div className="pt-3 border-t border-emerald-800/30">
               <div className="flex items-center justify-between gap-3 text-[10px] text-emerald-500/50">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-medium text-emerald-400/60 shrink-0">Arkiv Braga Record</span>
+                  <span className="font-medium text-emerald-400/60 shrink-0">Registro en Arkiv Braga</span>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button type="button" className="shrink-0 text-emerald-400/40 hover:text-emerald-300 transition-colors">
@@ -238,7 +238,7 @@ export function IncidentDispatchCard({
             className="w-full border-emerald-800 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 font-semibold"
             onClick={onDismiss}
           >
-            Close
+            Volver al mapa
           </Button>
         </div>
       </div>
@@ -253,7 +253,7 @@ export function IncidentDispatchCard({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Truck className="h-5 w-5 text-orange-400" />
-            <h3 className="font-bold text-foreground">Authorize Deployment</h3>
+            <h3 className="font-bold text-foreground">Autorizar despacho</h3>
           </div>
           <span className={cn("text-[10px] px-2 py-0.5 rounded-full border font-medium", severityColor)}>
             {incident.severidad.toUpperCase()}
@@ -266,26 +266,26 @@ export function IncidentDispatchCard({
             <AlertTriangle className="h-8 w-8 text-orange-500 shrink-0" />
             <div>
               <p className="font-semibold text-foreground">{typeLabel}</p>
-              <p className="text-xs text-muted-foreground">Requires unit deployment</p>
+              <p className="text-xs text-muted-foreground">Requiere asistencia operativa</p>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
             <div className="p-2 rounded-lg bg-muted/30 border border-border text-center">
               <MapPin className="h-4 w-4 text-orange-400 mx-auto mb-1" />
-              <p className="text-[9px] text-muted-foreground">Location</p>
+              <p className="text-[9px] text-muted-foreground">Ubicación</p>
               <p className="text-[10px] font-semibold truncate">{incident.ubicacion}</p>
             </div>
             <div className="p-2 rounded-lg bg-muted/30 border border-border text-center">
               <Users className="h-4 w-4 text-red-400 mx-auto mb-1" />
-              <p className="text-[9px] text-muted-foreground">Affected</p>
+              <p className="text-[9px] text-muted-foreground">Personas afectadas</p>
               <p className="text-[10px] font-semibold">{incident.afectados}</p>
             </div>
             <div className="p-2 rounded-lg bg-muted/30 border border-border text-center">
               <Clock className="h-4 w-4 text-yellow-400 mx-auto mb-1" />
-              <p className="text-[9px] text-muted-foreground">Time</p>
+              <p className="text-[9px] text-muted-foreground">Hora</p>
               <p className="text-[10px] font-semibold">
-                {new Date(incident.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                {new Date(incident.timestamp).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
               </p>
             </div>
           </div>
@@ -294,7 +294,7 @@ export function IncidentDispatchCard({
         {/* Selected Resources List */}
         {selectedCounts && Object.values(selectedCounts).some(v => v > 0) && (
           <div className="space-y-2 mb-4 bg-muted/20 border border-border p-3 rounded-lg">
-            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Units to send:</p>
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Unidades a enviar:</p>
             <div className="space-y-1.5">
               {Object.entries(selectedCounts)
                 .filter(([_, count]) => count > 0)
@@ -330,12 +330,12 @@ export function IncidentDispatchCard({
             {isDeploying ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Deploying...
+                Despachando...
               </>
             ) : (
               <>
                 <Truck className="h-4 w-4 mr-2" />
-                Confirm Deployment
+                Confirmar despacho
               </>
             )}
           </Button>
@@ -345,7 +345,7 @@ export function IncidentDispatchCard({
             onClick={onDismiss}
             disabled={isDeploying}
           >
-            Cancel
+            Cancelar
           </Button>
         </div>
       </div>

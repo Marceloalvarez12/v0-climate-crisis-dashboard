@@ -219,7 +219,7 @@ export class StellarService {
     input: StellarVerifyInput
   ): Promise<StellarAuditEntry> {
     if (this.isSimulated()) {
-      // Local fallback: run snarkjs locally and build a fake audit entry.
+      // Verify the real proof locally; no transaction is created by this path.
       const zkProof: import("@/lib/services/zk-service").ZkProof = {
         pi_a: [
           String(BigInt("0x" + input.proof.a.slice(0, 64))),

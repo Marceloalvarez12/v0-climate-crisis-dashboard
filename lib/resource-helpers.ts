@@ -64,7 +64,7 @@ export function groupResourcesByTypeAndBase(resources: DbResource[]): GroupedRes
     }
     grouped[key].resources.push(r)
     grouped[key].totalCantidad += r.cantidad || 1
-    grouped[key].totalDisponible += r.cantidad_disponible ?? (r.cantidad || 1)
+    grouped[key].totalDisponible += r.estado === "available" ? r.cantidad_disponible ?? (r.cantidad || 1) : 0
   }
 
   return Object.values(grouped).sort((a, b) => {

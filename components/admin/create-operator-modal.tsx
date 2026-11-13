@@ -9,6 +9,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react"
+import { useModalFocus } from "@/hooks/use-modal-focus"
 import { cn } from "@/lib/utils"
 import { createOperator } from "@/app/admin/actions"
 
@@ -48,12 +49,12 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
     setError("")
 
     if (!nombre.trim() || !email.trim() || !password.trim()) {
-      setError("All fields are required")
+      setError("Completá todos los campos")
       return
     }
 
     if (password.length < 12) {
-      setError("Password must be at least 12 characters")
+      setError("La contraseña debe tener al menos 12 caracteres")
       return
     }
 
@@ -67,10 +68,12 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
         onSuccess()
       }, 1500)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error creating operator")
+      setError(err instanceof Error ? err.message : "No se pudo crear el operador")
       setSaving(false)
     }
   }
+
+  const dialogRef = useModalFocus(isOpen, handleClose, saving)
 
   if (!isOpen) return null
 
@@ -78,7 +81,7 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleClose} />
 
-      <div className="relative z-10 w-full max-w-md mx-4 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/50 overflow-hidden">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Crear operador" tabIndex={-1} className="max-h-[90dvh] overflow-y-auto relative z-10 w-full max-w-md mx-4 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/50 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
           <div className="flex items-center gap-3">
@@ -86,11 +89,11 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
               <UserPlus className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-zinc-100">Add New Operator</h2>
+              <h2 className="text-sm font-semibold text-zinc-100">Crear operador</h2>
               <p className="text-[10px] text-zinc-500 font-mono tracking-wider">ROL: OPERADOR</p>
             </div>
           </div>
-          <button
+          <button aria-label="Cerrar"
             onClick={handleClose}
             disabled={saving}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors disabled:opacity-30"
@@ -117,13 +120,14 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
               {/* Nombre */}
               <div>
                 <label className="block text-[10px] font-mono tracking-widest text-zinc-500 uppercase mb-1.5">
-                  Full Name
+                  Nombre completo
                 </label>
                 <input
                   type="text"
+                  aria-label="Nombre completo"
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
-                  placeholder="Ex: Juan Pérez"
+                  placeholder="Ej: Juan Pérez"
                   className="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition-all"
                   disabled={saving}
                 />
@@ -136,6 +140,7 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
                 </label>
                 <input
                   type="email"
+                  aria-label="Correo electrónico"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="operador@zntinel.com"
@@ -144,23 +149,25 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
                 />
               </div>
 
-              {/* Password */}
+              {/* Contraseña */}
               <div>
                 <label className="block text-[10px] font-mono tracking-widest text-zinc-500 uppercase mb-1.5">
-                  Temporary Password
+                  Contraseña inicial
                 </label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
+                    aria-label="Contraseña inicial"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Min 12 characters"
+                    placeholder="Mínimo 12 caracteres"
                     className="w-full px-3 py-2.5 pr-10 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition-all"
                     disabled={saving}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
                   >
                     {showPassword ? (
@@ -198,7 +205,7 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
               disabled={saving}
               className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800/50 px-4 py-2.5 text-xs font-medium text-zinc-300 hover:bg-zinc-700/50 transition-all disabled:opacity-30"
             >
-              Cancel
+              Cancelar
             </button>
             <button
               type="button"
@@ -214,12 +221,12 @@ export function CreateOperatorModal({ isOpen, onClose, onSuccess }: CreateOperat
               {saving ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Creating...
+                  Creando…
                 </>
               ) : (
                 <>
                   <UserPlus className="h-3.5 w-3.5" />
-                  Create Operator
+                  Crear operador
                 </>
               )}
             </button>

@@ -26,6 +26,7 @@ import {
 } from "./incident-helpers"
 import { RecursoIcon, tipoRecursoLabel } from "./resource-helpers"
 import { IncidentVerifyPanel } from "./incident-verify-panel"
+import { useStaffAccess } from "@/hooks/use-staff-access"
 import type { Incident, DbResource } from "@/lib/types"
 
 // ---------------------------------------------------------------------------
@@ -83,7 +84,7 @@ function OnChainVerifier({ arkivKey }: OnChainVerifierProps) {
     return (
       <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4 flex flex-col items-center justify-center gap-2 animate-pulse">
         <Loader2 className="h-6 w-6 text-emerald-400 animate-spin" />
-        <p className="text-xs text-emerald-400 font-medium">Verifying cryptographic signature on Braga Testnet...</p>
+        <p className="text-xs text-emerald-400 font-medium">Consultando entidad en Braga Testnet…</p>
       </div>
     )
   }
@@ -93,7 +94,7 @@ function OnChainVerifier({ arkivKey }: OnChainVerifierProps) {
       <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4 flex flex-col gap-2">
         <div className="flex items-center gap-2 text-red-400">
           <ShieldAlert className="h-5 w-5" />
-          <span className="text-xs font-semibold">On-Chain Audit Error</span>
+          <span className="text-xs font-semibold">No se pudo verificar la entidad</span>
         </div>
         <p className="text-xs text-muted-foreground">{error}</p>
       </div>
@@ -109,8 +110,8 @@ function OnChainVerifier({ arkivKey }: OnChainVerifierProps) {
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0" />
           <div>
-            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Cryptographic Verification Successful</span>
-            <p className="text-[10px] text-muted-foreground">Status audited and sealed immutably</p>
+            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Entidad confirmada en blockchain</span>
+            <p className="text-[10px] text-muted-foreground">Registro confirmado en Arkiv Braga</p>
           </div>
         </div>
         <span className="text-[9px] font-mono bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30">
@@ -120,13 +121,13 @@ function OnChainVerifier({ arkivKey }: OnChainVerifierProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-[11px] border-t border-emerald-500/10">
         <div className="space-y-1">
-          <p className="text-[9px] text-muted-foreground uppercase">Dispatcher (Public Key)</p>
+          <p className="text-[9px] text-muted-foreground uppercase">Firmante (clave pública)</p>
           <p className="font-mono text-foreground truncate select-all" title={data?.creator}>
             {data?.creator}
           </p>
         </div>
         <div className="space-y-1">
-          <p className="text-[9px] text-muted-foreground uppercase">Entity Key</p>
+          <p className="text-[9px] text-muted-foreground uppercase">Clave de entidad</p>
           <p className="font-mono text-foreground truncate select-all" title={arkivKey}>
             {arkivKey}
           </p>
@@ -134,14 +135,14 @@ function OnChainVerifier({ arkivKey }: OnChainVerifierProps) {
       </div>
 
       <div className="space-y-1 text-[11px]">
-        <p className="text-[9px] text-muted-foreground uppercase">Payload Registered on Block</p>
+        <p className="text-[9px] text-muted-foreground uppercase">Contenido registrado</p>
         <pre className="font-mono text-[10px] text-emerald-300 bg-black/40 p-2.5 rounded border border-emerald-500/15 overflow-x-auto max-h-32 custom-scrollbar">
           {JSON.stringify(data?.payload, null, 2)}
         </pre>
       </div>
 
       <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1.5 border-t border-emerald-500/10">
-        <span>Expires at block: <strong className="font-mono text-foreground">{data?.expiresAtBlock || 'Infinite'}</strong></span>
+        <span>Vence en bloque: <strong className="font-mono text-foreground">{data?.expiresAtBlock || 'No disponible'}</strong></span>
         {data?.isSimulated ? (
           <span className="text-yellow-500 font-semibold bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20 text-[9px]">
             Simulated (Local)
@@ -179,26 +180,27 @@ export function IncidentDetailModal({
   onClose,
   onOpenDeploy,
 }: IncidentDetailModalProps) {
+  const { canOperate } = useStaffAccess()
   const [isGenerating, setIsGenerating] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
-  const pendingConfirmation = incident?.estado === "atendido" && incident.sourceDetails.pending_confirmation === true
 
-  // Auto-resuelto por la simulación → el operador confirma el cierre (sella en Arkiv si está configurado).
+  // La finalización siempre requiere una confirmación operativa explícita.
   const handleConfirmResolution = async (inc: Incident) => {
+    if (!window.confirm("¿Confirmás que la atención finalizó y los recursos fueron liberados?")) return
     setIsConfirming(true)
     try {
-      const res = await fetch("/api/incidentes/arkiv-dispatch", {
-        method: "POST",
+      const res = await fetch("/api/incidentes", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: inc.id }),
+        body: JSON.stringify({ id: inc.id, estado: "atendido" }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      toast.success(`Resolution confirmed: ${inc.location}`)
-      await Promise.allSettled([mutate("/api/incidentes?estado=atendido"), mutate("/api/analytics")])
+      if (!res.ok) { const body = await res.json(); throw new Error(body.error || "No se pudo finalizar la atención") }
+      toast.success(`Atención finalizada: ${inc.location}`)
+      await Promise.allSettled([mutate("/api/incidentes?estado=activo"), mutate("/api/incidentes?estado=atendido"), mutate("/api/operaciones"), mutate("/api/analytics")])
       onClose()
     } catch (err) {
       console.error("Error confirming incident resolution:", err)
-      toast.error("Could not confirm the resolution. Try again.")
+      toast.error(err instanceof Error ? err.message : "No se pudo finalizar la atención")
     } finally {
       setIsConfirming(false)
     }
@@ -214,7 +216,7 @@ export function IncidentDetailModal({
         ubicacion: inc.location,
         afectados: inc.affectedPeople,
         timestamp: inc.timestamp ? new Date(inc.timestamp).toISOString() : new Date().toISOString(),
-        resumenIA: inc.sourceDetails?.ai_analysis?.reasoning || inc.sourceDetails?.content || "Analysis not available",
+        resumenIA: inc.sourceDetails?.ai_analysis?.reasoning || inc.sourceDetails?.content || "Análisis no disponible",
       }
       const aiKey = inc.sourceDetails?.ai_analysis?.arkiv_entity_key || inc.sourceDetails?.arkiv_entity_key
       await generateIncidentPdf(pdfData, aiKey, inc.arkiv_key)
@@ -242,19 +244,14 @@ export function IncidentDetailModal({
                     <span className="text-xs font-normal text-muted-foreground">
                       {incidentTypeLabel(incident.type)} — Severidad {incidentSeverityLabel(incident.severity)}
                     </span>
-                    {pendingConfirmation && (
-                      <Badge className="bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500/20 text-[9px] px-1.5 py-0 border border-yellow-500/30 animate-pulse">
-                        Awaiting Confirmation
-                      </Badge>
-                    )}
-                    {incident.estado === "atendido" && !pendingConfirmation && (
+                    {incident.estado === "atendido" && (
                       <Badge className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25 text-[9px] px-1.5 py-0 border border-emerald-500/30">
                         Atendido
                       </Badge>
                     )}
                     {incident.estado === "activo" && (
                       <Badge className="bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500/20 text-[9px] px-1.5 py-0 border border-yellow-500/30 animate-pulse">
-                        Pending Validation
+                        Pendiente de validación
                       </Badge>
                     )}
                   </div>
@@ -266,13 +263,13 @@ export function IncidentDetailModal({
             <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6 space-y-4">
               {/* Stats */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <StatCard icon={<Users className="h-4 w-4 mx-auto mb-1 text-primary" />} label="Affected">
+                <StatCard icon={<Users className="h-4 w-4 mx-auto mb-1 text-primary" />} label="Personas afectadas">
                   {incident.affectedPeople.toLocaleString()}
                 </StatCard>
-                <StatCard icon={<Clock className="h-4 w-4 mx-auto mb-1 text-accent" />} label="Reported">
-                  {incident.timestamp.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                <StatCard icon={<Clock className="h-4 w-4 mx-auto mb-1 text-accent" />} label="Recibido">
+                  {incident.timestamp.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
                 </StatCard>
-                <StatCard icon={<MapPinned className="h-4 w-4 mx-auto mb-1 text-blue-400" />} label="Coordinates" small>
+                <StatCard icon={<MapPinned className="h-4 w-4 mx-auto mb-1 text-blue-400" />} label="Coordenadas" small>
                   {incident.coordinates.lat.toFixed(4)}, {incident.coordinates.lng.toFixed(4)}
                 </StatCard>
               </div>
@@ -281,7 +278,7 @@ export function IncidentDetailModal({
               <div className="rounded-lg border border-border bg-secondary/30 p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <SourceIcon source={incident.source} />
-                  <span className="text-sm font-medium">Source: {sourceLabel(incident.source)}</span>
+                  <span className="text-sm font-medium">Fuente: {sourceLabel(incident.source)}</span>
                   <Badge variant="outline" className="ml-auto text-[10px]">
                     {incident.source === "social"
                       ? incident.sourceDetails.platform
@@ -297,31 +294,7 @@ export function IncidentDetailModal({
               <IncidentVerifyPanel incident={incident} />
 
               {/* On-Chain Verification / Dispatch Action */}
-              {pendingConfirmation ? (
-                <div className="space-y-3">
-                  <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 space-y-2">
-                    <div className="flex items-center gap-2 text-yellow-400">
-                      <Clock className="h-4 w-4" />
-                      <span className="text-xs font-semibold">Auto-resolved — awaiting operator confirmation</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">
-                      This simulated incident was closed automatically
-                      {incident.sourceDetails.auto_resolved_at
-                        ? ` at ${new Date(incident.sourceDetails.auto_resolved_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`
-                        : ""}{" "}
-                      after its time window without attention. Confirm the resolution to seal it in the audit trail.
-                    </p>
-                  </div>
-                  <Button
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center justify-center gap-2 py-5 cursor-pointer"
-                    onClick={() => handleConfirmResolution(incident)}
-                    disabled={isConfirming}
-                  >
-                    {isConfirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                    {isConfirming ? "Confirming..." : "Confirm Resolution"}
-                  </Button>
-                </div>
-              ) : incident.estado === "atendido" ? (
+              {incident.estado === "atendido" ? (
                 <div className="space-y-3">
                   {incident.arkiv_key ? (
                     <OnChainVerifier arkivKey={incident.arkiv_key} />
@@ -329,12 +302,10 @@ export function IncidentDetailModal({
                     <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 space-y-2">
                       <div className="flex items-center gap-2 text-yellow-400">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-xs font-semibold">On-chain audit pending</span>
+                        <span className="text-xs font-semibold">Auditoría en cadena no confirmada</span>
                       </div>
                       <p className="text-[10px] text-muted-foreground">
-                        The incident is attended but the cryptographic seal on Arkiv/Stellar
-                        has not been recorded yet (the network may be congested). Refresh
-                        this window in a few seconds to see the hash.
+                        La atención fue finalizada por un operador. No hay un registro confirmado de despacho en blockchain.
                       </p>
                     </div>
                   )}
@@ -347,12 +318,12 @@ export function IncidentDetailModal({
                       {isGenerating ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Generating...
+                          Generando…
                         </>
                       ) : (
                         <>
                           <FileText className="h-4 w-4" />
-                          PDF Report
+                          Informe PDF
                         </>
                       )}
                     </Button>
@@ -364,7 +335,7 @@ export function IncidentDetailModal({
                       >
                         <a href={`/auditoria?key=${incident.arkiv_key}`} target="_blank" rel="noopener noreferrer">
                           <ExternalLink className="h-4 w-4" />
-                          Verify Portal
+                          Ver auditoría
                         </a>
                       </Button>
                     )}
@@ -372,10 +343,11 @@ export function IncidentDetailModal({
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 cursor-pointer" onClick={onOpenDeploy}>
+                  <Button disabled={!canOperate} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 cursor-pointer" onClick={onOpenDeploy}>
                     <Truck className="h-5 w-5 mr-2" />
-                    {incident.source === "social" ? "Confirm Incident" : "Resource Deployment"}
+                    Despachar recursos
                   </Button>
+                  <Button variant="outline" disabled={isConfirming || !canOperate} onClick={() => void handleConfirmResolution(incident)}>Finalizar atención</Button>
                 </div>
               )}
             </div>
@@ -407,6 +379,8 @@ const SOCIAL_PLATFORM_STYLE: Record<string, { icon: typeof Twitter; tint: string
 function SourceDetail({ incident }: { incident: Incident }) {
   const { source, sourceDetails: sd } = incident
 
+  if (source === "citizen") return <div className="space-y-3 text-sm"><p className="whitespace-pre-wrap break-words text-slate-200">{sd.descripcion || "El ciudadano no agregó una descripción."}</p>{sd.contacto && <p className="break-all text-xs text-slate-400">Contacto para el equipo operativo: <a className="text-sky-300 underline" href={`mailto:${sd.contacto}`}>{sd.contacto}</a></p>}<a className="inline-block text-xs text-sky-300 underline" href={`/seguimiento/${incident.id}`} target="_blank" rel="noopener noreferrer">Abrir seguimiento público</a></div>
+
   if (source === "social") {
     const { icon: PlatformIcon, tint } = SOCIAL_PLATFORM_STYLE[sd.platform_id ?? ""] ?? SOCIAL_PLATFORM_STYLE.twitter
     const reports = sd.reports_count ?? 1
@@ -435,7 +409,7 @@ function SourceDetail({ incident }: { incident: Incident }) {
         </p>
         {sd.ai_analysis?.summary && sd.ai_analysis.summary !== sd.content && (
           <p className="text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">AI summary:</span> {sd.ai_analysis.summary}
+            <span className="font-semibold text-foreground">Resumen del análisis:</span> {sd.ai_analysis.summary}
           </p>
         )}
         {(reports > 1 || sd.analyzer) && (
@@ -443,12 +417,12 @@ function SourceDetail({ incident }: { incident: Incident }) {
             {reports > 1 && (
               <Badge variant="outline" className="gap-1 border-sky-500/40 text-[10px] text-sky-300">
                 <Repeat2 className="h-3 w-3" />
-                {reports} reports corroborate this incident
+                {reports} reportes corroboran este incidente
               </Badge>
             )}
             {sd.analyzer && (
               <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                {sd.analyzer === "llm" ? "Classified by LLM" : "Classified by rules"}
+                {sd.analyzer === "llm" ? "Clasificado por IA" : "Clasificado por reglas"}
               </Badge>
             )}
           </div>
@@ -476,10 +450,10 @@ function SourceDetail({ incident }: { incident: Incident }) {
 
   if (source === "sensor") {
     const fields = [
-      { label: "Temperature", value: `${sd.temperature}°C` },
-      { label: "Humidity",    value: `${sd.humidity}%` },
-      { label: "Wind",        value: `${sd.windSpeed} km/h` },
-      { label: "Pressure",    value: `${sd.pressure} hPa` },
+      { label: "Temperatura", value: typeof sd.temperature === "number" ? `${sd.temperature}°C` : "Sin datos" },
+      { label: "Humedad", value: typeof sd.humidity === "number" ? `${sd.humidity}%` : "Sin datos" },
+      { label: "Viento", value: typeof sd.windSpeed === "number" ? `${sd.windSpeed} km/h` : "Sin datos" },
+      { label: "Presión", value: typeof sd.pressure === "number" ? `${sd.pressure} hPa` : "Sin datos" },
     ]
     return (
       <div className="space-y-3">
@@ -506,14 +480,14 @@ function SourceDetail({ incident }: { incident: Incident }) {
         <div className="relative h-[140px] w-full rounded-lg overflow-hidden bg-zinc-950 border border-border/40">
           <img src={sd.imageUrl} alt="Camera capture" className="absolute inset-0 w-full h-full object-contain" />
           <div className="absolute top-2 left-2 z-10">
-            <Badge className="bg-red-500/90 text-white text-[10px] animate-pulse">LIVE</Badge>
+            <Badge className="bg-slate-800/90 text-white text-[10px]">Captura registrada</Badge>
           </div>
           <div className="absolute bottom-2 right-2 z-10">
             <Badge className="bg-black/70 text-white text-[10px]">{sd.cameraId}</Badge>
           </div>
           <div className="absolute bottom-2 left-2 z-10">
             <Badge className="bg-black/70 text-white text-[10px]">
-              {new Date().toLocaleTimeString("en-US")}
+              {new Date().toLocaleTimeString("es-AR")}
             </Badge>
           </div>
         </div>
@@ -568,10 +542,10 @@ export function DeployModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Send className="h-5 w-5 text-primary" />
-            Deploy Emergency Resources
+            Despachar recursos de emergencia
           </DialogTitle>
           <DialogDescription>
-            Select the resources to send to{" "}
+            Seleccioná los recursos para{" "}
             <span className="font-medium text-foreground">{incident?.location}</span>
           </DialogDescription>
         </DialogHeader>
@@ -581,18 +555,18 @@ export function DeployModal({
             <div className="h-16 w-16 rounded-full bg-success/20 flex items-center justify-center">
               <CheckCircle2 className="h-8 w-8 text-success" />
             </div>
-            <p className="text-lg font-semibold text-foreground">Resources Deployed</p>
+            <p className="text-lg font-semibold text-foreground">Recursos despachados</p>
             <p className="text-sm text-muted-foreground text-center">
-              Units have been notified and are on their way
+              La asignación de los recursos fue registrada
             </p>
           </div>
         ) : (
           <>
             <div className="space-y-2 py-2">
               {!dbRecursos ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Loading resources...</p>
+                <p className="text-sm text-muted-foreground text-center py-4">Cargando recursos…</p>
               ) : resourceGroups.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No resources registered</p>
+                <p className="text-sm text-muted-foreground text-center py-4">No hay recursos registrados</p>
               ) : (
                 resourceGroups.map((group) => {
                   const available = group.availableIds.length
@@ -661,29 +635,29 @@ export function DeployModal({
 
             {/* Summary */}
             <div className="rounded-lg bg-secondary/50 p-3">
-              <p className="text-xs text-muted-foreground mb-1">Deployment summary</p>
+              <p className="text-xs text-muted-foreground mb-1">Resumen del despacho</p>
               <p className="text-sm font-medium text-foreground">
                 {totalSelected > 0
                   ? Object.entries(selectedCounts)
                       .filter(([, v]) => v > 0)
                       .map(([tipo, v]) => `${v} ${tipoRecursoLabel(tipo)}`)
                       .join(", ")
-                  : "No resources selected"}
+                  : "No se seleccionaron recursos"}
               </p>
             </div>
 
             <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button variant="outline" onClick={onClose}>Cancelar</Button>
               <Button onClick={onDeploy} disabled={deployingResources || totalSelected === 0}>
                 {deployingResources ? (
                   <>
                     <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Deploying...
+                    Despachando…
                   </>
                 ) : (
                   <>
                     <Send className="h-4 w-4 mr-2" />
-                    Confirm Deployment
+                    Confirmar despacho
                   </>
                 )}
               </Button>

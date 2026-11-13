@@ -20,18 +20,17 @@
  *        ¿límite de activos? ──sí──► skipped
  *                    │ no
  *                    ▼
- *                 created  (Supabase → Realtime → mapa)
+ *                 created  (PostgreSQL → actualización del mapa)
  *
  * Lo usan tanto el webhook POST /api/social/mention como el SocialMediaAgent.
  */
 
-import { randomUUID } from "crypto"
 import { CONFIG } from "@/lib/config"
 import { isNonReportIncident } from "@/lib/types"
 import { LlmAnalyzer } from "@/lib/agents/llm-analyzer"
 import { analyzePostHeuristically } from "@/lib/agents/heuristic-analyzer"
 import { containsTriggerHashtag, extractHashtags, TRIGGER_HASHTAG } from "@/lib/agents/hashtag"
-import { DEFAULT_PLACE, findPlaceInText, jitter } from "@/lib/agents/tucuman-gazetteer"
+import { findPlaceInText } from "@/lib/agents/tucuman-gazetteer"
 import { getConfigNumber } from "@/lib/services/config-service"
 import { getDb } from "@/lib/db"
 import type { GeminiAnalysis, MentionOutcome, SocialPlatform, SocialPost } from "@/lib/agents/types"
@@ -60,7 +59,7 @@ export const PLATFORM_LABELS: Record<SocialPlatform, string> = {
   eonet:     "NASA EONET",
 }
 
-// La capa de datos es dual (Supabase o memoria según .env.local) — ver lib/db.ts
+// La capa de datos usa Neon/PostgreSQL sin fallback a memoria — ver lib/db.ts
 
 let llm: LlmAnalyzer | null = null
 
@@ -79,11 +78,11 @@ async function analyze(post: SocialPost): Promise<{ analysis: GeminiAnalysis; an
 function resolveLocation(post: SocialPost, analysis: GeminiAnalysis) {
   const place = findPlaceInText(analysis.locationName, post.text, post.location)
   if (post.geoLat !== undefined && post.geoLng !== undefined) {
-    return { nombre: place?.nombre ?? analysis.locationName ?? post.location ?? DEFAULT_PLACE.nombre, lat: post.geoLat, lng: post.geoLng }
+    return { nombre: place?.nombre ?? analysis.locationName ?? post.location ?? "Ubicación del reporte", lat: post.geoLat, lng: post.geoLng }
   }
   if (place) return { nombre: place.nombre, lat: place.lat, lng: place.lng }
   if (analysis.coordinatesInferred) return { nombre: analysis.locationName, ...analysis.coordinatesInferred }
-  return { nombre: analysis.locationName || DEFAULT_PLACE.nombre, lat: jitter(DEFAULT_PLACE.lat, 600), lng: jitter(DEFAULT_PLACE.lng, 600) }
+  return null
 }
 
 function maxSeverity(a: string, b: string): string {
@@ -124,6 +123,7 @@ export async function ingestSocialPost(post: SocialPost, { dryRun = false }: Ing
   }
 
   const location = resolveLocation(post, analysis)
+  if (!location) return { ...base, status: "rejected", analyzer, analysis, reason: "No se pudo localizar el reporte; se requiere una ubicación verificable" }
   analysis.locationName = location.nombre
 
   if (!db) {
@@ -169,10 +169,7 @@ export async function ingestSocialPost(post: SocialPost, { dryRun = false }: Ing
     return { ...base, status: "skipped", analyzer, analysis, location: location.nombre, reason: `Límite de ${CONFIG.INCIDENTS.MAX_ACTIVE} incidentes activos alcanzado` }
   }
 
-  // Las detecciones de IA quedan PENDIENTES (locales). Sólo al confirmarse y despacharse
-  // se firman en Arkiv; si nadie las valida en 1 hora se eliminan (Darwinian Decay).
-  const onChainKey = `${CONFIG.ARKIV.SIMULATED_KEY_PREFIX}Detection-${randomUUID().replace(/-/g, "")}`
-  analysis.arkivKey = onChainKey
+  // A pending social report has no blockchain key until an entity is confirmed.
   const now = new Date().toISOString()
 
   const inserted = await db.insertIncident({
@@ -199,15 +196,12 @@ export async function ingestSocialPost(post: SocialPost, { dryRun = false }: Ing
         related_post_ids: [post.id],
         corroborations:   [],
         analyzer,
-        ...(post.simulated ? { simulated: true } : {}),
-        arkiv_entity_key: onChainKey,
         ai_analysis: {
           summary:          analysis.summary,
           reasoning:        analysis.reasoning,
           suggestedActions: analysis.suggestedActions,
           confidence:       analysis.confidence,
           relatedPostIds:   [post.id],
-          arkiv_entity_key: onChainKey,
         },
       },
       estado:     "activo",

@@ -1,6 +1,5 @@
 interface DispatchDependencies {
   dispatch: (incidentId: string, resourceId: string) => Promise<unknown>
-  markAttended: (incidentId: string) => Promise<unknown>
 }
 
 export async function dispatchSelectedResources(incidentId: string | undefined, resourceIds: string[], dependencies: DispatchDependencies): Promise<void> {
@@ -14,9 +13,5 @@ export async function dispatchSelectedResources(incidentId: string | undefined, 
       ? `${sent} recursos despachados; ${failed.length} fallaron. Revisá la disponibilidad antes de reintentar.`
       : "No se pudo despachar ningún recurso. Revisá la disponibilidad e intentá nuevamente.")
   }
-  try {
-    await dependencies.markAttended(incidentId)
-  } catch {
-    throw new Error("Los recursos fueron despachados, pero no se pudo actualizar el incidente. Revisá su estado.")
-  }
+  // Dispatching is not completing care. Closing requires an explicit operation.
 }

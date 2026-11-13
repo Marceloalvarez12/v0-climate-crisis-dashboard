@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react"
 import useSWR from "swr"
-import { AlertTriangle, ShieldCheck, ExternalLink, Map, FileWarning } from "lucide-react"
+import { AlertTriangle, ShieldCheck, ExternalLink, Map, FileWarning, Settings } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { fetcher } from "@/lib/api"
+import { logout } from "@/app/login/actions"
+import { useStaffAccess } from "@/hooks/use-staff-access"
 
 const NAV_LINKS = [
   { href: "/reportar",  label: "Reporte ciudadano", icon: FileWarning },
@@ -14,6 +16,7 @@ const NAV_LINKS = [
 ]
 
 export function DashboardHeader() {
+  const { isAdmin } = useStaffAccess()
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
   const { data: analytics } = useSWR<{ criticalCount: number; highCount: number }>("/api/analytics", fetcher, { refreshInterval: 10_000 })
 
@@ -30,7 +33,7 @@ export function DashboardHeader() {
       {/* Left: brand */}
       <div className="flex min-w-0 items-center gap-3">
         <Link href="/" aria-label="Zntinel, centro de control">
-          <Image src="/zntinel-logo-trimmed.png" alt="Zntinel" width={382} height={141} className="h-11 w-auto object-contain" priority />
+          <Image src="/zntinel-logo-trimmed.png" alt="Zntinel" width={382} height={141} className="h-8 w-auto object-contain sm:h-11" priority />
         </Link>
         <div className="hidden h-6 w-px bg-border sm:block" />
         <div className="hidden leading-tight sm:block">
@@ -41,9 +44,11 @@ export function DashboardHeader() {
 
       {/* Right: status + navigation */}
       <div className="flex items-center gap-2">
+        {isAdmin && <Link href="/admin" aria-label="Administración" title="Administración" className="flex h-9 w-9 items-center justify-center gap-2 rounded-md border border-border text-xs text-slate-300 xl:w-auto xl:px-2"><Settings className="h-4 w-4" /><span className="hidden xl:inline">Administración</span></Link>}
+        <form action={logout}><button className="rounded-md border border-border px-2 py-1 text-xs text-slate-300">Salir</button></form>
         <nav aria-label="Accesos públicos" className="flex items-center gap-1.5 md:hidden">
           <Link href="/mapa" aria-label="Abrir mapa público" title="Mapa público" className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-secondary/30 text-slate-200 transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300"><Map className="h-4 w-4" /></Link>
-          <Link href="/reportar" aria-label="Hacer un reporte ciudadano" title="Reporte ciudadano" className="flex h-10 items-center gap-1.5 rounded-md border border-sky-400/30 bg-sky-400/10 px-3 text-xs font-medium text-sky-100 transition-colors hover:bg-sky-400/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300"><FileWarning className="h-4 w-4" /><span>Reportar</span></Link>
+          <Link href="/reportar" aria-label="Hacer un reporte ciudadano" title="Reporte ciudadano" className="flex h-10 items-center gap-1.5 rounded-md border border-sky-400/30 bg-sky-400/10 px-3 text-xs font-medium text-sky-100 transition-colors hover:bg-sky-400/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300"><FileWarning className="h-4 w-4" /><span className="hidden min-[380px]:inline">Reportar</span></Link>
         </nav>
         {criticalCount > 0 && (
           <span className="hidden h-7 items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 font-mono text-[10px] font-semibold text-red-400 md:flex">

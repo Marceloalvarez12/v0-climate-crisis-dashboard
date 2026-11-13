@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { X, Check, Loader2, Truck, Ambulance, Shield, Ship, Plane } from "lucide-react"
+import { useModalFocus } from "@/hooks/use-modal-focus"
 import { cn } from "@/lib/utils"
 import { generateResourceName } from "@/lib/resource-helpers"
 
@@ -29,6 +30,7 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
   const [ubicacion, setUbicacion] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [nameEdited, setNameEdited] = useState(false)
 
   useEffect(() => {
     if (editResource) {
@@ -43,14 +45,15 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
       setUbicacion("")
     }
     setError("")
+    setNameEdited(false)
   }, [editResource, isOpen])
 
   useEffect(() => {
-    if (!editResource && tipo && ubicacion) {
+    if (!editResource && !nameEdited && tipo && ubicacion) {
       const suggestedName = generateResourceName(tipo, ubicacion)
       setNombre(suggestedName)
     }
-  }, [tipo, ubicacion, editResource])
+  }, [tipo, ubicacion, editResource, nameEdited])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -84,13 +87,16 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
     }
   }
 
+  const closeModal = () => { if (!loading) onClose() }
+  const dialogRef = useModalFocus(isOpen, closeModal, loading)
+
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeModal} />
 
-      <div className="relative z-10 w-full max-w-md mx-4 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/50 overflow-hidden">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Ficha del recurso" tabIndex={-1} className="max-h-[90dvh] overflow-y-auto relative z-10 w-full max-w-md mx-4 rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/50 overflow-hidden">
         <div className="flex items-center justify-between border-b border-zinc-800 px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400">
@@ -106,7 +112,8 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={closeModal}
+            aria-label="Cerrar"
             disabled={loading}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors disabled:opacity-30"
           >
@@ -128,7 +135,8 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
             <input
               type="text"
               value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
+              aria-label="Nombre del recurso"
+              onChange={(e) => { setNameEdited(true); setNombre(e.target.value) }}
               placeholder="Ej: Ambulancias SAME - Base Central"
               required
               className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
@@ -143,12 +151,14 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
               <button
                 type="button"
                 onClick={() => setCantidad(Math.max(1, cantidad - 1))}
+                aria-label="Restar una unidad"
                 className="h-9 w-9 rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 flex items-center justify-center transition-colors"
               >
                 −
               </button>
               <input
                 type="number"
+                aria-label="Cantidad de unidades"
                 value={cantidad}
                 onChange={(e) => setCantidad(Math.max(1, parseInt(e.target.value) || 1))}
                 min="1"
@@ -176,6 +186,7 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
                   key={t.id}
                   type="button"
                   onClick={() => setTipo(t.id)}
+                  aria-pressed={tipo === t.id}
                   className={cn(
                     "flex items-center gap-2 px-3 py-2 rounded-lg border text-xs transition-all",
                     tipo === t.id
@@ -197,6 +208,7 @@ export function ResourceFormModal({ isOpen, onClose, onSuccess, editResource }: 
             <input
               type="text"
               value={ubicacion}
+              aria-label="Base del recurso"
               onChange={(e) => setUbicacion(e.target.value)}
               placeholder="Ej: Base Central"
               required

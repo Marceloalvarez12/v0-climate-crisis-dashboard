@@ -37,7 +37,7 @@ interface Metric {
 }
 
 export function AnalyticsPanel() {
-  const { data } = useSWR<AnalyticsData>("/api/analytics", fetcher, {
+  const { data, error, mutate } = useSWR<AnalyticsData>("/api/analytics", fetcher, {
     refreshInterval: 5000,
     revalidateOnFocus: false,
     dedupingInterval: 3000,
@@ -76,7 +76,7 @@ export function AnalyticsPanel() {
       id: "risk",
       label: "Nivel de riesgo",
       // Show LOW when active but no critical/high, show — when no data yet
-      value: !d || d.activeIncidentCount === 0 ? "SIN INCIDENTES" : ({ LOW: "BAJO", "LOW-MEDIUM": "BAJO–MEDIO", MEDIUM: "MEDIO", HIGH: "ALTO", CRITICAL: "CRÍTICO" } as Record<string, string>)[d.riskLevel] ?? d.riskLevel,
+      value: !d ? "Sin datos" : d.activeIncidentCount === 0 ? "SIN INCIDENTES" : ({ LOW: "BAJO", "LOW-MEDIUM": "BAJO–MEDIO", MEDIUM: "MEDIO", HIGH: "ALTO", CRITICAL: "CRÍTICO" } as Record<string, string>)[d.riskLevel] ?? d.riskLevel,
       icon: <AlertTriangle className="h-4 w-4" />,
       color: riskColor,
       progress: d?.activeIncidentCount === 0 ? 0 : d?.riskProgress,
@@ -84,7 +84,7 @@ export function AnalyticsPanel() {
     {
       id: "affected",
       label: "Personas afectadas",
-      value: d ? d.affectedNow.toLocaleString("en-US") : "—",
+      value: d ? d.affectedNow.toLocaleString("es-AR") : "Sin datos",
       // Only show change badge if it's non-zero (real comparison exists)
       change: d?.affectedChange !== 0 ? d?.affectedChange : undefined,
       icon: <Users className="h-4 w-4" />,
@@ -174,12 +174,13 @@ export function AnalyticsPanel() {
   return (
     <div className="rounded-lg border border-[#30373c] bg-[#0f1417] shadow-[0_8px_24px_rgba(0,0,0,.12)]">
       <div className="flex items-center justify-between border-b border-[#30373c] px-4 py-2">
-        <h2 className="text-sm font-semibold text-foreground">Indicadores de la simulación</h2>
+        <h2 className="text-sm font-semibold text-foreground">Indicadores operativos</h2>
         <div className="flex items-center gap-1.5">
           <div className={cn("h-1.5 w-1.5 rounded-full", d ? "bg-success animate-pulse" : "bg-muted-foreground")} />
-          <span className="text-[10px] text-muted-foreground">{d ? "Actualizado" : "Cargando..."}</span>
+          <span className="text-[10px] text-muted-foreground">{error ? "Sin conexión" : d ? "Actualizado" : "Cargando..."}</span>
         </div>
       </div>
+      {error && <div role="alert" className="px-4 py-2 text-xs text-red-300">No se pudieron actualizar los indicadores.<button onClick={() => void mutate()} className="ml-2 underline">Reintentar</button></div>}
       <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         {metrics.map((metric) => (
           <div
