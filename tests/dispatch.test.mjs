@@ -12,13 +12,13 @@ const { withTimeout } = await load("../lib/services/with-timeout.ts")
 const { buildDispatchPayload } = await load("../lib/dispatch-payload.ts")
 const { publicStellarAudit } = await load("../lib/public-audit.ts")
 
-test("dispatch sends all resources and never closes the incident", async () => {
+test("incident is updated only after all resources succeed", async () => {
   const calls = []
   await dispatchSelectedResources("incident", ["one", "two"], {
     dispatch: async (_, id) => { calls.push(id) },
     markAttended: async () => { assert.deepEqual(calls, ["one", "two"]); calls.push("attended") },
   })
-  assert.deepEqual(calls, ["one", "two"])
+  assert.equal(calls.at(-1), "attended")
 })
 
 test("partial dispatch reports the failure and never marks the incident attended", async () => {
@@ -30,11 +30,14 @@ test("partial dispatch reports the failure and never marks the incident attended
   assert.equal(marked, false)
 })
 
-test("empty and duplicate selections cannot dispatch", async () => {
+test("empty and duplicate selections cannot dispatch; incident update failures stay visible", async () => {
   const dependencies = { dispatch: async () => { throw new Error("must not dispatch") }, markAttended: async () => {} }
   await assert.rejects(dispatchSelectedResources(undefined, ["one"], dependencies), /incidente válido/)
   await assert.rejects(dispatchSelectedResources("incident", [], dependencies), /Seleccioná recursos/)
   await assert.rejects(dispatchSelectedResources("incident", ["one", "one"], dependencies), /duplicados/)
+  await assert.rejects(dispatchSelectedResources("incident", ["one"], {
+    dispatch: async () => {}, markAttended: async () => { throw new Error("database unavailable") },
+  }), /recursos fueron despachados, pero/)
 })
 
 test("blockchain timeouts reject rather than returning a successful placeholder", async () => {

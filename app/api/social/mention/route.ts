@@ -6,7 +6,6 @@ import { TRIGGER_HASHTAG } from "@/lib/agents/hashtag"
 import { getSystemConfig } from "@/lib/services/config-service"
 import { apiSuccess, apiError, apiValidationError } from "@/lib/services/api-response"
 import { SocialMentionSchema } from "@/lib/validation"
-import { recordAgentEvent } from "@/lib/services/agent-event-service"
 
 /**
  * Webhook de ingesta de menciones en redes sociales.
@@ -24,7 +23,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return apiValidationError(parsed.error.flatten())
 
     const m = parsed.data
-    if (m.simulated) {
+    if (m.simulated && process.env.NODE_ENV !== "development") {
       return apiError("Los reportes simulados están deshabilitados", 403)
     }
     const dryRun = request.nextUrl.searchParams.get("dryRun") === "true"
@@ -51,7 +50,6 @@ export async function POST(request: NextRequest) {
       { dryRun },
     )
 
-    if (!dryRun) await recordAgentEvent(outcome.status === "created" ? "alert" : "analysis", `Mención procesada: ${outcome.status}`, m.platform)
     return apiSuccess({ ...outcome, dryRun })
   } catch (err) {
     console.error("[API/social/mention]", err)

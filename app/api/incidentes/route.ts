@@ -2,9 +2,6 @@ import { NextRequest } from "next/server"
 import { IncidentService } from "@/lib/services/incident-service"
 import { apiSuccess, apiError, apiValidationError } from "@/lib/services/api-response"
 import { IncidentCreateSchema, IncidentPatchSchema } from "@/lib/validation"
-import { requireStaff } from "@/lib/auth"
-import { getDb } from "@/lib/db"
-import { isNonReportIncident } from "@/lib/types"
 
 export async function GET(request: NextRequest) {
   try {
@@ -71,16 +68,6 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { id, ...updates } = parsed.data
-    const { user, profile } = await requireStaff()
-    if (!["admin", "operador"].includes(profile.rol)) return apiError("Acceso denegado", 403)
-    const incident = await IncidentService.findById(id)
-    if (!incident || isNonReportIncident(incident)) return apiError("Incidente no encontrado", 404)
-    if (updates.estado === "atendido") {
-      const assigned = await (await getDb()).listIncidentResources(id)
-      if (assigned.some(r => ["busy", "dispatched"].includes(r.estado))) return apiError("Confirmá la liberación de los recursos antes de finalizar la atención", 409)
-      const updated = await IncidentService.update(id, { ...updates, fuente_detalles: { ...incident.fuente_detalles, resolved_at: new Date().toISOString(), resolved_by: user.id } })
-      return apiSuccess(updated)
-    }
     const updated = await IncidentService.update(id, updates)
     return apiSuccess(updated)
   } catch (err) {
@@ -89,17 +76,21 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  try { await requireStaff("admin") } catch { return apiError("Acceso denegado", 403) }
   try {
     const body = await request.json()
-    const { id } = body
+    const { id, estado, simulated } = body
 
     if (id) {
       await IncidentService.deleteById(id)
       return apiSuccess({ deleted: id })
     }
 
-    return apiValidationError({ formErrors: ["Se requiere el ID del incidente"], fieldErrors: {} })
+    if (simulated) {
+      await IncidentService.deleteSimulated(estado)
+      return apiSuccess({ cleaned: true })
+    }
+
+    return apiValidationError({ formErrors: ["Se requiere id o simulated=true"], fieldErrors: {} })
   } catch (err) {
     return apiError(String(err))
   }

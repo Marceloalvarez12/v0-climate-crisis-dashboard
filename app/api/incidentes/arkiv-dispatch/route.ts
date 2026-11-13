@@ -8,19 +8,13 @@ import { buildDispatchPayload } from "@/lib/dispatch-payload"
 import { IncidentDispatchSchema } from "@/lib/validation"
 import { CONFIG } from "@/lib/config"
 import { isNonReportIncident, type DbIncident, type ArkivDispatchResponse } from "@/lib/types"
-import { getDb } from "@/lib/db"
-import { requireStaff } from "@/lib/auth"
 
 export async function POST(request: NextRequest): Promise<Response> {
   try {
-    const { user, profile } = await requireStaff()
-    if (!["admin", "operador"].includes(profile.rol)) return apiError("Acceso denegado", 403)
     const parsed = IncidentDispatchSchema.safeParse(await request.json().catch(() => null))
     if (!parsed.success) return apiValidationError(parsed.error.flatten())
     const incident = await IncidentService.findById(parsed.data.id)
     if (!incident || isNonReportIncident(incident)) return apiNotFound("Incident")
-    const assigned = await (await getDb()).listIncidentResources(incident.id)
-    if (!assigned.some(r => ["busy", "dispatched"].includes(r.estado))) return apiError("No hay un recurso asignado para auditar el despacho", 409)
 
     const dispatchedAt = new Date().toISOString()
     const priorKey = incident.fuente_detalles.arkiv_entity_key
@@ -56,12 +50,12 @@ export async function POST(request: NextRequest): Promise<Response> {
       ...(entityKey ? { arkiv_entity_key: entityKey, arkiv_is_simulated: false } : {}),
       detection_arkiv_key: payload.detectionKey,
       dispatched_at: dispatchedAt, lease_extended: lease,
-      dispatched_by: user.id,
-      ...(incident.fuente === "social" ? { validated: true, validated_at: dispatchedAt, validated_by: user.id } : {}),
       arkiv_audit_status: entityKey ? "confirmed" : "unavailable",
       ...(stellarAudit ? { stellar_audit: stellarAudit } : {}),
+      // Auto-resuelto por la simulación: el operador confirma el cierre acá.
+      ...(incident.fuente_detalles.pending_confirmation ? { pending_confirmation: false, confirmed_at: dispatchedAt } : {}),
     }
-    await IncidentService.update(incident.id, { fuente_detalles: details })
+    await IncidentService.update(incident.id, { estado: "atendido", fuente_detalles: details })
     const response: ArkivDispatchResponse = { success: true, onChain: Boolean(entityKey), entityKey, isSimulated: !entityKey, stellarAudit: stellarAudit ?? undefined }
     return apiSuccess(response)
   } catch (error) {

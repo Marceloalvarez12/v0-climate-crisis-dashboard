@@ -6,7 +6,7 @@ const SERVICES = [
   { id: "openrouter", name: "OpenRouter", icon: Cpu, variable: "OPENROUTER_API_KEY" },
   { id: "gemini", name: "Gemini", icon: Cpu, variable: "GOOGLE_AI_API_KEY" },
   { id: "twitter", name: "X", icon: Globe, variable: "X_BEARER_TOKEN" },
-  { id: "neon", name: "Neon PostgreSQL", icon: Database, variable: "DATABASE_URL" },
+  { id: "supabase", name: "Supabase (opcional — sin claves usa memoria)", icon: Database, variable: "SUPABASE_SERVICE_ROLE_KEY" },
   { id: "leaflet", name: "Leaflet (sin clave)", icon: Map, variable: "" },
 ] as const
 

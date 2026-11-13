@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
-import { getDb, hasDatabaseConfig } from "@/lib/db"
+import { getDb, hasSupabaseConfig } from "@/lib/db"
 import { auditAdmin, requireStaff } from "@/lib/auth"
 
 const idSchema = z.string().uuid()
@@ -41,29 +41,27 @@ export async function createOperator(input: z.infer<typeof operatorSchema>) {
   const { nombre, email, password } = operatorSchema.parse(input)
   const db = await getDb()
   const created = await db.createOperator({ nombre, email, password })
-  await auditAdmin("create_operator", { user_id: created.id, email, nombre })
+  await auditAdmin(null, "create_operator", { user_id: created.id, email, nombre })
   revalidatePath("/admin")
 }
 
 export async function updateUserRole(userId: string, role: z.infer<typeof roleSchema>) {
-  const { user } = await requireStaff("admin")
+  await requireStaff("admin")
   const id = idSchema.parse(userId)
-  if (id === user.id) throw new Error("No podés cambiar tu propio rol")
   const parsedRole = roleSchema.parse(role)
   const db = await getDb()
   await db.updateProfile(id, { rol: parsedRole })
-  await auditAdmin("update_user_role", { user_id: id, role: parsedRole })
+  await auditAdmin(null, "update_user_role", { user_id: id, role: parsedRole })
   revalidatePath("/admin")
 }
 
 export async function suspendUser(userId: string, status: "activo" | "suspendido") {
-  const { user } = await requireStaff("admin")
+  await requireStaff("admin")
   const id = idSchema.parse(userId)
-  if (id === user.id) throw new Error("No podés suspender tu propia cuenta")
   const parsedStatus = z.enum(["activo", "suspendido"]).parse(status)
   const db = await getDb()
   await db.updateProfile(id, { status: parsedStatus })
-  await auditAdmin("update_user_status", { user_id: id, status: parsedStatus })
+  await auditAdmin(null, "update_user_status", { user_id: id, status: parsedStatus })
   revalidatePath("/admin")
 }
 
@@ -71,9 +69,8 @@ export async function resetUserPassword(userId: string) {
   await requireStaff("admin")
   const id = idSchema.parse(userId)
   const db = await getDb()
-  if (!process.env.APP_URL) throw new Error("APP_URL no configurada para recuperación")
-  await db.resetUserPassword(id, new URL("/restablecer", process.env.APP_URL).toString())
-  await auditAdmin("reset_user_password", { user_id: id })
+  await db.resetUserPassword(id)
+  await auditAdmin(null, "reset_user_password", { user_id: id })
 }
 
 export async function getOperatorAssignments(userId: string): Promise<string[]> {
@@ -83,10 +80,12 @@ export async function getOperatorAssignments(userId: string): Promise<string[]> 
 }
 
 export async function assignResourcesToOperator(userId: string, resourceIds: string[]) {
-  const { user } = await requireStaff("admin")
+  await requireStaff("admin")
   const id = idSchema.parse(userId)
   const resources = z.array(z.string().min(1).max(100)).max(100).parse(resourceIds)
-  await (await getDb()).replaceAssignments(user.id, id, [...new Set(resources)])
+  const db = await getDb()
+  await db.replaceAssignments(id, [...new Set(resources)])
+  await auditAdmin(null, "assign_resources", { user_id: id, count: resources.length })
   revalidatePath("/admin")
 }
 
@@ -111,32 +110,34 @@ export async function updateAgentMode(autonomous: boolean) {
   })
   const { invalidateConfigCache } = await import("@/lib/services/config-service")
   invalidateConfigCache("agent_mode")
-  await auditAdmin("agent_mode_toggle", { autonomous, ejecutado_por: user.email })
+  await auditAdmin(null, "agent_mode_toggle", { autonomous, ejecutado_por: user.email })
 }
 
-export async function getAgentThresholds(): Promise<{ confidence: number }> {
+export async function getAgentThresholds(): Promise<{ autoResolve: number; confidence: number }> {
   await requireStaff("admin")
   const db = await getDb()
   const read = async (clave: string, fallback: number) => {
     const row = await db.getConfig<{ value?: number }>(clave)
     return typeof row?.value === "number" ? row.value : fallback
   }
-  return { confidence: await read("confidence_threshold", 80) }
+  return { autoResolve: await read("auto_resolve_minutes", 5), confidence: await read("confidence_threshold", 80) }
 }
 
-export async function updateAgentThresholds(confidence: number) {
+export async function updateAgentThresholds(autoResolve: number, confidence: number) {
   const { user } = await requireStaff("admin")
   const parsed = z.object({
+    autoResolve: z.number().int().min(1).max(60),
     confidence: z.number().int().min(50).max(100),
-  }).parse({ confidence })
+  }).parse({ autoResolve, confidence })
   const stamp = { updated_by: user.email, updated_at: new Date().toISOString() }
   const db = await getDb()
   await db.upsertConfigs([
+    { clave: "auto_resolve_minutes", valor: { value: parsed.autoResolve, ...stamp } },
     { clave: "confidence_threshold", valor: { value: parsed.confidence, ...stamp } },
   ])
   const { invalidateConfigCache } = await import("@/lib/services/config-service")
   invalidateConfigCache()
-  await auditAdmin("update_thresholds", { ...parsed, ejecutado_por: user.email })
+  await auditAdmin(null, "update_thresholds", { ...parsed, ejecutado_por: user.email })
 }
 
 export async function getApiCredentials(): Promise<Record<string, boolean>> {
@@ -145,7 +146,7 @@ export async function getApiCredentials(): Promise<Record<string, boolean>> {
     openrouter: Boolean(process.env.OPENROUTER_API_KEY),
     gemini: Boolean(process.env.GOOGLE_AI_API_KEY),
     twitter: Boolean(process.env.X_BEARER_TOKEN),
-    neon: hasDatabaseConfig(),
+    supabase: hasSupabaseConfig(),
     leaflet: true,
   }
 }

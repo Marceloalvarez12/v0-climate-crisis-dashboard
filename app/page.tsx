@@ -7,7 +7,7 @@ import { ResourcesPanel } from "@/components/dashboard/resources-panel"
 import { CrisisMap } from "@/components/dashboard/crisis-map"
 import { AnalyticsPanel } from "@/components/dashboard/analytics-panel"
 import { BroadcastPanel } from "@/components/dashboard/broadcast-panel"
-import { OperationalTimeline } from "@/components/dashboard/operational-timeline"
+import { SimulationControls, SimulationTimeline } from "@/components/dashboard/simulation-controls"
 import { Map, Bot, Shield, BarChart2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { mutate } from "swr"
@@ -42,6 +42,7 @@ export default function CrisisDashboard() {
   return (
     <div className="flex h-[100dvh] flex-col bg-[#080b0d]">
       <DashboardHeader />
+      <SimulationControls />
 
       {/* ── DESKTOP layout (lg+) ── */}
       <div className="hidden lg:flex flex-1 overflow-hidden">
@@ -63,7 +64,7 @@ export default function CrisisDashboard() {
         {/* Right sidebar — Resources + Broadcast */}
         <aside className="hidden w-72 shrink-0 border-l border-[#252b30] p-3 lg:block xl:w-80 overflow-y-auto">
           <div className="space-y-3">
-            <OperationalTimeline />
+            <SimulationTimeline />
             <ResourcesPanel />
             <BroadcastPanel />
           </div>
@@ -86,7 +87,7 @@ export default function CrisisDashboard() {
               <div className="h-[min(70dvh,38rem)] min-h-[24rem]">
                 <AIActivityLog />
               </div>
-              <OperationalTimeline />
+              <SimulationTimeline />
             </div>
           )}
 

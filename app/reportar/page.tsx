@@ -51,7 +51,6 @@ async function geocodeAddress(address: string): Promise<GeocodedLocation | null>
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?${params.toString()}`,
         {
-          signal: AbortSignal.timeout(5000),
           headers: {
             "User-Agent": "Zntinel-Dashboard/1.0 (crisis reporting)",
             "Accept-Language": "es",
@@ -116,13 +115,12 @@ export default function ReportarPage() {
             <p className="mt-1 text-xs text-emerald-300">
               Tu reporte fue recibido. Guardá el código de seguimiento para consultarlo cuando quieras.
             </p>
-            <p className="mt-2 text-xs text-zinc-400">{reportResult.txHash ? "Transacción de verificación confirmada en Stellar." : "Ubicación verificada localmente con una prueba ZK. No hay una transacción confirmada en Stellar."}</p>
             {reportResult.mailStatus && (
               <p className="mt-2 text-[11px] text-zinc-400">
                 {reportResult.mailStatus === "sent"
                   ? `📩 Enviado a ${reportResult.mailTo} — buscá el mail de Zntinel con tu hash y links.`
                   : reportResult.mailStatus === "failed"
-                    ? `⚠ No pudimos enviar el mail a ${reportResult.mailTo}. Guardá el código de seguimiento manualmente.`
+                    ? `⚠ No pudimos enviar el mail a ${reportResult.mailTo}. Guardá el hash de abajo manualmente.`
                     : null}
               </p>
             )}
@@ -331,7 +329,7 @@ export default function ReportarPage() {
             Indicá el lugar y describí la emergencia. Al enviarla volverás al mapa para verla en vivo.
             Tu dirección exacta no se mostrará en la vista pública.
           </p>
-          <p className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">El centro de control recibirá tu reporte. Si hay peligro inmediato, contactá al servicio local de emergencias.</p>
+          <p className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">Esto es una simulación: el reporte no convoca servicios de emergencia reales.</p>
         </div>
 
         {/* Form card */}

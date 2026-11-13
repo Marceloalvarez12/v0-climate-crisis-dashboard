@@ -1,23 +1,34 @@
 "use client"
 
-import { useEffect, useState, useRef, useMemo } from "react"
+import { useEffect, useState, useRef, useCallback, useMemo } from "react"
+import { useSWRConfig } from "swr"
 import { Bot, CheckCircle2, Hash } from "lucide-react"
 import useSWR from "swr"
 import { cn } from "@/lib/utils"
-import { fetcher } from "@/lib/api"
+import { dispatchResourceWithLifecycle } from "@/hooks/use-resource-lifecycle"
+import { patchIncidente, fetcher } from "@/lib/api"
 import { TRIGGER_HASHTAG } from "@/lib/agents/hashtag"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useStaffAccess } from "@/hooks/use-staff-access"
+import { toast } from "sonner"
 
 import type { ActivityItem } from "./ai-activity-log/types"
 import type { DbIncident } from "@/lib/types"
+import { initialActivities, backgroundMessages, agentTasks } from "./ai-activity-log/data"
 import { ActivityNode, activityTypeStyle, SeverityBadge } from "./ai-activity-log/activity-helpers"
 import { ReasoningPanel, ConfidenceBadge } from "./ai-activity-log/reasoning-panel"
-import { AlertActions } from "./ai-activity-log/alert-actions"
+import { AlertActions, ConfirmActionDialog } from "./ai-activity-log/alert-actions"
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Crea una ActivityItem con id y timestamp auto-generados */
+function makeActivity(
+  template: Omit<ActivityItem, "id" | "timestamp">,
+  extra?: Partial<ActivityItem>,
+): ActivityItem {
+  return { ...template, id: `${Date.now()}-${Math.random()}`, timestamp: new Date(), isNew: true, ...extra }
+}
 
 function incidentToActivity(incident: DbIncident): ActivityItem {
   const details = incident.fuente_detalles ?? {}
@@ -36,7 +47,6 @@ function incidentToActivity(incident: DbIncident): ActivityItem {
     severity: incident.severidad as ActivityItem["severity"],
     incidentId: incident.id,
     confidence: typeof analysis?.confidence === "number" ? analysis.confidence : undefined,
-    reasoning: typeof analysis?.reasoning === "string" ? [{ step: 1, thought: analysis.reasoning }] : undefined,
     sourcePost: social ? {
       platform: String(details.platform || "Red social"),
       author: String(details.username || "Usuario"),
@@ -53,19 +63,55 @@ const formatTime = (date: Date) =>
 // ---------------------------------------------------------------------------
 
 export function AIActivityLog() {
-  const { canOperate } = useStaffAccess()
-  const { data: activeIncidents, error: incidentError } = useSWR<DbIncident[]>("/api/incidentes?estado=activo", fetcher, { refreshInterval: 5000 })
-  const { data: agent, error: agentError } = useSWR<{ status: string; activeConnectors: number; lastScan?: string }>("/api/agent", fetcher, { refreshInterval: 10000 })
-  const { data: logs, error: logError } = useSWR<Array<{ id: string; created_at: string; type: ActivityItem["type"]; message: string; source: string }>>("/api/agent-logs", fetcher, { refreshInterval: 10000 })
-  const isRunning = agent?.status === "ready" && !agentError
-  const activities = useMemo((): ActivityItem[] => [
-    ...(activeIncidents ?? []).map(incidentToActivity),
-    ...(logs ?? []).map((log): ActivityItem => ({ ...log, timestamp: new Date(log.created_at) })),
-  ].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()).slice(-40), [activeIncidents, logs])
+  const [activities,          setActivities]         = useState<ActivityItem[]>(initialActivities)
+  const { data: activeIncidents } = useSWR<DbIncident[]>("/api/incidentes?estado=activo", fetcher, { refreshInterval: 5000 })
+  const { data: simulation } = useSWR<{ running: boolean; assignments: Array<{ incidentId: string }> }>("/api/simulacion", fetcher, { refreshInterval: 2000 })
+  const isRunning = simulation?.running === true
+  const [confirmDialog,       setConfirmDialog]       = useState<{ open: boolean; type: "deploy" | "notify"; activity: ActivityItem | null }>({ open: false, type: "deploy", activity: null })
   const [processedAlerts,     setProcessedAlerts]     = useState<Set<string>>(new Set())
   const [expandedReasoning,   setExpandedReasoning]   = useState<Set<string>>(new Set())
+  const [signalCount,         setSignalCount]         = useState(1284)
+  const [taskIndex,           setTaskIndex]           = useState(0)
+  const validatingSatellite: string | null = null
 
   const scrollRef          = useRef<HTMLDivElement>(null)
+  const seenIncidentsRef   = useRef<Set<string>>(new Set())
+  const messageIndexRef    = useRef(0)
+
+  const addActivity = useCallback((template: Omit<ActivityItem, "id" | "timestamp">) => {
+    setActivities((prev) => [...prev.slice(-20), makeActivity(template)])
+  }, [])
+
+  const { mutate } = useSWRConfig()
+
+  // ── Actividad de reportes reales ──────────────────────────────────────────
+  useEffect(() => {
+    if (!activeIncidents) return
+    const incoming = activeIncidents.filter(incident => !seenIncidentsRef.current.has(incident.id))
+    for (const incident of incoming) seenIncidentsRef.current.add(incident.id)
+    if (incoming.length) setActivities(prev => [...prev, ...incoming.map(incidentToActivity)].slice(-20))
+  }, [activeIncidents])
+
+  // ── Loop de mensajes de fondo (monitoring, extraction, etc.) ─────────────
+  useEffect(() => {
+    if (!isRunning) return
+    const interval = setInterval(() => {
+      const template = backgroundMessages[messageIndexRef.current % backgroundMessages.length]
+      addActivity(template)
+      messageIndexRef.current += 1
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [addActivity, isRunning])
+
+  // ── Telemetría del agente (contador de señales + tarea actual) ───────────
+  useEffect(() => {
+    if (!isRunning) return
+    const interval = setInterval(() => {
+      setSignalCount((n) => n + Math.floor(Math.random() * 6) + 1)
+      setTaskIndex((i) => (i + 1) % agentTasks.length)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [isRunning])
 
   // ── Auto-scroll ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -78,7 +124,7 @@ export function AIActivityLog() {
     return values.length ? Math.round(values.reduce((s, v) => s + v, 0) / values.length) : 0
   }, [activities])
 
-  const pendingAlerts = activities.filter(a => a.type === "alert" && a.actionable && !processedAlerts.has(a.id) && activeIncidents?.some(i => i.id === a.incidentId)).length
+  const pendingAlerts = activities.filter(a => a.type === "alert" && a.actionable && !processedAlerts.has(a.id) && activeIncidents?.some(i => i.id === a.incidentId) && !simulation?.assignments.some(assignment => assignment.incidentId === a.incidentId)).length
 
   // ── Handlers de interacción ───────────────────────────────────────────────
 
@@ -92,6 +138,40 @@ export function AIActivityLog() {
       }
       return next
     })
+  }
+
+  const handleValidateSatellite = () => {
+    toast.info("No hay un proveedor de verificación satelital conectado. Consultá las cámaras y fuentes del incidente.")
+  }
+
+  const confirmAction = async () => {
+    if (!confirmDialog.activity) return
+    const { id: activityId, location = "", incidentId } = confirmDialog.activity
+    setConfirmDialog(prev => ({ ...prev, open: false, activity: null }))
+    if (confirmDialog.type !== "deploy") {
+      toast.info("La notificación automática no está configurada. Usá el canal operativo de comunicación.")
+      return
+    }
+    try {
+      if (!incidentId) throw new Error("La alerta no tiene un incidente asociado")
+      const incidentes: DbIncident[] = await fetcher("/api/incidentes?estado=activo")
+      const incidente = incidentes.find(inc => inc.id === incidentId)
+      if (!incidente) throw new Error("El incidente ya no está activo. Actualizá la vista.")
+      await dispatchResourceWithLifecycle(incidente.id)
+      await patchIncidente(incidente.id, { estado: "atendido" })
+      setProcessedAlerts(prev => new Set(prev).add(activityId))
+      toast.success("Recursos despachados", { description: location })
+      addActivity({ type: "complete", source: "Despacho", message: "Despacho confirmado para " + location })
+      const response = await fetch("/api/incidentes/arkiv-dispatch", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: incidente.id }),
+      })
+      const data = await response.json()
+      if (!response.ok || data.onChain !== true) toast.info("Despacho registrado; auditoría en cadena no confirmada")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo confirmar el despacho")
+    } finally {
+      await Promise.allSettled([mutate("/api/recursos"), mutate("/api/incidentes?estado=activo"), mutate("/api/incidentes?estado=atendido"), mutate("/api/analytics")])
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -112,7 +192,7 @@ export function AIActivityLog() {
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-[13px] font-semibold leading-tight tracking-tight text-foreground">Agente IA</h2>
-            <p className="text-[10px] leading-tight text-slate-300">{agentError || incidentError || logError ? "Conexión o registros no disponibles" : isRunning ? "Habilitado · esperando eventos reales" : "Deshabilitado o sin conectores"}</p>
+            <p className="text-[10px] leading-tight text-slate-300">Monitoreo simulado · Gran Tucumán</p>
           </div>
           <span className="inline-flex h-5 shrink-0 items-center gap-0.5 rounded-md border border-sky-500/30 bg-sky-500/10 px-1.5 font-mono text-[9px] text-sky-300" title="Hashtag monitoreado">
             <Hash className="h-2.5 w-2.5" />
@@ -122,17 +202,17 @@ export function AIActivityLog() {
 
         {/* Telemetría */}
         <div className="mt-3 grid grid-cols-3 divide-x divide-border rounded-md border border-border bg-background/40">
-          <Metric label="Reportes" value={activeIncidents ? activeIncidents.length.toLocaleString("es-AR") : "—"} />
-          <Metric label="Conectores" value={agent ? String(agent.activeConnectors) : "—"} />
+          <Metric label="Señales" value={signalCount.toLocaleString("es-AR")} />
+          <Metric label="Fuentes" value="7" />
           <Metric label="Confianza" value={avgConfidence ? `${avgConfidence}%` : "—"} />
         </div>
-        <p className="mt-1.5 text-[10px] text-muted-foreground">Registros reales. Confianza media de los análisis disponibles.</p>
+        <p className="mt-1.5 text-[10px] text-muted-foreground">Actividad y métricas ilustrativas; no son búsquedas reales.</p>
 
         {/* Tarea actual */}
         <div className="mt-2.5">
           <div className="flex items-center justify-between text-[10px]">
-            <span className="break-words text-foreground/80">
-              {agent?.lastScan ? `Último escaneo: ${new Date(agent.lastScan).toLocaleString("es-AR")}` : "Sin escaneos confirmados"}
+            <span key={taskIndex} className="truncate text-foreground/80 animate-in fade-in duration-500">
+              {isRunning ? `${agentTasks[taskIndex]}…` : "Conectando con el monitoreo"}
             </span>
             {pendingAlerts > 0 && (
               <span className="ml-2 shrink-0 font-mono text-red-400">{pendingAlerts} pendiente{pendingAlerts === 1 ? "" : "s"}</span>
@@ -150,10 +230,9 @@ export function AIActivityLog() {
           <div className="relative px-3 py-3">
             <div className="absolute top-3 bottom-3 left-[23px] w-px bg-gradient-to-b from-transparent via-border to-border" />
             <ul className="space-y-1">
-              {activities.length === 0 && <li className="p-3 text-xs text-slate-400">Sin actividad registrada.</li>}
               {activities.map((activity) => {
                 const isProcessed     = processedAlerts.has(activity.id)
-                const showActions     = canOperate && activity.actionable && activity.type === "alert" && !isProcessed && activeIncidents?.some(i => i.id === activity.incidentId)
+                const showActions     = activity.actionable && activity.type === "alert" && !isProcessed && !isRunning && activeIncidents?.some(i => i.id === activity.incidentId) && !simulation?.assignments.some(assignment => assignment.incidentId === activity.incidentId)
                 const isReasoningOpen = expandedReasoning.has(activity.id)
                 const style           = activityTypeStyle(activity.type)
 
@@ -188,7 +267,7 @@ export function AIActivityLog() {
                       )}
 
                       {activity.sourcePost && (
-                        <p className="mt-1 break-words text-[10px] text-muted-foreground">
+                        <p className="mt-1 truncate text-[10px] text-muted-foreground">
                           <span className="font-mono text-sky-400">{activity.sourcePost.hashtag}</span>
                           {" · "}{activity.sourcePost.author} en {activity.sourcePost.platform}
                         </p>
@@ -197,13 +276,16 @@ export function AIActivityLog() {
                       <ReasoningPanel
                         activity={activity}
                         isExpanded={isReasoningOpen}
+                        validatingSatellite={validatingSatellite}
                         onToggle={() => toggleReasoning(activity.id)}
+                        onValidateSatellite={handleValidateSatellite}
                       />
 
                       {showActions && (
                         <AlertActions
                           activity={activity}
-                          onDeploy={(a) => { if (a.incidentId) window.location.assign(`/?incidente=${encodeURIComponent(a.incidentId)}`) }}
+                          onDeploy={(a) => setConfirmDialog({ open: true, type: "deploy", activity: a })}
+                          onNotify={(a) => setConfirmDialog({ open: true, type: "notify", activity: a })}
                           onDismiss={(id) => setProcessedAlerts((prev) => new Set(prev).add(id))}
                         />
                       )}
@@ -211,7 +293,7 @@ export function AIActivityLog() {
                       {isProcessed && activity.actionable && (
                         <div className="mt-1.5 flex items-center gap-1">
                           <CheckCircle2 className="h-3 w-3 text-emerald-400" />
-                          <span className="text-[10px] text-emerald-400">Revisada en esta vista</span>
+                          <span className="text-[10px] text-emerald-400">Acción tomada</span>
                         </div>
                       )}
                     </div>
@@ -230,11 +312,15 @@ export function AIActivityLog() {
             <span key={delay} className={cn("h-1 w-1 rounded-full bg-violet-400", isRunning && "animate-bounce")} style={{ animationDelay: `${delay}ms` }} />
           ))}
         </span>
-        {agentError || logError ? "Registros no disponibles" : "Actividad operativa"}
+        {isRunning ? "Actividad simulada en curso" : "Conectando con el sistema"}
         <span className="ml-auto font-mono text-muted-foreground/60">zntinel-reasoner</span>
       </div>
 
-
+      <ConfirmActionDialog
+        state={confirmDialog}
+        onChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
+        onConfirm={confirmAction}
+      />
     </div>
   )
 }

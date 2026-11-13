@@ -22,19 +22,20 @@ import type { ActivityItem } from "./types"
 interface AlertActionsProps {
   activity:   ActivityItem
   onDeploy:   (activity: ActivityItem) => void
+  onNotify:   (activity: ActivityItem) => void
   onDismiss:  (id: string) => void
 }
 
-export function AlertActions({ activity, onDeploy, onDismiss }: AlertActionsProps) {
+export function AlertActions({ activity, onDeploy, onNotify, onDismiss }: AlertActionsProps) {
   return (
     <div className="mt-2 flex items-center gap-1.5">
       <Button size="sm" className="h-6 gap-1 px-2 text-[10px]" onClick={() => onDeploy(activity)}>
         <Rocket className="h-3 w-3" />
-        Ver incidente
+        Despachar
       </Button>
-      <Button size="sm" variant="outline" disabled title="No hay un canal de notificación configurado" className="h-6 gap-1 px-2 text-[10px]">
+      <Button size="sm" variant="outline" className="h-6 gap-1 px-2 text-[10px]" onClick={() => onNotify(activity)}>
         <Bell className="h-3 w-3" />
-        Avisos sin conectar
+        Notificar
       </Button>
       <Button
         size="sm"

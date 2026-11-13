@@ -1,6 +1,6 @@
 "use client"
 
-import { Sparkles, Zap, CheckCircle2, Satellite, ChevronDown, Target } from "lucide-react"
+import { Sparkles, Zap, CheckCircle2, Loader2, Satellite, ChevronDown, Target } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ActivityItem } from "./types"
 
@@ -11,13 +11,17 @@ import type { ActivityItem } from "./types"
 interface ReasoningPanelProps {
   activity:           ActivityItem
   isExpanded:         boolean
+  validatingSatellite: string | null
   onToggle:           () => void
+  onValidateSatellite: (id: string) => void
 }
 
 export function ReasoningPanel({
   activity,
   isExpanded,
+  validatingSatellite,
   onToggle,
+  onValidateSatellite,
 }: ReasoningPanelProps) {
   if (!activity.reasoning?.length) return null
 
@@ -61,7 +65,16 @@ export function ReasoningPanel({
           </ol>
 
           {activity.confidence && activity.confidence < 98 && (
-            <p className="mt-2.5 flex items-center gap-1.5 text-[10px] text-slate-400"><Satellite className="h-3 w-3" />Verificación satelital sin proveedor conectado</p>
+            <button
+              type="button"
+              className="mt-2.5 flex h-7 w-full items-center justify-center gap-1.5 rounded-md border border-sky-500/25 bg-sky-500/5 text-[10px] font-medium text-sky-400 transition-colors hover:bg-sky-500/10 disabled:opacity-60"
+              onClick={() => onValidateSatellite(activity.id)}
+              disabled={validatingSatellite === activity.id}
+            >
+              {validatingSatellite === activity.id
+                ? <><Loader2 className="h-3 w-3 animate-spin" /> Consultando Sentinel-2…</>
+                : <><Satellite className="h-3 w-3" /> Validar con imagen satelital</>}
+            </button>
           )}
         </div>
       )}

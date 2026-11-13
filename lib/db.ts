@@ -1,11 +1,14 @@
 /**
  * lib/db.ts
  *
- * Datos operativos persistentes de Neon/PostgreSQL. Sin credenciales falla
- * explícitamente; nunca inventa datos en memoria.
+ * Capa de acceso a datos dual:
+ *   - Si `.env.local` define NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+ *     → usa Supabase (PostgreSQL real, mismo schema que el repo PMV).
+ *   - Si no → usa el store en memoria de `lib/mock-db.ts`, con datos
+ *     simulados precargados (incidentes, recursos, config, perfiles demo).
  *
  * Toda la aplicación pasa por `getDb()`; ninguna ruta o servicio debería
- * acceder a la conexión directamente.
+ * importar `@/lib/supabase` directamente.
  */
 
 import type { DbIncident, DbResource } from "./types"
@@ -27,7 +30,7 @@ export interface ListIncidentsOptions {
 }
 
 export interface DataStore {
-  mode: "neon"
+  mode: "supabase" | "memory"
 
   // ── Incidentes ──────────────────────────────────────────────────────────
   listIncidents(opts?: ListIncidentsOptions): Promise<DbIncident[]>
@@ -40,10 +43,10 @@ export interface DataStore {
   insertIncident(row: Omit<DbIncident, "id">): Promise<DbIncident>
   updateIncident(id: string, updates: Partial<DbIncident>): Promise<DbIncident | null>
   deleteIncident(id: string): Promise<void>
+  deleteSimulatedIncidents(estado?: "activo" | "atendido"): Promise<number>
 
   // ── Recursos ────────────────────────────────────────────────────────────
   listResources(): Promise<DbResource[]>
-  listIncidentResources(incidentId: string): Promise<Array<Pick<DbResource, "estado">>>
   findResourceById(id: string): Promise<DbResource | null>
   insertResource(row: Omit<DbResource, "id">): Promise<DbResource>
   /** requireEstado implementa el compare-and-set del despacho (409 si está tomado) */
@@ -60,23 +63,24 @@ export interface DataStore {
   updateProfile(id: string, updates: { rol?: string; status?: string }): Promise<void>
   resetUserPassword(id: string, redirectTo?: string): Promise<void>
   getAssignments(operadorId: string): Promise<string[]>
-  replaceAssignments(actorId: string, operadorId: string, resourceIds: string[]): Promise<void>
-  listAgentEvents(limit?: number): Promise<Array<{ id: string; type: string; message: string; source: string; created_at: string }>>
-  recordAgentEvent(type: string, message: string, source: string): Promise<void>
-  lastAgentScan(): Promise<string | null>
+  replaceAssignments(operadorId: string, recursoIds: string[]): Promise<void>
+  logAudit(accion: string, detalle: Record<string, unknown>): Promise<void>
 }
 
-export function hasDatabaseConfig(): boolean {
-  return Boolean(process.env.DATABASE_URL)
+export function hasSupabaseConfig(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
 }
 
 let cached: DataStore | null = null
 
 export async function getDb(): Promise<DataStore> {
   if (cached) return cached
-  if (hasDatabaseConfig()) {
-    const { neonDb } = await import("./db-neon")
-    cached = neonDb
-  } else throw new Error("Base de datos no configurada")
+  if (hasSupabaseConfig()) {
+    const { supabaseDb } = await import("./db-supabase")
+    cached = supabaseDb
+  } else {
+    const { memoryDb } = await import("./mock-db")
+    cached = memoryDb
+  }
   return cached
 }

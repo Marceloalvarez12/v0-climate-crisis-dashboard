@@ -4,6 +4,7 @@ const LEGACY_PERSISTENCE_KEY = "crisis-dashboard-resource-timers"
 
 /** Dispatch changes only the operational state confirmed by the server.
  * Arrival and release require an explicit operator action, never a timer.
+ * The development simulation panel manages its own simulated lifecycle.
  */
 export async function dispatchResourceWithLifecycle(
   incidenteId?: string,

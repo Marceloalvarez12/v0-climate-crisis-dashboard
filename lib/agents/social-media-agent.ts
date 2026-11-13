@@ -15,7 +15,7 @@
  *     ├── XConnector          (requiere X_BEARER_TOKEN)
  *     ├── FacebookConnector   (requiere FACEBOOK_ACCESS_TOKEN)
  *     ├── InstagramConnector  (requiere INSTAGRAM_ACCESS_TOKEN)
- *     └── ingestSocialPost    (filtro de hashtag → OpenRouter/Gemini/reglas → PostgreSQL)
+ *     └── ingestSocialPost    (filtro de hashtag → OpenRouter/Gemini/reglas → Supabase)
  */
 
 import { randomUUID } from "crypto"

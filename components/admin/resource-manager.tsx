@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils"
 import { ResourceFormModal } from "./resource-form-modal"
 import { toast } from "sonner"
-import { groupResourcesByTypeAndBase, getTipoLabel } from "@/lib/resource-helpers"
+import { groupResourcesByTypeAndBase, getTipoLabel, calculateEstado } from "@/lib/resource-helpers"
 import type { DbResource } from "@/lib/types"
 
 const RESOURCE_ICONS: Record<string, React.ReactNode> = {
@@ -39,16 +39,15 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  available: "Disponible",
-  dispatched: "En camino",
-  busy: "En servicio",
-  retired: "Retirado",
+  available: "Available",
+  dispatched: "En Route",
+  busy: "Occupied",
+  retired: "Retired",
 }
 
 export function ResourceManager() {
   const [resources, setResources] = useState<DbResource[]>([])
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [showFormModal, setShowFormModal] = useState(false)
   const [editResource, setEditResource] = useState<DbResource | null>(null)
@@ -57,15 +56,14 @@ export function ResourceManager() {
 
   const loadResources = useCallback(async () => {
     setLoading(true)
-    setLoadError("")
     try {
       const res = await fetch("/api/recursos")
       if (res.ok) {
         const data = await res.json()
         setResources(Array.isArray(data) ? data : [])
-      } else throw new Error("No se pudieron cargar los recursos")
+      }
     } catch {
-      setLoadError("No se pudieron cargar los recursos. La información anterior puede estar desactualizada.")
+      setResources([])
     } finally {
       setLoading(false)
     }
@@ -100,17 +98,16 @@ export function ResourceManager() {
   }
 
   const handleDelete = async (resource: DbResource) => {
-    if (!confirm(`Retirar "${resource.nombre}" del sistema?`)) return
+    if (!confirm(`Remove "${resource.nombre}" from system?`)) return
 
     setDeletingId(resource.id)
     try {
       const res = await fetch(`/api/recursos?id=${resource.id}`, { method: "DELETE" })
       if (res.ok) {
         setResources((prev) => prev.filter((r) => r.id !== resource.id))
-        toast.success("Recurso retirado")
+        toast.success("Resource removed from system")
       } else {
-        const body = await res.json()
-        toast.error(body.error || "No se pudo retirar el recurso")
+        toast.error("Error removing resource")
       }
     } catch {
       toast.error("Error de conexión")
@@ -123,7 +120,7 @@ export function ResourceManager() {
     setShowFormModal(false)
     setEditResource(null)
     loadResources()
-    toast.success(editResource ? "Recurso actualizado" : "Recurso creado")
+    toast.success(editResource ? "Resource updated" : "Resource created")
   }
 
   const openEdit = (resource: DbResource) => {
@@ -138,58 +135,56 @@ export function ResourceManager() {
 
   const stats = {
     total: resources.reduce((sum, r) => sum + (r.cantidad || 1), 0),
-    available: resources.filter(r => r.estado === "available").reduce((sum, r) => sum + (r.cantidad_disponible ?? (r.cantidad || 1)), 0),
-    dispatched: resources.filter((r) => r.estado === "dispatched").reduce((sum, r) => sum + (r.cantidad || 1), 0),
+    available: resources.reduce((sum, r) => sum + (r.cantidad_disponible ?? (r.cantidad || 1)), 0),
+    dispatched: resources.filter((r) => r.estado === "dispatched").reduce((sum, r) => sum + ((r.cantidad || 1) - (r.cantidad_disponible ?? (r.cantidad || 1))), 0),
     busy: resources.filter((r) => r.estado === "busy").reduce((sum, r) => sum + (r.cantidad || 1), 0),
   }
 
   return (
-    <div className="flex flex-col h-full rounded-xl border border-[#30373e] bg-[#11161a] overflow-hidden">
-      {loadError && <div role="alert" className="border-b border-red-400/20 p-4 text-sm text-red-300">{loadError}<button onClick={() => void loadResources()} className="ml-2 underline">Reintentar</button></div>}
+    <div className="flex flex-col h-full rounded-xl border border-zinc-800 bg-zinc-950/80 backdrop-blur-sm overflow-hidden">
       <div className="flex items-center gap-3 border-b border-zinc-800 px-6 py-4">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10">
           <Truck className="h-5 w-5 text-orange-400" />
         </div>
         <div>
           <h2 className="text-sm font-semibold text-zinc-100">
-            Gestión de recursos
+            Resource Management
           </h2>
           <p className="text-[11px] text-zinc-500">
-            Unidades, vehículos y equipamiento
+            Manage units, vehicles and equipment
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 px-4 py-3 border-b border-zinc-800/50 bg-zinc-900/20 sm:flex sm:flex-wrap sm:px-6">
+      <div className="flex items-center gap-4 px-6 py-3 border-b border-zinc-800/50 bg-zinc-900/20">
         <div className="flex items-center gap-1.5">
           <div className="h-2 w-2 rounded-full bg-emerald-500" />
           <span className="text-[10px] text-zinc-500 font-mono">
-            {stats.available} disponibles
+            {stats.available} available
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="h-2 w-2 rounded-full bg-yellow-500" />
           <span className="text-[10px] text-zinc-500 font-mono">
-            {stats.dispatched} en camino
+            {stats.dispatched} en route
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="h-2 w-2 rounded-full bg-red-500" />
           <span className="text-[10px] text-zinc-500 font-mono">
-            {stats.busy} en servicio
+            {stats.busy} occupied
           </span>
         </div>
-        <span className="text-[10px] text-slate-400 font-mono sm:ml-auto">
+        <span className="text-[10px] text-zinc-600 font-mono ml-auto">
           Total: {stats.total}
         </span>
       </div>
 
-      <div className="flex flex-col gap-3 px-4 py-4 border-b border-zinc-800/50 sm:flex-row sm:items-center sm:px-6">
-        <div className="relative min-w-0 flex-1">
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-zinc-800/50">
+        <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600" />
           <input
             type="text"
-            aria-label="Buscar recursos"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar por nombre, tipo o ubicación..."
@@ -198,10 +193,10 @@ export function ResourceManager() {
         </div>
         <button
           onClick={openCreate}
-          className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-sky-300 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-sky-200"
+          className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500 active:scale-95 transition-all"
         >
           <Plus className="h-4 w-4" />
-          Crear recurso
+          Add Resource
         </button>
       </div>
 
@@ -214,7 +209,7 @@ export function ResourceManager() {
         ) : filteredGroups.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-zinc-600">
             <Truck className="h-8 w-8 mb-2" />
-            <p className="text-sm">No se encontraron recursos</p>
+            <p className="text-sm">No resources found</p>
             <p className="text-xs mt-1">
               {searchQuery ? "Try a different search term" : "Add a new resource to get started"}
             </p>
@@ -238,7 +233,7 @@ export function ResourceManager() {
                       {RESOURCE_ICONS[group.tipo] || <Truck className="h-4 w-4" />}
                     </div>
                     <div className="flex-1 min-w-0 text-left">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold text-zinc-200">
                           {getTipoLabel(group.tipo)}
                         </span>
@@ -256,13 +251,13 @@ export function ResourceManager() {
                           {disponible}/{total}
                         </span>
                         <span className="text-[10px] text-zinc-600">
-                          {disponible === total ? "disponibles" :
-                           disponible > 0 ? `${total - disponible} en servicio` : "sin disponibilidad"}
+                          {disponible === total ? "available" :
+                           disponible > 0 ? `${total - disponible} in use` : "all occupied"}
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <div className="hidden w-16 h-1.5 bg-zinc-800 rounded-full overflow-hidden sm:block">
+                      <div className="w-16 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                         <div
                           className={cn(
                             "h-full rounded-full transition-all",
@@ -283,10 +278,10 @@ export function ResourceManager() {
                   {isExpanded && (
                     <div className="border-t border-zinc-800/50">
                       {group.resources.map((resource) => {
-                        const rDisponible = resource.estado === "available" ? resource.cantidad_disponible ?? (resource.cantidad || 1) : 0
+                        const rDisponible = resource.cantidad_disponible ?? (resource.cantidad || 1)
                         const rTotal = resource.cantidad || 1
                         const rPercent = rTotal > 0 ? (rDisponible / rTotal) * 100 : 0
-                        const rEstado = resource.estado
+                        const rEstado = calculateEstado(rTotal, rDisponible)
 
                         return (
                           <div key={resource.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-zinc-800/30 last:border-b-0 hover:bg-zinc-800/20 transition-colors">
@@ -334,15 +329,15 @@ export function ResourceManager() {
                               <button
                                 onClick={() => openEdit(resource)}
                                 className="p-1 rounded text-zinc-500 hover:text-cyan-400 hover:bg-zinc-800 transition-colors"
-                                title="Editar recurso"
+                                title="Edit"
                               >
                                 <Edit className="h-3.5 w-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDelete(resource)}
-                                disabled={deletingId === resource.id || resource.estado !== "available" || !!resource.incidente_id}
+                                disabled={deletingId === resource.id}
                                 className="p-1 rounded text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors disabled:opacity-30"
-                                title="Retirar recurso"
+                                title="Remove"
                               >
                                 {deletingId === resource.id ? (
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

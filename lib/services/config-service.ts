@@ -1,6 +1,7 @@
 // Lectura de config_sistema con fallback tolerante: si el store no tiene
 // la clave devuelve null y el caller usa su default. Cache corto para no
-// golpear la base por cada ingest. Configuración ausente falla cerrada.
+// golpear la base por cada ingest. En modo memoria el store ya viene
+// sembrado con agent_mode/autonomous = true (ver lib/mock-db.ts).
 const CACHE_TTL_MS = 10_000
 const cache = new Map<string, { value: unknown; at: number }>()
 

@@ -1,21 +1,40 @@
-import { headers } from "next/headers"
-import { getAuth } from "./auth-server"
-import { getPool } from "./postgres"
-import type { Perfil } from "./db"
+/**
+ * lib/auth.ts
+ *
+ * Stub de autenticación: esta build corre SIN login (modo simulación).
+ * `requireStaff` devuelve siempre un perfil admin demo para que las rutas
+ * y páginas protegidas funcionen igual que con una sesión real.
+ * `auditAdmin` persiste la acción en el store (memoria o auditoria_admin
+ * si hay Supabase configurado).
+ */
+
+import { getDb } from "@/lib/db"
+import type { Perfil } from "@/lib/db"
 
 export type StaffRole = "admin" | "operador" | "agente_ia" | "visualizador"
-export async function getStaffProfile(id: string): Promise<Perfil | null> {
-  return (await getPool().query("SELECT id,nombre,rol,status FROM perfiles WHERE id=$1", [id])).rows[0] ?? null
+
+const DEMO_USER_ID = "00000000-0000-4000-8000-000000000001"
+
+const DEMO_PROFILE: Perfil = {
+  id: DEMO_USER_ID,
+  nombre: "Operador Demo",
+  rol: "admin",
+  status: "activo",
 }
-export async function requireStaff(role?: StaffRole) {
-  const session = await getAuth().api.getSession({ headers: await headers() })
-  if (!session) throw new Error("No autorizado")
-  const profile = await getStaffProfile(session.user.id)
-  if (!profile || profile.status !== "activo") throw new Error("Acceso denegado")
-  if (role && profile.rol !== role) throw new Error("Permisos insuficientes")
-  return { user: session.user, profile }
+
+export async function requireStaff(_role?: StaffRole) {
+  return {
+    client: null,
+    user: { id: DEMO_USER_ID, email: "demo@zntinel.local" },
+    profile: DEMO_PROFILE,
+  }
 }
-export async function auditAdmin(accion: string, detalle: Record<string, unknown>) {
-  const { user } = await requireStaff("admin")
-  await getPool().query("INSERT INTO auditoria_admin(admin_id,accion,detalle) VALUES($1,$2,$3)", [user.id, accion, JSON.stringify(detalle)])
+
+export async function auditAdmin(
+  _client: unknown,
+  accion: string,
+  detalle: Record<string, unknown>,
+) {
+  const db = await getDb()
+  await db.logAudit(accion, { ...detalle, ejecutado_por: DEMO_PROFILE.nombre })
 }

@@ -246,7 +246,7 @@ export default function SeguimientoPage() {
                 <>
                   <p className="text-zinc-300">
                     {audit.stellarZk.verified
-                      ? "La prueba Groth16 confirma que la ubicación está dentro de la zona habilitada para reportes."
+                      ? "La prueba Groth16 confirma que la ubicación está dentro de la zona habilitada para esta demostración."
                       : "Verificación pendiente o fallida."}
                   </p>
                   {!audit.stellarZk.onChain ? (

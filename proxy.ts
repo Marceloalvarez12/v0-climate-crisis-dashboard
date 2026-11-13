@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getAuth } from "@/lib/auth-server"
-import { getStaffProfile } from "@/lib/auth"
-import { timingSafeEqual } from "node:crypto"
-import { isPublicPath, isServicePath, roleCanAccess } from "@/lib/access-policy"
 import { checkRateLimit, RateLimitUnavailableError, type RateLimitResult } from "@/lib/rate-limit"
 import { CONFIG } from "@/lib/config"
 
 /**
- * Sesión verificada y perfil activo para el centro operativo.
+ * Proxy (Next.js 16): build sin login. Todo es público — el gatekeeper sólo
+ * aplica límite de tamaño de body y rate limiting a las APIs.
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const isApi = pathname.startsWith("/api/")
-  if (isApi) {
+  if (!pathname.startsWith("/api/")) return NextResponse.next()
 
   const contentLength = request.headers.get("content-length")
   if (contentLength && /^\d+$/.test(contentLength) && Number(contentLength) > CONFIG.HTTP.MAX_API_BODY_BYTES) {
@@ -43,28 +39,7 @@ export async function proxy(request: NextRequest) {
     if (!(error instanceof RateLimitUnavailableError)) throw error
     return NextResponse.json({ error: "Protección de solicitudes temporalmente no disponible" }, { status: 503, headers: { "Retry-After": "5" } })
   }
-  }
-  if (isPublicPath(pathname, request.method)) return NextResponse.next()
-  const supplied = request.headers.get("x-api-secret")
-  const configured = process.env.API_SECRET
-  if (isServicePath(pathname) && supplied && configured) {
-    const a = Buffer.from(supplied), b = Buffer.from(configured)
-    if (a.length === b.length && timingSafeEqual(a, b)) return NextResponse.next()
-  }
-  const response = NextResponse.next()
-  try {
-    const session = await getAuth().api.getSession({ headers: request.headers })
-    if (!session) return isApi ? NextResponse.json({ error: "No autorizado" }, { status: 401 })
-      : NextResponse.redirect(new URL("/login", request.url))
-    const profile = await getStaffProfile(session.user.id)
-    if (!profile || profile.status !== "activo" || !roleCanAccess(pathname, request.method, profile.rol)) return isApi
-      ? NextResponse.json({ error: "Acceso denegado" }, { status: 403 })
-      : NextResponse.redirect(new URL("/login?error=forbidden", request.url))
-    return response
-  } catch {
-    return isApi ? NextResponse.json({ error: "Autenticación temporalmente no disponible" }, { status: 503 })
-      : NextResponse.redirect(new URL("/login?error=unavailable", request.url))
-  }
+  return NextResponse.next()
 }
 
 export const config = {
